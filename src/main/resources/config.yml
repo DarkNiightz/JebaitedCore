@@ -1,0 +1,99 @@
+# Core Plugin Configuration
+
+# Rank Colors (Minecraft color codes: &a for green, etc.)
+ranks:
+  default: '&a'  # Green
+  friend: '&d'   # Pink
+  vip: '&5'      # Purple
+  moderator: '&c'  # Red
+  srmoderator: '&4'  # Dark red
+  admin: '&4&l'    # Dark red bold
+  # Developer rainbow is hardcoded (no single color)
+
+# Messages (customize text/colors)
+messages:
+  muted: '&cYou''ve been muted!'
+  unmuted: '&aYou''ve been unmuted!'
+  killed: '&cYou were killed by staff.'
+  kicked: 'Kicked for chat issue by staff.'
+  banned: 'Banned for chat violation by staff.'
+  broadcast-prefix: '&9[&4GLOBAL&9] &b&l'  # Prefix for /broadcast messages
+  staff-chat-prefix: '&b[Staff] &f'     # Prefix for /sc messages
+
+# Logging Toggles
+logging:
+  enable: true
+  log-joins: true
+  log-chat: true
+  log-moderation: true  # Mutes, kicks, etc.
+
+# Other
+staff-message-color: '&b'  # Already set, but configurable if you want changes
+
+# Moderation
+moderation:
+  reasons:
+    - hacking
+    - griefing
+    - chat violation
+    - being a cock
+  times:
+    - 30m
+    - 1h
+    - 1d
+    - 7d
+    - permanent
+
+# Pets
+pets:
+  types:
+    - dog
+    - cat
+    - parrot
+  staff_types:
+    - guardian
+    - flying_dragon
+  feed_item: BONE  # Material to feed for level up
+
+# MOTD Settings
+motd:
+  enabled: true
+  server-list: |  # Multi-line for server browser
+    &6Jebaited Server
+    &aPlayers: {online}/{max}
+  player-join:  # List for multi-line on join
+    - "&eWelcome back, {player}!"
+    - "&aYour rank: {rank}"
+    - "&bOnline: {online} players"
+
+# Auto Broadcaster
+broadcaster:
+  enabled: true
+  interval-seconds: 300  # Every 5 mins
+  messages:
+    - "&eTip: Don't forget to vote for rewards!"
+    - "&aJoin our Discord: discord.gg/jebaited"
+    - "&bServer rules: No griefing!"
+
+# BossBar
+bossbar:
+  messages:
+    - "Welcome to Jebaited!"
+    - "This is a test"
+    - "Another Config TesTTTTTT"
+
+# Join/Quit Messages
+join-quit:
+  join: "&a{player} ({rank}) joined the server!"
+  quit: "&c{player} ({rank}) left the server."
+
+# Teleport
+teleport:
+  permission-message: "&cNo permission to teleport!"
+
+  # Spawn Settings
+  spawn:
+    location: null  # Auto-set by /setspawn (world:x:y:z:yaw:pitch)
+    message: "&aTeleported to spawn!"
+    set-message: "&aSpawn set at your location!"
+    no-permission: "&cNo permission!"

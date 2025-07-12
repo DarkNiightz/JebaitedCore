@@ -1,0 +1,109 @@
+name: Core
+main: com.darkniightz.main.Core
+version: 1.0
+api-version: 1.21
+author: DarkNiightz
+description: Jebaited Core Plugin.
+
+commands:
+  mute:
+    description: Mutes a player from chatting.
+    usage: /mute <player>
+    permission: core.staff
+  unmute:
+    description: Unmutes a previously muted player.
+    usage: /unmute <player>
+    permission: core.staff
+  core:
+    description: Manages the Core plugin (reload/restart).
+    usage: /core <reload|restart>
+  corekill:
+    description: Kills a player (with hierarchy check).
+    usage: /corekill <player>
+    permission: core.staff
+  corekick:
+    description: Kicks a player for chat issue (with hierarchy check).
+    usage: /corekick <player>
+    permission: core.staff
+  coreban:
+    description: Bans a player for chat violation (with hierarchy check).
+    usage: /coreban <player>
+    permission: core.staff
+  broadcast:
+    description: Broadcasts a message to the server.
+    usage: /broadcast <message>
+    permission: core.broadcast
+  sc:
+    description: Sends a message to staff chat.
+    usage: /sc <message>
+    permission: core.staff
+  setrank:
+    description: Sets a player's rank.
+    usage: /setrank <player> <rank>
+    permission: core.admin
+  tp:
+    description: Teleports to a player or coordinates.
+    usage: /tp <player> or /tp <x> <y> <z>
+    permission: core.teleport
+  help:
+    description: Shows a paginated list of Core commands.
+    usage: /help [page]
+  spawn:
+    description: Teleports to the server spawn.
+    usage: /spawn
+    permission: core.spawn
+  setspawn:
+      description: Sets the server spawn at your location.
+      usage: /setspawn
+      permission: core.setspawn
+  fly:
+      description: Toggles flight for yourself or another player.
+      usage: /fly [player]
+      permission: core.fly.self
+  gamemode:
+      description: Changes gamemode for yourself or another player.
+      usage: /gamemode <mode> [player]
+      permission: core.gamemode.self
+  unban:
+      description: Unbans a player.
+      usage: /unban <player>
+      permission: core.staff
+
+permissions:
+  core.staff:
+    description: Allows staff features like moderating and staff chat.
+    default: op
+  core.admin:
+    description: Allows admin features like setting ranks.
+    default: op
+  core.broadcast:
+    description: Allows broadcasting messages.
+    default: op
+  core.reload:
+    description: Allows reloading the plugin.
+    default: op
+  core.restart:
+    description: Allows restarting the server.
+    default: op
+  core.teleport:
+    description: Allows using /tp command.
+    default: op
+  core.spawn:
+    description: Allows using /spawn.
+    default: true  # Everyone can spawn
+  core.setspawn:
+      description: Allows using /setspawn.
+      default: op
+  core.fly.self:
+      description: Allows toggling your own flight.
+      default: op
+  core.fly.others:
+      description: Allows toggling flight for others.
+      default: op
+  core.gamemode.self:
+      description: Allows changing your own gamemode.
+      default: op
+  core.gamemode.others:
+      description: Allows changing gamemode for others.
+      default: op
+  # Removed rank perms since now using RankManager
