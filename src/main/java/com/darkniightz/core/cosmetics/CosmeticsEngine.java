@@ -53,8 +53,8 @@ public class CosmeticsEngine {
     private void spawnParticleForKey(Player p, String key) {
         Particle particle = switch (key) {
             case "ember_sparks" -> Particle.FLAME;
-            case "leaf_whirl" -> Particle.HAPPY_VILLAGER;
-            case "aqua_bubbles" -> Particle.WATER_BUBBLE;
+            case "leaf_whirl" -> Particle.CLOUD;
+            case "aqua_bubbles" -> Particle.CLOUD;
             default -> null;
         };
         if (particle != null) {
@@ -64,9 +64,9 @@ public class CosmeticsEngine {
 
     private void spawnTrailForKey(Player p, String key) {
         Particle particle = switch (key) {
-            case "rune_trail" -> Particle.ENCHANTMENT_TABLE;
+            case "rune_trail" -> Particle.END_ROD;
             case "feather_trail" -> Particle.CLOUD;
-            case "star_trail" -> Particle.CRIT_MAGIC;
+            case "star_trail" -> Particle.CRIT;
             default -> null;
         };
         if (particle != null) {

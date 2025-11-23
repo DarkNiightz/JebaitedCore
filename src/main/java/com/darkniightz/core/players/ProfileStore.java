@@ -62,13 +62,13 @@ public class ProfileStore {
             p.setBanUntil(loadLong(yml, "moderation.banUntil"));
             p.setBanReason(yml.getString("moderation.banReason"));
             p.setBanActor(yml.getString("moderation.banActor"));
-            var logSec = yml.getList("moderation.log");
-            if (logSec instanceof java.util.List<?> list) {
+            java.util.List<?> logSec = yml.getList("moderation.log");
+            if (logSec != null) {
                 java.util.List<java.util.Map<String,Object>> entries = new java.util.ArrayList<>();
-                for (Object o : list) {
+                for (Object o : logSec) {
                     if (o instanceof java.util.Map<?,?> m) {
                         java.util.Map<String,Object> entry = new java.util.HashMap<>();
-                        for (var e : m.entrySet()) {
+                        for (java.util.Map.Entry<?,?> e : m.entrySet()) {
                             if (e.getKey() != null) entry.put(e.getKey().toString(), e.getValue());
                         }
                         entries.add(entry);

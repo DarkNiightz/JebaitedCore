@@ -18,7 +18,7 @@ public class WardrobeMenu extends BaseMenu {
     private CosmeticsManager.Category current = CosmeticsManager.Category.PARTICLES;
 
     public WardrobeMenu(Plugin plugin, CosmeticsManager cosmetics, ProfileStore profiles) {
-        super(plugin, "§d§lWardrobe", 27);
+        super(plugin, "§d§lWardrobe", 36);
         this.cosmetics = cosmetics;
         this.profiles = profiles;
     }
@@ -33,7 +33,7 @@ public class WardrobeMenu extends BaseMenu {
         inv.setItem(6, new ItemBuilder(Material.FIREWORK_ROCKET).name("§dGadgets").build());
 
         // Clear grid area
-        for (int i = 9; i < 27; i++) inv.setItem(i, null);
+        for (int i = 9; i < 36; i++) inv.setItem(i, null);
 
         PlayerProfile prof = profiles.getOrCreate(viewer, plugin.getConfig().getString("ranks.default", "friend"));
         List<CosmeticsManager.Cosmetic> list = switch (current) {
