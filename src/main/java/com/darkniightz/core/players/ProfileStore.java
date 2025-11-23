@@ -49,6 +49,12 @@ public class ProfileStore {
             p.setCosmeticTickets(yml.getInt("cosmeticTickets", 0));
             p.setMessagesSent(yml.getInt("messagesSent", 0));
             p.setCommandsSent(yml.getInt("commandsSent", 0));
+            // Cosmetics
+            java.util.List<String> unlocked = yml.getStringList("cosmetics.unlocked");
+            p.setCosmeticsUnlocked(new java.util.HashSet<>(unlocked));
+            p.setEquippedParticles(yml.getString("cosmetics.equipped.particles", null));
+            p.setEquippedTrail(yml.getString("cosmetics.equipped.trail", null));
+            p.setEquippedGadget(yml.getString("cosmetics.equipped.gadget", null));
             // Moderation fields
             p.setMuteUntil(loadLong(yml, "moderation.muteUntil"));
             p.setMuteReason(yml.getString("moderation.muteReason"));
@@ -91,6 +97,11 @@ public class ProfileStore {
         yml.set("cosmeticTickets", p.getCosmeticTickets());
         yml.set("messagesSent", p.getMessagesSent());
         yml.set("commandsSent", p.getCommandsSent());
+        // Cosmetics
+        yml.set("cosmetics.unlocked", new java.util.ArrayList<>(p.getCosmeticsUnlocked()));
+        yml.set("cosmetics.equipped.particles", p.getEquippedParticles());
+        yml.set("cosmetics.equipped.trail", p.getEquippedTrail());
+        yml.set("cosmetics.equipped.gadget", p.getEquippedGadget());
         // Moderation fields
         if (p.getMuteUntil() != null) yml.set("moderation.muteUntil", p.getMuteUntil()); else yml.set("moderation.muteUntil", null);
         yml.set("moderation.muteReason", p.getMuteReason());

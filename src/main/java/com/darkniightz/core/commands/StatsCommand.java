@@ -47,6 +47,11 @@ public class StatsCommand implements CommandExecutor {
         sender.sendMessage("§7Messages Sent: §a" + prof.getMessagesSent());
         sender.sendMessage("§7Commands Sent: §a" + prof.getCommandsSent());
         sender.sendMessage("§7Cosmetic Tickets: §e" + prof.getCosmeticTickets());
+        // Cosmetics & games
+        try {
+            sender.sendMessage("§7Wardrobe Opens: §a" + prof.getWardrobeOpens());
+            sender.sendMessage("§7Cosmetics Equipped: §a" + prof.getCosmeticEquips());
+        } catch (Throwable ignored) {}
         return true;
     }
 }

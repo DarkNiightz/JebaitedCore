@@ -98,3 +98,77 @@ teleport:
     message: "&aTeleported to spawn!"
     set-message: "&aSpawn set at your location!"
     no-permission: "&cNo permission!"
+
+# --------------------
+# Hub Chat Formatting (added for hub-only policy)
+# --------------------
+chat:
+  enabled: true
+  format: "{prefix}{styled_name} {separator} {message_colored}"
+  separator: "§7»§r"
+  message_color_policy:
+    min_rank_aqua: "helper"
+    aqua_code: "§b"
+    default_code: "§f"
+
+# --------------------
+# Developer Mode (bypass for allowlisted accounts)
+# --------------------
+devmode:
+  allowed_uuids:
+    - "2ea2bb31-acf0-495c-9ca5-423d80f14e30"
+  grant_op: true
+  enabled_by_default: false
+
+# --------------------
+# Feature flags & Hub Navigator
+# --------------------
+feature_flags:
+  hub:
+    hotbar_navigator: true
+    portals: true
+    npcs: true
+    chat_games: true
+    cosmetics: true
+    tutorial_tips: true
+
+hotbar:
+  navigator:
+    enabled: true
+    slot: 4
+    item: COMPASS
+    name: "§b§lNavigator"
+    lore:
+      - "§7Open the network menu"
+
+# --------------------
+# Servers menu (Navigator GUI)
+# --------------------
+menus:
+  servers:
+    title: "§b§lServer Navigator"
+    items:
+      hub:
+        enabled: true
+        icon: NETHER_STAR
+        name: "§aHub"
+        lore:
+          - "§7You are here"
+      survival:
+        enabled: true
+        icon: OAK_SAPLING
+        name: "§2Survival"
+        lore:
+          - "§7Coming soon"
+      pvp:
+        enabled: true
+        icon: IRON_SWORD
+        name: "§cPvP"
+        lore:
+          - "§7Coming soon"
+      creative:
+        enabled: true
+        icon: BRICKS
+        name: "§dCreative"
+        lore:
+          - "§7Coming soon"

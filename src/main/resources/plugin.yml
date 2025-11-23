@@ -1,109 +1,95 @@
-name: Core
-main: com.darkniightz.main.Core
-version: 1.0
+name: JebaitedCore
+main: com.darkniightz.main.JebaitedCore
+version: 1.0.0-SNAPSHOT
 api-version: 1.21
 author: DarkNiightz
 description: Jebaited Core Plugin.
 
 commands:
-  mute:
-    description: Mutes a player from chatting.
-    usage: /mute <player>
-    permission: core.staff
-  unmute:
-    description: Unmutes a previously muted player.
-    usage: /unmute <player>
-    permission: core.staff
-  core:
-    description: Manages the Core plugin (reload/restart).
-    usage: /core <reload|restart>
-  corekill:
-    description: Kills a player (with hierarchy check).
-    usage: /corekill <player>
-    permission: core.staff
-  corekick:
-    description: Kicks a player for chat issue (with hierarchy check).
-    usage: /corekick <player>
-    permission: core.staff
-  coreban:
-    description: Bans a player for chat violation (with hierarchy check).
-    usage: /coreban <player>
-    permission: core.staff
-  broadcast:
-    description: Broadcasts a message to the server.
-    usage: /broadcast <message>
-    permission: core.broadcast
-  sc:
-    description: Sends a message to staff chat.
-    usage: /sc <message>
-    permission: core.staff
+  # Core/help
+  jebaited:
+    description: Adaptive help for Jebaited Core
+    usage: /jebaited
+  devmode:
+    description: Toggle developer bypass mode (allowed UUIDs only)
+    usage: /devmode <on|off|toggle>
+  # Ranks & tickets & stats
+  rank:
+    description: Manage or view player ranks
+    usage: /rank <get|set> ...
   setrank:
-    description: Sets a player's rank.
-    usage: /setrank <player> <rank>
-    permission: core.admin
-  tp:
-    description: Teleports to a player or coordinates.
-    usage: /tp <player> or /tp <x> <y> <z>
-    permission: core.teleport
-  help:
-    description: Shows a paginated list of Core commands.
-    usage: /help [page]
-  spawn:
-    description: Teleports to the server spawn.
-    usage: /spawn
-    permission: core.spawn
-  setspawn:
-      description: Sets the server spawn at your location.
-      usage: /setspawn
-      permission: core.setspawn
-  fly:
-      description: Toggles flight for yourself or another player.
-      usage: /fly [player]
-      permission: core.fly.self
-  gamemode:
-      description: Changes gamemode for yourself or another player.
-      usage: /gamemode <mode> [player]
-      permission: core.gamemode.self
+    description: Sets a player's rank
+    usage: /setrank <player> <group>
+  tickets:
+    description: View or manage cosmetic tickets
+    usage: /tickets [player] | /tickets <give|take|set> <player> <amount>
+  stats:
+    description: View your (or another player's) hub stats
+    usage: /stats [player]
+  # Moderation suite
+  kick:
+    description: Kick a player
+    usage: /kick <player> [reason]
+  warn:
+    description: Warn a player
+    usage: /warn <player> <reason>
+  mute:
+    description: Permanently mute a player
+    usage: /mute <player> [reason]
+  tempmute:
+    description: Temporarily mute a player
+    usage: /tempmute <player> <duration> [reason]
+  unmute:
+    description: Unmute a player
+    usage: /unmute <player>
+  ban:
+    description: Permanently ban a player
+    usage: /ban <player> [reason]
+  tempban:
+    description: Temporarily ban a player
+    usage: /tempban <player> <duration> [reason]
   unban:
-      description: Unbans a player.
-      usage: /unban <player>
-      permission: core.staff
+    description: Unban a player
+    usage: /unban <player>
+  freeze:
+    description: Toggle freeze on a player
+    usage: /freeze <player>
+  vanish:
+    description: Toggle staff vanish
+    usage: /vanish
+  staffchat:
+    description: Toggle staff chat or send a message
+    usage: /staffchat [message]
+  clearchat:
+    description: Clear public chat for non-staff
+    usage: /clearchat
+  slowmode:
+    description: Set global chat slowmode
+    usage: /slowmode <seconds|off>
+  history:
+    description: View moderation history for a player
+    usage: /history [player]
+  # Hub menus
+  menu:
+    description: Open the Servers Navigator GUI
+    usage: /menu
+  servers:
+    description: Open the Servers Navigator GUI
+    usage: /servers
+  navigator:
+    description: Open the Servers Navigator GUI
+    usage: /navigator
+  cosmetics:
+    description: Open the Wardrobe (cosmetics) GUI
+    usage: /cosmetics
+  wardrobe:
+    description: Open the Wardrobe (cosmetics) GUI
+    usage: /wardrobe
 
 permissions:
-  core.staff:
-    description: Allows staff features like moderating and staff chat.
-    default: op
-  core.admin:
-    description: Allows admin features like setting ranks.
-    default: op
-  core.broadcast:
-    description: Allows broadcasting messages.
-    default: op
-  core.reload:
-    description: Allows reloading the plugin.
-    default: op
-  core.restart:
-    description: Allows restarting the server.
-    default: op
-  core.teleport:
-    description: Allows using /tp command.
-    default: op
-  core.spawn:
-    description: Allows using /spawn.
-    default: true  # Everyone can spawn
-  core.setspawn:
-      description: Allows using /setspawn.
-      default: op
-  core.fly.self:
-      description: Allows toggling your own flight.
-      default: op
-  core.fly.others:
-      description: Allows toggling flight for others.
-      default: op
-  core.gamemode.self:
-      description: Allows changing your own gamemode.
-      default: op
-  core.gamemode.others:
-      description: Allows changing gamemode for others.
-      default: op
-  # Removed rank perms since now using RankManager
+  jebaited.core.use:
+    default: true
+  jebaited.menu.use:
+    default: true
+  jebaited.cosmetics.open:
+    default: true

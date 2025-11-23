@@ -15,6 +15,13 @@ public class PlayerProfile {
     private int commandsSent;
     private long createdAt;
     private long updatedAt;
+    // Cosmetics
+    private java.util.Set<String> cosmeticsUnlocked = new java.util.HashSet<>();
+    private String equippedParticles;
+    private String equippedTrail;
+    private String equippedGadget;
+    private int wardrobeOpens;
+    private int cosmeticEquips;
     // Moderation history stored directly on profile (list of maps for simplicity in YAML)
     private java.util.List<java.util.Map<String, Object>> moderationLog = new java.util.ArrayList<>();
     // Active punishments
@@ -70,4 +77,22 @@ public class PlayerProfile {
     public void setBanActor(String banActor) { this.banActor = banActor; touch(); }
 
     public void touch() { this.updatedAt = System.currentTimeMillis(); }
+
+    // Cosmetics getters/setters
+    public java.util.Set<String> getCosmeticsUnlocked() { return cosmeticsUnlocked; }
+    public void setCosmeticsUnlocked(java.util.Set<String> set) { this.cosmeticsUnlocked = set != null ? set : new java.util.HashSet<>(); touch(); }
+    public boolean hasUnlocked(String key) { return cosmeticsUnlocked != null && cosmeticsUnlocked.contains(key); }
+    public void unlock(String key) { if (cosmeticsUnlocked == null) cosmeticsUnlocked = new java.util.HashSet<>(); cosmeticsUnlocked.add(key); touch(); }
+
+    public String getEquippedParticles() { return equippedParticles; }
+    public void setEquippedParticles(String key) { this.equippedParticles = key; touch(); }
+    public String getEquippedTrail() { return equippedTrail; }
+    public void setEquippedTrail(String key) { this.equippedTrail = key; touch(); }
+    public String getEquippedGadget() { return equippedGadget; }
+    public void setEquippedGadget(String key) { this.equippedGadget = key; touch(); }
+
+    public int getWardrobeOpens() { return wardrobeOpens; }
+    public void incWardrobeOpens() { this.wardrobeOpens++; touch(); }
+    public int getCosmeticEquips() { return cosmeticEquips; }
+    public void incCosmeticEquips() { this.cosmeticEquips++; touch(); }
 }

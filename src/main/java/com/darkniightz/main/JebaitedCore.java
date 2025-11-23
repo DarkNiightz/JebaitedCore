@@ -15,6 +15,12 @@ import com.darkniightz.core.tracking.CommandTrackingListener;
 import com.darkniightz.core.moderation.ModerationManager;
 import com.darkniightz.core.moderation.ModerationListener;
 import com.darkniightz.core.commands.mod.*;
+import com.darkniightz.core.gui.MenuListener;
+import com.darkniightz.core.hub.HotbarNavigatorListener;
+import com.darkniightz.core.commands.MenuCommand;
+import com.darkniightz.core.cosmetics.CosmeticsManager;
+import com.darkniightz.core.cosmetics.CosmeticsEngine;
+import com.darkniightz.core.commands.CosmeticsCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -26,6 +32,8 @@ public final class JebaitedCore extends JavaPlugin {
     private ProfileStore profileStore;
     private DevModeManager devModeManager;
     private ModerationManager moderationManager;
+    private CosmeticsManager cosmeticsManager;
+    private CosmeticsEngine cosmeticsEngine;
 
     @Override
     public void onEnable() {
@@ -37,12 +45,19 @@ public final class JebaitedCore extends JavaPlugin {
         this.profileStore = new ProfileStore(this);
         this.devModeManager = new DevModeManager(this);
         this.moderationManager = new ModerationManager(this);
+        this.cosmeticsManager = new CosmeticsManager(this);
+        this.cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager);
 
         // Register listeners (chat renderer + first-join setup)
         Bukkit.getPluginManager().registerEvents(new ChatListener(this, rankManager, profileStore, moderationManager, devModeManager), this);
         Bukkit.getPluginManager().registerEvents(new JoinListener(this, rankManager, profileStore), this);
         Bukkit.getPluginManager().registerEvents(new CommandTrackingListener(profileStore, rankManager), this);
         Bukkit.getPluginManager().registerEvents(new ModerationListener(profileStore, rankManager, moderationManager, this), this);
+        // GUI + Hub Hotbar
+        Bukkit.getPluginManager().registerEvents(new MenuListener(), this);
+        Bukkit.getPluginManager().registerEvents(new HotbarNavigatorListener(this), this);
+        // Start cosmetics engine (particles/trails)
+        cosmeticsEngine.start();
 
         // Register commands
         getCommand("rank").setExecutor(new RankCommand(profileStore, rankManager, devModeManager));
@@ -51,6 +66,15 @@ public final class JebaitedCore extends JavaPlugin {
         getCommand("stats").setExecutor(new StatsCommand(profileStore, rankManager));
         getCommand("devmode").setExecutor(new DevModeCommand(devModeManager));
         getCommand("jebaited").setExecutor(new JebaitedCommand(profileStore, rankManager, devModeManager));
+        // Hub menu commands (aliases share executor)
+        MenuCommand menuCmd = new MenuCommand(this);
+        getCommand("menu").setExecutor(menuCmd);
+        getCommand("servers").setExecutor(menuCmd);
+        getCommand("navigator").setExecutor(menuCmd);
+        // Wardrobe/cosmetics
+        CosmeticsCommand cosCmd = new CosmeticsCommand(this, cosmeticsManager, profileStore);
+        getCommand("cosmetics").setExecutor(cosCmd);
+        getCommand("wardrobe").setExecutor(cosCmd);
         // Moderation
         getCommand("kick").setExecutor(new KickCommand(profileStore, rankManager, devModeManager));
         getCommand("warn").setExecutor(new WarnCommand(profileStore, rankManager, devModeManager));
@@ -74,6 +98,7 @@ public final class JebaitedCore extends JavaPlugin {
     public void onDisable() {
         // Persist any pending caches
         if (profileStore != null) profileStore.flushAll();
+        if (cosmeticsEngine != null) cosmeticsEngine.stop();
         getLogger().info("§cJebaitedCore §7DISABLED – All saved!");
     }
 
@@ -83,4 +108,5 @@ public final class JebaitedCore extends JavaPlugin {
     public ProfileStore getProfileStore() { return profileStore; }
     public DevModeManager getDevModeManager() { return devModeManager; }
     public ModerationManager getModerationManager() { return moderationManager; }
+    public CosmeticsManager getCosmeticsManager() { return cosmeticsManager; }
 }
