@@ -1,20 +1,17 @@
 package com.darkniightz.core.moderation;
 
-import com.darkniightz.core.players.PlayerProfile;
-import com.darkniightz.core.players.ProfileStore;
+import com.darkniightz.main.JebaitedCore;
+import com.darkniightz.main.database.dao.PlayerProfileDAO;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public final class ModerationLogger {
-    private ModerationLogger() {}
-
-    public static void log(ProfileStore store, UUID target, Map<String, Object> entry) {
-        PlayerProfile p = store.get(target);
-        if (p == null) return; // should be present during online moderation
-        p.addModerationEntry(entry);
-        store.save(target);
+    public static void log(UUID target, Map<String, Object> entry) {
+        PlayerProfileDAO dao = JebaitedCore.getInstance().getPlayerProfileDAO();
+        if (dao == null) return; // Database might be disabled or not initialized
+        dao.logModerationAction(target, entry);
     }
 
     public static Map<String, Object> entry(String type, String actorName, UUID actorId, String reason, Long durationMs, Long expiresAt) {
