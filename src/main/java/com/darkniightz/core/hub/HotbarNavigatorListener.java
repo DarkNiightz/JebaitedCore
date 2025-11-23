@@ -25,47 +25,91 @@ public class HotbarNavigatorListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         if (!plugin.getConfig().getBoolean("feature_flags.hub.hotbar_navigator", true)) return;
-        var sec = plugin.getConfig().getConfigurationSection("hotbar.navigator");
-        if (sec == null || !sec.getBoolean("enabled", true)) return;
-        int slot = Math.max(0, Math.min(8, sec.getInt("slot", 4)));
-        Material mat = materialOrDefault(sec.getString("item"), Material.COMPASS);
-        String name = sec.getString("name", "§b§lNavigator");
-        List<String> lore = sec.getStringList("lore");
-
         Player p = event.getPlayer();
-        ItemStack existing = p.getInventory().getItem(slot);
-        if (existing == null || existing.getType() == Material.AIR) {
-            ItemStack give = new ItemStack(mat);
-            ItemMeta meta = give.getItemMeta();
-            meta.setDisplayName(name);
-            if (lore != null && !lore.isEmpty()) meta.setLore(lore);
-            give.setItemMeta(meta);
-            p.getInventory().setItem(slot, give);
+
+        // Navigator item
+        var nav = plugin.getConfig().getConfigurationSection("hotbar.navigator");
+        if (nav != null && nav.getBoolean("enabled", true)) {
+            int slot = Math.max(0, Math.min(8, nav.getInt("slot", 4)));
+            Material mat = materialOrDefault(nav.getString("item"), Material.COMPASS);
+            String name = nav.getString("name", "§b§lNavigator");
+            List<String> lore = nav.getStringList("lore");
+            ItemStack existing = p.getInventory().getItem(slot);
+            if (existing == null || existing.getType() == Material.AIR) {
+                ItemStack give = new ItemStack(mat);
+                ItemMeta meta = give.getItemMeta();
+                meta.setDisplayName(name);
+                if (lore != null && !lore.isEmpty()) meta.setLore(lore);
+                give.setItemMeta(meta);
+                p.getInventory().setItem(slot, give);
+            }
+        }
+
+        // Cosmetics item
+        var cos = plugin.getConfig().getConfigurationSection("hotbar.cosmetics");
+        if (cos != null && cos.getBoolean("enabled", true)) {
+            int slot = Math.max(0, Math.min(8, cos.getInt("slot", 0)));
+            Material mat = materialOrDefault(cos.getString("item"), Material.GOLDEN_HELMET);
+            String name = cos.getString("name", "§d§lCosmetics");
+            List<String> lore = cos.getStringList("lore");
+            ItemStack existing = p.getInventory().getItem(slot);
+            if (existing == null || existing.getType() == Material.AIR) {
+                ItemStack give = new ItemStack(mat);
+                ItemMeta meta = give.getItemMeta();
+                meta.setDisplayName(name);
+                if (lore != null && !lore.isEmpty()) meta.setLore(lore);
+                give.setItemMeta(meta);
+                p.getInventory().setItem(slot, give);
+            }
         }
     }
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         if (!plugin.getConfig().getBoolean("feature_flags.hub.hotbar_navigator", true)) return;
-        var sec = plugin.getConfig().getConfigurationSection("hotbar.navigator");
-        if (sec == null || !sec.getBoolean("enabled", true)) return;
         if (event.getItem() == null) return;
-        String name = sec.getString("name", "§b§lNavigator");
-        if (!matches(event.getItem(), name)) return;
-        // Open servers menu
-        new ServersMenu(plugin).open(event.getPlayer());
-        event.setCancelled(true);
+
+        // Navigator click
+        var nav = plugin.getConfig().getConfigurationSection("hotbar.navigator");
+        if (nav != null && nav.getBoolean("enabled", true)) {
+            String name = nav.getString("name", "§b§lNavigator");
+            if (matches(event.getItem(), name)) {
+                new ServersMenu(plugin).open(event.getPlayer());
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        // Cosmetics click -> open via command to avoid tight coupling
+        var cos = plugin.getConfig().getConfigurationSection("hotbar.cosmetics");
+        if (cos != null && cos.getBoolean("enabled", true)) {
+            String name = cos.getString("name", "§d§lCosmetics");
+            if (matches(event.getItem(), name)) {
+                event.getPlayer().performCommand("cosmetics");
+                event.setCancelled(true);
+            }
+        }
     }
 
     @EventHandler
     public void onDrop(PlayerDropItemEvent event) {
         if (!plugin.getConfig().getBoolean("feature_flags.hub.hotbar_navigator", true)) return;
-        var sec = plugin.getConfig().getConfigurationSection("hotbar.navigator");
-        if (sec == null || !sec.getBoolean("enabled", true)) return;
-        String name = sec.getString("name", "§b§lNavigator");
-        if (matches(event.getItemDrop().getItemStack(), name)) {
-            // keep navigator bound in hub
-            event.setCancelled(true);
+        // Navigator drop prevention
+        var nav = plugin.getConfig().getConfigurationSection("hotbar.navigator");
+        if (nav != null && nav.getBoolean("enabled", true)) {
+            String name = nav.getString("name", "§b§lNavigator");
+            if (matches(event.getItemDrop().getItemStack(), name)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+        // Cosmetics drop prevention
+        var cos = plugin.getConfig().getConfigurationSection("hotbar.cosmetics");
+        if (cos != null && cos.getBoolean("enabled", true)) {
+            String name = cos.getString("name", "§d§lCosmetics");
+            if (matches(event.getItemDrop().getItemStack(), name)) {
+                event.setCancelled(true);
+            }
         }
     }
 

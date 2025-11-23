@@ -3,24 +3,25 @@ package com.darkniightz.core.cosmetics;
 import com.darkniightz.core.moderation.ModerationManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
+import com.darkniightz.core.ranks.RankManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.UUID;
-
 public class CosmeticsEngine {
     private final Plugin plugin;
     private final ProfileStore profiles;
     private final ModerationManager moderation;
+    private final RankManager ranks;
     private BukkitTask task;
 
-    public CosmeticsEngine(Plugin plugin, ProfileStore profiles, ModerationManager moderation) {
+    public CosmeticsEngine(Plugin plugin, ProfileStore profiles, ModerationManager moderation, RankManager ranks) {
         this.plugin = plugin;
         this.profiles = profiles;
         this.moderation = moderation;
+        this.ranks = ranks;
     }
 
     public void start() {
@@ -36,7 +37,7 @@ public class CosmeticsEngine {
     private void tick() {
         boolean hideWhenVanished = plugin.getConfig().getBoolean("cosmetics.toggles.hide_when_vanished", true);
         for (Player p : Bukkit.getOnlinePlayers()) {
-            PlayerProfile prof = profiles.getOrCreate(p, plugin.getConfig().getString("ranks.default", "friend"));
+            PlayerProfile prof = profiles.getOrCreate(p, ranks.getDefaultGroup());
             // Skip if vanished and config says to hide
             if (hideWhenVanished && moderation != null && moderation.isVanished(p.getUniqueId())) continue;
 

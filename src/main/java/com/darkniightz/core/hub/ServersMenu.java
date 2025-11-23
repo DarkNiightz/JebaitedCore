@@ -39,6 +39,7 @@ public class ServersMenu extends BaseMenu {
         Material mat = defMat;
         String name = defName;
         List<String> lore = new ArrayList<>(defLore);
+        int effectiveSlot = slot;
         if (base != null) {
             ConfigurationSection sec = base.getConfigurationSection(key);
             if (sec != null) {
@@ -50,10 +51,16 @@ public class ServersMenu extends BaseMenu {
                 name = sec.getString("name", name);
                 List<String> l = sec.getStringList("lore");
                 if (l != null && !l.isEmpty()) lore = l;
+                // Optional slot override from config
+                if (sec.isInt("slot")) {
+                    int s = sec.getInt("slot", slot);
+                    // clamp within inventory size
+                    effectiveSlot = Math.max(0, Math.min(inv.getSize() - 1, s));
+                }
             }
         }
         if (!enabled) return;
-        inv.setItem(slot, new ItemBuilder(mat).name(name).lore(lore).build());
+        inv.setItem(effectiveSlot, new ItemBuilder(mat).name(name).lore(lore).build());
     }
 
     @Override

@@ -45,6 +45,15 @@ moderation:
     - 7d
     - permanent
 
+  # ClearChat behavior (used by /clearchat)
+  clearchat:
+    # Minimum rank required to execute /clearchat (helper/admin/etc.)
+    min_staff_rank: helper
+    # How many blank lines to send to non-staff when clearing chat
+    blank_lines: 150
+    # Cooldown between uses in seconds (devmode bypasses)
+    cooldown_seconds: 5
+
 # Pets
 pets:
   types:
@@ -172,3 +181,91 @@ menus:
         name: "§dCreative"
         lore:
           - "§7Coming soon"
+
+  # Cosmetics main menu (tabs)
+  cosmetics:
+    title: "§d§lCosmetics"
+    size: 54
+    tabs:
+      wardrobe: { name: "§aWardrobe", icon: LEATHER_CHESTPLATE, slot: 10, enabled: true }
+      particles: { name: "§bParticles", icon: BLAZE_POWDER, slot: 12, enabled: true }
+      trails: { name: "§eTrails", icon: FEATHER, slot: 14, enabled: true }
+      gadgets: { name: "§7Gadgets", icon: STICK, slot: 16, enabled: true }
+    gold_bar:
+      icon: GOLD_INGOT
+      slot: 53
+      message: "§6Earn cosmetic coins by playing minigames and events!"
+
+# --------------------
+# Hub protections (build, damage, hunger, respawn)
+# --------------------
+hub:
+  protection:
+    # Minimum rank that can place/break blocks in hub
+    min_rank_build: admin
+    # Cancel all damage taken by players in the hub
+    disable_damage: true
+    # Prevent hunger changes in the hub
+    disable_hunger: true
+    # On death/respawn, send players to world spawn
+    on_death_teleport_spawn: true
+
+# --------------------
+# Cosmetics catalog and rules (DB‑ready structure)
+# --------------------
+cosmetics:
+  catalog:
+    particles:
+      ember_sparks:
+        enabled: true
+        price: 100
+        pattern: spiral
+        particle: FLAME
+        radius: 0.6
+        speed: 0.2
+        density: 12
+      leaf_whirl:
+        enabled: true
+        price: 100
+        pattern: ring
+        particle: CLOUD
+        radius: 0.8
+        speed: 0.1
+        density: 16
+    trails:
+      rune_trail:
+        enabled: true
+        price: 100
+        particle: END_ROD
+        move_min_delta: 0.08
+        density: 8
+      star_trail:
+        enabled: true
+        price: 100
+        particle: CRIT
+        move_min_delta: 0.08
+        density: 8
+    wardrobe:
+      frog:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          jump_boost: 3
+      ravers:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          rainbow_aura: true
+      cloud:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          double_jump:
+            cooldown_ms: 1000
+  rules:
+    price_default: 100
+    disable_when_vanished: true
+    particles:
+      auto_off_minutes: 5
+      per_tick_cap: 100
+      global_toggle_default: true

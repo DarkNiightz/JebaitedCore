@@ -17,6 +17,7 @@ import com.darkniightz.core.moderation.ModerationListener;
 import com.darkniightz.core.commands.mod.*;
 import com.darkniightz.core.gui.MenuListener;
 import com.darkniightz.core.hub.HotbarNavigatorListener;
+import com.darkniightz.core.hub.HubProtectionListener;
 import com.darkniightz.core.commands.MenuCommand;
 import com.darkniightz.core.cosmetics.CosmeticsManager;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
@@ -46,7 +47,7 @@ public final class JebaitedCore extends JavaPlugin {
         this.devModeManager = new DevModeManager(this);
         this.moderationManager = new ModerationManager(this);
         this.cosmeticsManager = new CosmeticsManager(this);
-        this.cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager);
+        this.cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager, rankManager);
 
         // Register listeners (chat renderer + first-join setup)
         Bukkit.getPluginManager().registerEvents(new ChatListener(this, rankManager, profileStore, moderationManager, devModeManager), this);
@@ -56,6 +57,7 @@ public final class JebaitedCore extends JavaPlugin {
         // GUI + Hub Hotbar
         Bukkit.getPluginManager().registerEvents(new MenuListener(), this);
         Bukkit.getPluginManager().registerEvents(new HotbarNavigatorListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new HubProtectionListener(this, profileStore, rankManager), this);
         // Start cosmetics engine (particles/trails)
         cosmeticsEngine.start();
 

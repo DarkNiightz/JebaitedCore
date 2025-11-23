@@ -13,6 +13,7 @@ commands:
   devmode:
     description: Toggle developer bypass mode (allowed UUIDs only)
     usage: /devmode <on|off|toggle>
+    aliases: [dev]
   # Ranks & tickets & stats
   rank:
     description: Manage or view player ranks
