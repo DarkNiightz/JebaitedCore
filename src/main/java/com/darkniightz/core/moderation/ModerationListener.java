@@ -3,7 +3,7 @@ package com.darkniightz.core.moderation;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
 import com.darkniightz.main.JebaitedCore;
-import com.darkniightz.main.database.dao.PlayerProfileDAO;
+import com.darkniightz.main.PlayerProfileDAO;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;

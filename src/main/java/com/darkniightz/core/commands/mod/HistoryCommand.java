@@ -5,6 +5,8 @@ import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.ranks.RankManager;
+import com.darkniightz.main.JebaitedCore;
+import com.darkniightz.main.PlayerProfileDAO;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
@@ -50,8 +52,11 @@ public class HistoryCommand implements CommandExecutor {
             if (target.getUniqueId() == null) { sender.sendMessage("§cPlayer not found: §e"+args[0]); return true; }
         }
 
+        // Ensure profile exists (creates DB row if new)
         PlayerProfile tp = profiles.getOrCreate(target, ranks.getDefaultGroup());
-        var list = tp.getModerationLog();
+        // Pull moderation history from the database
+        PlayerProfileDAO dao = JebaitedCore.getInstance().getPlayerProfileDAO();
+        java.util.List<java.util.Map<String,Object>> list = dao != null ? dao.getModerationHistory(target.getUniqueId(), 100) : java.util.List.of();
         String name = target.getName() != null ? target.getName() : target.getUniqueId().toString().substring(0, 8);
         sender.sendMessage("§6— Moderation History for §e"+name+" §6(§7"+list.size()+" entries§6) —");
         if (list.isEmpty()) { sender.sendMessage("§7No entries."); return true; }

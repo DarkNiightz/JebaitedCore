@@ -41,7 +41,7 @@ public class FreezeCommand implements CommandExecutor {
         String state = now ? "frozen" : "unfrozen";
         var entry = ModerationLogger.entry(now?"freeze":"unfreeze", p.getName(), p.getUniqueId(), null, null, null);
         profiles.getOrCreate(target, ranks.getDefaultGroup());
-        ModerationLogger.log(profiles, target.getUniqueId(), entry);
+        ModerationLogger.log(target.getUniqueId(), entry);
         sender.sendMessage("§a"+state.substring(0,1).toUpperCase()+state.substring(1)+" §e"+target.getName());
         if (now) target.sendMessage("§cYou have been frozen by staff. Do not move."); else target.sendMessage("§aYou are no longer frozen.");
         return true;

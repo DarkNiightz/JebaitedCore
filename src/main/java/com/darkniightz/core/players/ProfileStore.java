@@ -1,7 +1,8 @@
 package com.darkniightz.core.players;
 
 import com.darkniightz.main.JebaitedCore;
-import com.darkniightz.main.database.dao.PlayerProfileDAO;
+import com.darkniightz.main.PlayerProfileDAO;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.util.Map;
@@ -65,6 +66,33 @@ public class ProfileStore {
     }
 
     /**
+     * Overload for OfflinePlayer (commands may target offline players).
+     */
+    public PlayerProfile getOrCreate(OfflinePlayer player, String defaultRank) {
+        if (!plugin.getDatabaseManager().isEnabled()) {
+            return null;
+        }
+        UUID uuid = player.getUniqueId();
+        if (uuid == null) return null;
+        if (profileCache.containsKey(uuid)) return profileCache.get(uuid);
+
+        PlayerProfile profile = dao.loadPlayerProfile(uuid);
+        if (profile == null) {
+            String name = player.getName() != null ? player.getName() : uuid.toString();
+            profile = new PlayerProfile(uuid, name);
+            profile.setRank(defaultRank);
+            long now = System.currentTimeMillis();
+            profile.setFirstJoined(now);
+            profile.setLastJoined(now);
+            dao.savePlayerProfile(profile);
+        } else {
+            profile.setLastJoined(System.currentTimeMillis());
+        }
+        profileCache.put(uuid, profile);
+        return profile;
+    }
+
+    /**
      * Gets a profile from the cache only. Does not load from DB.
      *
      * @param uuid The player's UUID.
@@ -99,5 +127,13 @@ public class ProfileStore {
             dao.savePlayerProfile(profile);
         }
         plugin.getLogger().info("... all profiles saved.");
+    }
+
+    /**
+     * Persist a single cached player profile immediately.
+     */
+    public void save(UUID uuid) {
+        PlayerProfile p = profileCache.get(uuid);
+        if (p != null) dao.savePlayerProfile(p);
     }
 }

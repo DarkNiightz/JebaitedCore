@@ -22,7 +22,7 @@ import com.darkniightz.core.commands.MenuCommand;
 import com.darkniightz.core.cosmetics.CosmeticsManager;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
 import com.darkniightz.core.commands.CosmeticsCommand;
-import com.darkniightz.main.database.dao.PlayerProfileDAO;
+import com.darkniightz.main.PlayerProfileDAO;
 import com.darkniightz.main.database.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;

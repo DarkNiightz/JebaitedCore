@@ -1,8 +1,7 @@
-package com.darkniightz.main.database.dao;
+package com.darkniightz.main;
 
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.main.database.DatabaseManager;
-import org.bukkit.entity.Player;
 
 import java.sql.*;
 import java.util.HashSet;
@@ -222,5 +221,43 @@ public class PlayerProfileDAO {
             logger.log(Level.SEVERE, "Failed to save player profile for " + profile.getUuid(), e);
         }
     }
+
+    /**
+     * Fetches moderation history entries for a target player, newest first.
+     *
+     * @param target The target player's UUID
+     * @param limit  Max number of rows to return (use a sane upper bound like 100)
+     * @return List of rows as maps compatible with ModerationLogger.entry() keys
+     */
+    public java.util.List<java.util.Map<String, Object>> getModerationHistory(UUID target, int limit) {
+        String sql = "SELECT type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp FROM moderation_history " +
+                "WHERE target_uuid = ? ORDER BY timestamp DESC LIMIT ?;";
+        java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, target.toString());
+            ps.setInt(2, Math.max(1, Math.min(500, limit)));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("ts", rs.getLong("timestamp"));
+                    m.put("type", rs.getString("type"));
+                    String actor = rs.getString("actor");
+                    if (actor != null && !actor.isEmpty()) m.put("actor", actor);
+                    String actorUuid = rs.getString("actor_uuid");
+                    if (actorUuid != null && !actorUuid.isEmpty()) m.put("actorUuid", actorUuid);
+                    String reason = rs.getString("reason");
+                    if (reason != null && !reason.isEmpty()) m.put("reason", reason);
+                    long duration = rs.getLong("duration_ms");
+                    if (!rs.wasNull()) m.put("durationMs", duration);
+                    long expires = rs.getLong("expires_at");
+                    if (!rs.wasNull()) m.put("expiresAt", expires);
+                    rows.add(m);
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Failed to fetch moderation history for " + target, e);
+        }
+        return rows;
     }
 }

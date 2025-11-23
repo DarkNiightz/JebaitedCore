@@ -45,7 +45,7 @@ public class MuteCommand implements CommandExecutor {
             tp.setMuteActor(p.getName());
             profiles.save(target.getUniqueId());
             var entry = ModerationLogger.entry("mute", p.getName(), p.getUniqueId(), reason, null, Long.MAX_VALUE);
-            ModerationLogger.log(profiles, target.getUniqueId(), entry);
+            ModerationLogger.log(target.getUniqueId(), entry);
             if (target.isOnline()) target.getPlayer().sendMessage("§cYou have been muted §7(permanent). Reason: §f"+reason);
             sender.sendMessage("§aMuted §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7(permanent)");
         } else {
@@ -62,7 +62,7 @@ public class MuteCommand implements CommandExecutor {
             tp.setMuteActor(p.getName());
             profiles.save(target.getUniqueId());
             var entry = ModerationLogger.entry("tempmute", p.getName(), p.getUniqueId(), reason, dur, until);
-            ModerationLogger.log(profiles, target.getUniqueId(), entry);
+            ModerationLogger.log(target.getUniqueId(), entry);
             if (target.isOnline()) target.getPlayer().sendMessage("§cYou have been muted for §e"+ TimeUtil.formatDurationShort(dur) + "§7. Reason: §f"+reason);
             sender.sendMessage("§aTemporarily muted §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7for §e"+TimeUtil.formatDurationShort(dur));
         }
