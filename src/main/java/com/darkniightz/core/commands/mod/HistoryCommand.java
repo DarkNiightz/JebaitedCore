@@ -1,5 +1,7 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
+import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.ranks.RankManager;
@@ -19,14 +21,26 @@ import java.util.Map;
 public class HistoryCommand implements CommandExecutor {
     private final ProfileStore profiles;
     private final RankManager ranks;
+    private final DevModeManager devMode;
 
-    public HistoryCommand(ProfileStore profiles, RankManager ranks) {
+    public HistoryCommand(ProfileStore profiles, RankManager ranks, DevModeManager devMode) {
         this.profiles = profiles;
         this.ranks = ranks;
+        this.devMode = devMode;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        // Permission: Helper+ (or DevMode bypass)
+        if (sender instanceof Player p) {
+            PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+        }
+
         OfflinePlayer target;
         if (args.length == 0) {
             if (!(sender instanceof Player p)) { sender.sendMessage("§cConsole must specify a player: §e/"+label+" <player>"); return true; }

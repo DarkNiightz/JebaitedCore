@@ -1,3 +1,3 @@
 # JebaitedCore
-A Minecraft plugin for Paper 1.21.1.
+A Minecraft plugin for Paper 1.21.8.
 Testing and fucking about ¯\_(ツ)_/¯ 

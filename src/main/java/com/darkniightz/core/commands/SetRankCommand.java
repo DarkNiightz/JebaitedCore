@@ -64,10 +64,7 @@ public class SetRankCommand implements CommandExecutor {
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
         boolean actorIsDevOrOwner = equalsAny(actorRank, "owner", "developer");
         boolean allowed = bypass || actorIsDevOrOwner || (ranks.outranksStrict(actorRank, targetRank) && ranks.outranksStrict(actorRank, newGroup));
-        if (!allowed) {
-            sender.sendMessage("§cYou must outrank the target and the destination group.");
-            return true;
-        }
+        if (!allowed) { sender.sendMessage(com.darkniightz.core.Messages.noPerm()); return true; }
 
         tp.setPrimaryRank(newGroup);
         profiles.save(tuid);

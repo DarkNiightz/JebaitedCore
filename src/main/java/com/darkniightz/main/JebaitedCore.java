@@ -65,7 +65,7 @@ public final class JebaitedCore extends JavaPlugin {
         getCommand("staffchat").setExecutor(new StaffChatCommand(profileStore, rankManager, devModeManager, moderationManager));
         getCommand("clearchat").setExecutor(new ClearChatCommand(profileStore, rankManager, devModeManager));
         getCommand("slowmode").setExecutor(new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
-        getCommand("history").setExecutor(new HistoryCommand(profileStore, rankManager));
+        getCommand("history").setExecutor(new HistoryCommand(profileStore, rankManager, devModeManager));
 
         getLogger().info("§6JebaitedCore v1.0.0 §aENABLED! §7Hub/core foundation loaded on Paper 1.21.8");
     }

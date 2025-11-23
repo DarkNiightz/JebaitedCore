@@ -17,6 +17,7 @@ messages:
   killed: '&cYou were killed by staff.'
   kicked: 'Kicked for chat issue by staff.'
   banned: 'Banned for chat violation by staff.'
+  no_permission: "§cYou don't have permission to use this command."
   broadcast-prefix: '&9[&4GLOBAL&9] &b&l'  # Prefix for /broadcast messages
   staff-chat-prefix: '&b[Staff] &f'     # Prefix for /sc messages
 

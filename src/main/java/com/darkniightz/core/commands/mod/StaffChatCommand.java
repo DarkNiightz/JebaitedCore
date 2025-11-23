@@ -1,5 +1,6 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
@@ -30,7 +31,7 @@ public class StaffChatCommand implements CommandExecutor {
         if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage("§cRequires Helper+."); return true; }
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
 
         if (args.length == 0) {
             boolean on = moderation.toggleStaffChat(p.getUniqueId());

@@ -1,5 +1,6 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.moderation.ModerationLogger;
 import com.darkniightz.core.players.PlayerProfile;
@@ -31,14 +32,14 @@ public class KickCommand implements CommandExecutor {
         if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage("§cRequires Helper+."); return true; }
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
         if (args.length < 1) { sender.sendMessage("§eUsage: §7/"+label+" <player> [reason]"); return true; }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) { sender.sendMessage("§cPlayer not found: §e"+args[0]); return true; }
         PlayerProfile tp = profiles.getOrCreate(target, ranks.getDefaultGroup());
         // Guardrail: must outrank target unless DevMode bypass
         if (!bypass && !ranks.outranksStrict(actor.getPrimaryRank(), tp.getPrimaryRank())) {
-            sender.sendMessage("§cYou must outrank the target to perform this action.");
+            sender.sendMessage(Messages.noPerm());
             return true;
         }
         String reason = args.length >= 2 ? String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)) : "Kicked";

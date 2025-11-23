@@ -32,7 +32,7 @@ public class MuteCommand implements CommandExecutor {
         if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) { sender.sendMessage("§cRequires Moderator+."); return true; }
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) { sender.sendMessage(com.darkniightz.core.Messages.noPerm()); return true; }
 
         if (permanentOnly) {
             if (args.length < 1) { sender.sendMessage("§eUsage: §7/mute <player> [reason]"); return true; }

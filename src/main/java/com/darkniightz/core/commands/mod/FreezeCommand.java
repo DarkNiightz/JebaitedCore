@@ -1,5 +1,6 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.moderation.ModerationLogger;
 import com.darkniightz.core.moderation.ModerationManager;
@@ -31,7 +32,7 @@ public class FreezeCommand implements CommandExecutor {
         if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) { sender.sendMessage("§cRequires Moderator+."); return true; }
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) { sender.sendMessage(Messages.noPerm()); return true; }
         if (args.length < 1) { sender.sendMessage("§eUsage: §7/"+label+" <player>"); return true; }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) { sender.sendMessage("§cPlayer not found: §e"+args[0]); return true; }

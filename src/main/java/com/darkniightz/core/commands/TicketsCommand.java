@@ -59,10 +59,7 @@ public class TicketsCommand implements CommandExecutor {
             }
             PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
             boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "admin")) {
-                sender.sendMessage("§cYou must be §4Admin§c or higher to manage tickets.");
-                return true;
-            }
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "admin")) { sender.sendMessage(com.darkniightz.core.Messages.noPerm()); return true; }
             var target = Bukkit.getOfflinePlayer(args[1]);
             if (target.getUniqueId() == null) {
                 sender.sendMessage("§cPlayer not found: §e" + args[1]);

@@ -1,5 +1,6 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.moderation.ModerationLogger;
 import com.darkniightz.core.moderation.TimeUtil;
@@ -34,7 +35,7 @@ public class BanCommand implements CommandExecutor {
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
         boolean allowed = bypass || (permanentOnly ? ranks.isAtLeast(actor.getPrimaryRank(), "moderator") : ranks.isAtLeast(actor.getPrimaryRank(), "helper"));
-        if (!allowed) { sender.sendMessage("§cInsufficient rank."); return true; }
+        if (!allowed) { sender.sendMessage(Messages.noPerm()); return true; }
 
         if (permanentOnly) {
             if (args.length < 1) { sender.sendMessage("§eUsage: §7/ban <player> [reason]"); return true; }

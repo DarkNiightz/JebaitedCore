@@ -1,5 +1,6 @@
 package com.darkniightz.core.commands.mod;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
@@ -27,15 +28,15 @@ public class ClearChatCommand implements CommandExecutor {
         if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage("§cRequires Helper+."); return true; }
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
 
         String notice = "§7Chat was cleared by §e" + p.getName();
-        String filler = " ".repeat(200);
+        String filler = "§r"; // visible reset so clients actually push lines
         for (Player online : Bukkit.getOnlinePlayers()) {
             PlayerProfile prof = profiles.getOrCreate(online, ranks.getDefaultGroup());
             boolean staff = ranks.isAtLeast(prof.getPrimaryRank(), "helper") || (devMode != null && devMode.isActive(online.getUniqueId()));
             if (!staff) {
-                for (int i = 0; i < 100; i++) online.sendMessage(filler);
+                for (int i = 0; i < 150; i++) online.sendMessage(filler);
             }
             online.sendMessage(notice);
         }
