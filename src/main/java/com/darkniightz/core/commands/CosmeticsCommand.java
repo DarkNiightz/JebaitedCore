@@ -1,7 +1,7 @@
 package com.darkniightz.core.commands;
 
 import com.darkniightz.core.cosmetics.CosmeticsManager;
-import com.darkniightz.core.cosmetics.WardrobeMenu;
+import com.darkniightz.core.cosmetics.CosmeticsMenu;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import org.bukkit.command.Command;
@@ -25,13 +25,14 @@ public class CosmeticsCommand implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player p)) {
-            sender.sendMessage("§cOnly players can open the wardrobe.");
+            sender.sendMessage("§cOnly players can open the cosmetics menu.");
             return true;
         }
         PlayerProfile prof = profiles.getOrCreate(p, plugin.getConfig().getString("ranks.default", "friend"));
         prof.incWardrobeOpens();
         profiles.save(p.getUniqueId());
-        new WardrobeMenu(plugin, cosmetics, profiles).open(p);
+        // Phase 2: open the new CosmeticsMenu container (Wardrobe still available as a tab)
+        new CosmeticsMenu(plugin, cosmetics, profiles).open(p);
         return true;
     }
 }
