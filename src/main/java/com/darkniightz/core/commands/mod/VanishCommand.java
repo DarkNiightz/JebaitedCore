@@ -34,7 +34,7 @@ public class VanishCommand implements CommandExecutor {
         if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
         boolean now = moderation.toggleVanish(p);
         var entry = ModerationLogger.entry(now?"vanish_on":"vanish_off", p.getName(), p.getUniqueId(), null, null, null);
-        ModerationLogger.log(profiles, p.getUniqueId(), entry);
+        ModerationLogger.log(p.getUniqueId(), entry);
         p.sendMessage(now ? "§7Vanish: §aON" : "§7Vanish: §cOFF");
         return true;
     }

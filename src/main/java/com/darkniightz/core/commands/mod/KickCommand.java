@@ -45,7 +45,7 @@ public class KickCommand implements CommandExecutor {
         String reason = args.length >= 2 ? String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)) : "Kicked";
         // log
         var entry = ModerationLogger.entry("kick", p.getName(), p.getUniqueId(), reason, null, null);
-        ModerationLogger.log(profiles, target.getUniqueId(), entry);
+        ModerationLogger.log(target.getUniqueId(), entry);
         // kick
         target.kick(net.kyori.adventure.text.Component.text("§cYou were kicked. §7Reason: §e" + reason));
         sender.sendMessage("§aKicked §e"+target.getName()+" §7for: §f"+reason);

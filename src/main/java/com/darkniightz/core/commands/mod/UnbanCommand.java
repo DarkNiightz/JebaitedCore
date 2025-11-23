@@ -38,7 +38,7 @@ public class UnbanCommand implements CommandExecutor {
         tp.setBanUntil(null); tp.setBanReason(null); tp.setBanActor(null);
         profiles.save(target.getUniqueId());
         var entry = ModerationLogger.entry("unban", p.getName(), p.getUniqueId(), null, null, null);
-        ModerationLogger.log(profiles, target.getUniqueId(), entry);
+        ModerationLogger.log(target.getUniqueId(), entry);
         sender.sendMessage("§aUnbanned §e" + (target.getName()!=null?target.getName():target.getUniqueId()));
         return true;
     }

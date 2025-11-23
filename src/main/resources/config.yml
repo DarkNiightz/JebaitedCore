@@ -211,6 +211,24 @@ hub:
     on_death_teleport_spawn: true
 
 # --------------------
+# Database (PostgreSQL)
+# --------------------
+database:
+  enabled: true
+  host: "localhost"
+  port: 5432
+  database: "jebaited"
+  username: "user"
+  password: "password"
+  # Connection pool settings (HikariCP)
+  pool-settings:
+    maximum-pool-size: 10
+    minimum-idle: 5
+    connection-timeout: 30000 # 30 seconds
+    idle-timeout: 600000 # 10 minutes
+    max-lifetime: 1800000 # 30 minutes
+
+# --------------------
 # Cosmetics catalog and rules (DB‑ready structure)
 # --------------------
 cosmetics:

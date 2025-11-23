@@ -22,8 +22,15 @@ import com.darkniightz.core.commands.MenuCommand;
 import com.darkniightz.core.cosmetics.CosmeticsManager;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
 import com.darkniightz.core.commands.CosmeticsCommand;
+import com.darkniightz.main.PlayerProfileDAO;
+import com.darkniightz.main.database.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.logging.Level;
 
 public final class JebaitedCore extends JavaPlugin {
 
@@ -35,11 +42,20 @@ public final class JebaitedCore extends JavaPlugin {
     private ModerationManager moderationManager;
     private CosmeticsManager cosmeticsManager;
     private CosmeticsEngine cosmeticsEngine;
+    private DatabaseManager databaseManager;
+    private PlayerProfileDAO playerProfileDAO;
 
     @Override
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+
+        // Initialize and connect to the database
+        this.databaseManager = new DatabaseManager(this);
+        this.databaseManager.connect();
+
+        // Initialize DAOs
+        this.playerProfileDAO = new PlayerProfileDAO(databaseManager, getLogger());
 
         // Initialize file-backed stores/managers
         this.rankManager = new RankManager(this);
@@ -48,6 +64,11 @@ public final class JebaitedCore extends JavaPlugin {
         this.moderationManager = new ModerationManager(this);
         this.cosmeticsManager = new CosmeticsManager(this);
         this.cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager, rankManager);
+
+        // Initialize database tables
+        if (databaseManager.isEnabled()) {
+            initializeDatabaseTables();
+        }
 
         // Register listeners (chat renderer + first-join setup)
         Bukkit.getPluginManager().registerEvents(new ChatListener(this, rankManager, profileStore, moderationManager, devModeManager), this);
@@ -101,6 +122,10 @@ public final class JebaitedCore extends JavaPlugin {
         // Persist any pending caches
         if (profileStore != null) profileStore.flushAll();
         if (cosmeticsEngine != null) cosmeticsEngine.stop();
+        // Disconnect from the database
+        if (this.databaseManager != null) {
+            this.databaseManager.disconnect();
+        }
         getLogger().info("§cJebaitedCore §7DISABLED – All saved!");
     }
 
@@ -111,4 +136,64 @@ public final class JebaitedCore extends JavaPlugin {
     public DevModeManager getDevModeManager() { return devModeManager; }
     public ModerationManager getModerationManager() { return moderationManager; }
     public CosmeticsManager getCosmeticsManager() { return cosmeticsManager; }
+    public DatabaseManager getDatabaseManager() {
+        return databaseManager;
+    }
+    public PlayerProfileDAO getPlayerProfileDAO() {
+        return playerProfileDAO;
+    }
+
+    /**
+     * Creates the necessary database tables if they don't exist.
+     */
+    private void initializeDatabaseTables() {
+        // Using a try-with-resources statement to ensure the connection is closed automatically.
+        String playersSql = "CREATE TABLE IF NOT EXISTS players (" +
+                "uuid VARCHAR(36) PRIMARY KEY," +
+                "username VARCHAR(16) NOT NULL," +
+                "rank VARCHAR(32) NOT NULL," +
+                "first_joined BIGINT NOT NULL," +
+                "last_joined BIGINT NOT NULL" +
+                ");";
+
+        String playerStatsSql = "CREATE TABLE IF NOT EXISTS player_stats (" +
+                "uuid VARCHAR(36) PRIMARY KEY," +
+                "kills INT NOT NULL DEFAULT 0," +
+                "deaths INT NOT NULL DEFAULT 0," +
+                "commands_sent INT NOT NULL DEFAULT 0," +
+                "CONSTRAINT fk_player FOREIGN KEY(uuid) REFERENCES players(uuid) ON DELETE CASCADE" +
+                ");";
+
+        String moderationHistorySql = "CREATE TABLE IF NOT EXISTS moderation_history (" +
+                "id SERIAL PRIMARY KEY," +
+                "target_uuid VARCHAR(36) NOT NULL," +
+                "type VARCHAR(32) NOT NULL," +
+                "actor VARCHAR(16)," +
+                "actor_uuid VARCHAR(36)," +
+                "reason VARCHAR(255)," +
+                "duration_ms BIGINT," +
+                "expires_at BIGINT," +
+                "timestamp BIGINT NOT NULL" +
+                ");";
+
+        String playerCosmeticsSql = "CREATE TABLE IF NOT EXISTS player_cosmetics (" +
+                "id SERIAL PRIMARY KEY," +
+                "player_uuid VARCHAR(36) NOT NULL," +
+                "cosmetic_id VARCHAR(64) NOT NULL," +
+                "cosmetic_type VARCHAR(32) NOT NULL," +
+                "is_active BOOLEAN NOT NULL DEFAULT false," +
+                "CONSTRAINT fk_player_cosmetic FOREIGN KEY(player_uuid) REFERENCES players(uuid) ON DELETE CASCADE," +
+                "UNIQUE(player_uuid, cosmetic_id, cosmetic_type)" +
+                ");";
+
+        try (Connection conn = databaseManager.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute(playersSql);
+            stmt.execute(playerStatsSql);
+            stmt.execute(moderationHistorySql);
+            stmt.execute(playerCosmeticsSql);
+        } catch (SQLException e) {
+            getLogger().log(Level.SEVERE, "Could not create database tables!", e);
+        }
+    }
 }

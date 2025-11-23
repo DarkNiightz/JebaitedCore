@@ -26,7 +26,7 @@ public class CommandTrackingListener implements Listener {
     public void onCommand(PlayerCommandPreprocessEvent event) {
         Player p = event.getPlayer();
         PlayerProfile prof = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        prof.incCommands();
-        profiles.save(p.getUniqueId());
+        if (prof == null) return; // Should not happen for an online player
+        prof.incCommands(); // This updates the cached object. It will be saved later.
     }
 }

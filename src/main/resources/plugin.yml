@@ -5,6 +5,10 @@ api-version: 1.21
 author: DarkNiightz
 description: Jebaited Core Plugin.
 
+libraries:
+  - com.zaxxer:HikariCP:5.1.0
+  - org.postgresql:postgresql:42.7.3
+
 commands:
   # Core/help
   jebaited:

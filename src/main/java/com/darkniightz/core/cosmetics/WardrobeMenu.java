@@ -36,6 +36,7 @@ public class WardrobeMenu extends BaseMenu {
         for (int i = 9; i < 36; i++) inv.setItem(i, null);
 
         PlayerProfile prof = profiles.getOrCreate(viewer, plugin.getConfig().getString("ranks.default", "friend"));
+        if (prof == null) return; // Database might be disabled
         List<CosmeticsManager.Cosmetic> list = switch (current) {
             case PARTICLES -> cosmetics.getByCategory(CosmeticsManager.Category.PARTICLES);
             case TRAILS -> cosmetics.getByCategory(CosmeticsManager.Category.TRAILS);
@@ -67,6 +68,7 @@ public class WardrobeMenu extends BaseMenu {
 
         if (slot >= 9) {
             PlayerProfile prof = profiles.getOrCreate(who, plugin.getConfig().getString("ranks.default", "friend"));
+            if (prof == null) return true; // DB disabled
             List<CosmeticsManager.Cosmetic> list = switch (current) {
                 case PARTICLES -> cosmetics.getByCategory(CosmeticsManager.Category.PARTICLES);
                 case TRAILS -> cosmetics.getByCategory(CosmeticsManager.Category.TRAILS);

@@ -1,136 +1,139 @@
 package com.darkniightz.core.players;
 
+import com.darkniightz.main.JebaitedCore;
+import com.darkniightz.main.PlayerProfileDAO;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Manages a cache of PlayerProfile objects.
+ * Handles loading from and saving to the database.
+ */
 public class ProfileStore {
-    private final Plugin plugin;
-    private final File dir;
-    private final Map<UUID, PlayerProfile> cache = new HashMap<>();
 
-    public ProfileStore(Plugin plugin) {
+    private final JebaitedCore plugin;
+    private final PlayerProfileDAO dao;
+    private final Map<UUID, PlayerProfile> profileCache = new ConcurrentHashMap<>();
+
+    public ProfileStore(JebaitedCore plugin) {
         this.plugin = plugin;
-        this.dir = new File(plugin.getDataFolder(), "players");
-        if (!dir.exists()) dir.mkdirs();
+        this.dao = plugin.getPlayerProfileDAO();
     }
 
+    /**
+     * Gets a player's profile from the cache. If not in the cache, it's loaded from the database.
+     * If it's not in the database (e.g., first join), a new profile is created and saved.
+     *
+     * @param player The player to get the profile for.
+     * @param defaultRank The rank to assign if the player is new.
+     * @return The PlayerProfile, or null if the database is disabled.
+     */
     public PlayerProfile getOrCreate(Player player, String defaultRank) {
-        return getOrCreate(player.getUniqueId(), player.getName(), defaultRank);
-    }
+        if (!plugin.getDatabaseManager().isEnabled()) {
+            return null; // Cannot function without a database
+        }
 
-    public PlayerProfile getOrCreate(OfflinePlayer player, String defaultRank) {
-        return getOrCreate(player.getUniqueId(), player.getName(), defaultRank);
-    }
+        UUID uuid = player.getUniqueId();
+        // 1. Check cache
+        if (profileCache.containsKey(uuid)) {
+            return profileCache.get(uuid);
+        }
 
-    public PlayerProfile get(UUID uuid) {
-        return cache.get(uuid);
-    }
+        // 2. Not in cache, try loading from DB
+        PlayerProfile profile = dao.loadPlayerProfile(uuid);
 
-    public PlayerProfile getOrCreate(UUID uuid, String name, String defaultRank) {
-        PlayerProfile cached = cache.get(uuid);
-        if (cached != null) return cached;
-
-        File f = file(uuid);
-        if (f.exists()) {
-            YamlConfiguration yml = YamlConfiguration.loadConfiguration(f);
-            PlayerProfile p = new PlayerProfile();
-            p.setUuid(uuid);
-            p.setName(yml.getString("name", name));
-            p.setPrimaryRank(yml.getString("primaryRank", defaultRank));
-            p.setCosmeticTickets(yml.getInt("cosmeticTickets", 0));
-            p.setMessagesSent(yml.getInt("messagesSent", 0));
-            p.setCommandsSent(yml.getInt("commandsSent", 0));
-            // Cosmetics
-            java.util.List<String> unlocked = yml.getStringList("cosmetics.unlocked");
-            p.setCosmeticsUnlocked(new java.util.HashSet<>(unlocked));
-            p.setEquippedParticles(yml.getString("cosmetics.equipped.particles", null));
-            p.setEquippedTrail(yml.getString("cosmetics.equipped.trail", null));
-            p.setEquippedGadget(yml.getString("cosmetics.equipped.gadget", null));
-            // Moderation fields
-            p.setMuteUntil(loadLong(yml, "moderation.muteUntil"));
-            p.setMuteReason(yml.getString("moderation.muteReason"));
-            p.setMuteActor(yml.getString("moderation.muteActor"));
-            p.setBanUntil(loadLong(yml, "moderation.banUntil"));
-            p.setBanReason(yml.getString("moderation.banReason"));
-            p.setBanActor(yml.getString("moderation.banActor"));
-            java.util.List<?> logSec = yml.getList("moderation.log");
-            if (logSec != null) {
-                java.util.List<java.util.Map<String,Object>> entries = new java.util.ArrayList<>();
-                for (Object o : logSec) {
-                    if (o instanceof java.util.Map<?,?> m) {
-                        java.util.Map<String,Object> entry = new java.util.HashMap<>();
-                        for (java.util.Map.Entry<?,?> e : m.entrySet()) {
-                            if (e.getKey() != null) entry.put(e.getKey().toString(), e.getValue());
-                        }
-                        entries.add(entry);
-                    }
-                }
-                p.setModerationLog(entries);
-            }
-            cache.put(uuid, p);
-            return p;
+        // 3. Not in DB, create a new profile for a new player
+        if (profile == null) {
+            profile = new PlayerProfile(uuid, player.getName());
+            profile.setRank(defaultRank);
+            long now = System.currentTimeMillis();
+            profile.setFirstJoined(now);
+            profile.setLastJoined(now);
+            // Save the new profile immediately to create the DB record
+            dao.savePlayerProfile(profile);
         } else {
-            PlayerProfile p = new PlayerProfile(uuid, name, defaultRank.toLowerCase(Locale.ROOT));
-            cache.put(uuid, p);
-            save(uuid);
-            return p;
+            // Update last joined time for existing player
+            profile.setLastJoined(System.currentTimeMillis());
+        }
+
+        // 4. Add to cache
+        profileCache.put(uuid, profile);
+        return profile;
+    }
+
+    /**
+     * Overload for OfflinePlayer (commands may target offline players).
+     */
+    public PlayerProfile getOrCreate(OfflinePlayer player, String defaultRank) {
+        if (!plugin.getDatabaseManager().isEnabled()) {
+            return null;
+        }
+        UUID uuid = player.getUniqueId();
+        if (uuid == null) return null;
+        if (profileCache.containsKey(uuid)) return profileCache.get(uuid);
+
+        PlayerProfile profile = dao.loadPlayerProfile(uuid);
+        if (profile == null) {
+            String name = player.getName() != null ? player.getName() : uuid.toString();
+            profile = new PlayerProfile(uuid, name);
+            profile.setRank(defaultRank);
+            long now = System.currentTimeMillis();
+            profile.setFirstJoined(now);
+            profile.setLastJoined(now);
+            dao.savePlayerProfile(profile);
+        } else {
+            profile.setLastJoined(System.currentTimeMillis());
+        }
+        profileCache.put(uuid, profile);
+        return profile;
+    }
+
+    /**
+     * Gets a profile from the cache only. Does not load from DB.
+     *
+     * @param uuid The player's UUID.
+     * @return The cached PlayerProfile, or null if not online/cached.
+     */
+    public PlayerProfile get(UUID uuid) {
+        return profileCache.get(uuid);
+    }
+
+    /**
+     * Removes a player's profile from the cache (e.g., on quit).
+     *
+     * @param uuid The player's UUID.
+     */
+    public void unload(UUID uuid) {
+        PlayerProfile profile = profileCache.remove(uuid);
+        if (profile != null) {
+            // Save on unload
+            dao.savePlayerProfile(profile);
         }
     }
 
-    public void save(UUID uuid) {
-        PlayerProfile p = cache.get(uuid);
-        if (p == null) return;
-        File f = file(uuid);
-        YamlConfiguration yml = new YamlConfiguration();
-        yml.set("uuid", p.getUuid().toString());
-        yml.set("name", p.getName());
-        yml.set("primaryRank", p.getPrimaryRank());
-        yml.set("cosmeticTickets", p.getCosmeticTickets());
-        yml.set("messagesSent", p.getMessagesSent());
-        yml.set("commandsSent", p.getCommandsSent());
-        // Cosmetics
-        yml.set("cosmetics.unlocked", new java.util.ArrayList<>(p.getCosmeticsUnlocked()));
-        yml.set("cosmetics.equipped.particles", p.getEquippedParticles());
-        yml.set("cosmetics.equipped.trail", p.getEquippedTrail());
-        yml.set("cosmetics.equipped.gadget", p.getEquippedGadget());
-        // Moderation fields
-        if (p.getMuteUntil() != null) yml.set("moderation.muteUntil", p.getMuteUntil()); else yml.set("moderation.muteUntil", null);
-        yml.set("moderation.muteReason", p.getMuteReason());
-        yml.set("moderation.muteActor", p.getMuteActor());
-        if (p.getBanUntil() != null) yml.set("moderation.banUntil", p.getBanUntil()); else yml.set("moderation.banUntil", null);
-        yml.set("moderation.banReason", p.getBanReason());
-        yml.set("moderation.banActor", p.getBanActor());
-        yml.set("moderation.log", p.getModerationLog());
-        yml.set("createdAt", p.getCreatedAt());
-        yml.set("updatedAt", p.getUpdatedAt());
-        try {
-            yml.save(f);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save profile for " + uuid + ": " + e.getMessage());
-        }
-    }
-
+    /**
+     * Saves all currently cached profiles to the database.
+     * Called on server shutdown to ensure all data is persisted.
+     */
     public void flushAll() {
-        for (UUID uuid : cache.keySet()) {
-            save(uuid);
+        if (!plugin.getDatabaseManager().isEnabled()) return;
+
+        plugin.getLogger().info("Saving all cached player profiles to the database...");
+        for (PlayerProfile profile : profileCache.values()) {
+            dao.savePlayerProfile(profile);
         }
+        plugin.getLogger().info("... all profiles saved.");
     }
 
-    private File file(UUID uuid) {
-        return new File(dir, uuid.toString() + ".yml");
-    }
-
-    private Long loadLong(YamlConfiguration yml, String path) {
-        if (!yml.isSet(path)) return null;
-        try { return yml.getLong(path); } catch (Exception e) { return null; }
+    /**
+     * Persist a single cached player profile immediately.
+     */
+    public void save(UUID uuid) {
+        PlayerProfile p = profileCache.get(uuid);
+        if (p != null) dao.savePlayerProfile(p);
     }
 }
