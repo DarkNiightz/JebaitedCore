@@ -110,7 +110,8 @@ public class PlayerProfileDAO {
                 ResultSet rs = pstmt.executeQuery();
                 if (rs.next()) {
                     profile = new PlayerProfile(uuid, rs.getString("username"));
-                    profile.setRank(rs.getString("rank"));
+                    // Use special setter that does not mark the rank as dirty on load
+                    profile.setRankLoaded(rs.getString("rank"));
                     profile.setFirstJoined(rs.getLong("first_joined"));
                     profile.setLastJoined(rs.getLong("last_joined"));
                 }
@@ -158,10 +159,17 @@ public class PlayerProfileDAO {
     }
 
     public void savePlayerProfile(PlayerProfile profile) {
-        String playerUpsertSql = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
+        // If the rank hasn't been changed in-memory, avoid overwriting the DB value.
+        // Use two variants: one that updates rank (when dirty or inserting new), and one that leaves it untouched.
+        String playerUpsertWithRank = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
                 "VALUES (?, ?, ?, ?, ?) " +
                 "ON CONFLICT (uuid) DO UPDATE SET " +
                 "username = EXCLUDED.username, rank = EXCLUDED.rank, last_joined = EXCLUDED.last_joined;";
+
+        String playerUpsertNoRank = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
+                "VALUES (?, ?, COALESCE((SELECT rank FROM players WHERE uuid = EXCLUDED.uuid), EXCLUDED.rank), ?, ?) " +
+                "ON CONFLICT (uuid) DO UPDATE SET " +
+                "username = EXCLUDED.username, last_joined = EXCLUDED.last_joined;";
 
         String statsUpsertSql = "INSERT INTO player_stats (uuid, commands_sent) " +
                 "VALUES (?, ?) " +
@@ -175,7 +183,9 @@ public class PlayerProfileDAO {
         try (Connection conn = dbManager.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
-            try (PreparedStatement psPlayer = conn.prepareStatement(playerUpsertSql);
+            boolean updateRank = profile.isRankDirty();
+            String playerSql = updateRank ? playerUpsertWithRank : playerUpsertNoRank;
+            try (PreparedStatement psPlayer = conn.prepareStatement(playerSql);
                  PreparedStatement psStats = conn.prepareStatement(statsUpsertSql)) {
 
                 // Player data
@@ -185,6 +195,8 @@ public class PlayerProfileDAO {
                 psPlayer.setLong(4, profile.getFirstJoined());
                 psPlayer.setLong(5, profile.getLastJoined());
                 psPlayer.executeUpdate();
+                // Clear rank dirty flag after successful write
+                if (updateRank) profile.clearRankDirty();
 
                 // Stats data
                 psStats.setString(1, profile.getUuid().toString());

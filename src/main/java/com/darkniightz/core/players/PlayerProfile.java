@@ -15,6 +15,8 @@ public class PlayerProfile {
 
     // Data from 'players' table
     private String rank;
+    // Tracks if the rank was modified in-memory since last load/save
+    private boolean rankDirty = false;
     private long firstJoined;
     private long lastJoined;
 
@@ -80,8 +82,14 @@ public class PlayerProfile {
     }
 
     // Setters
-    public void setRank(String rank) { this.rank = rank; }
-    public void setPrimaryRank(String rank) { this.rank = rank; }
+    public void setRank(String rank) { this.rank = rank; this.rankDirty = true; }
+    public void setPrimaryRank(String rank) { this.rank = rank; this.rankDirty = true; }
+
+    /**
+     * Sets the rank when loading from the database without marking it as modified.
+     * Use only from DAO layer.
+     */
+    public void setRankLoaded(String rank) { this.rank = rank; this.rankDirty = false; }
     public void setFirstJoined(long firstJoined) { this.firstJoined = firstJoined; }
     public void setLastJoined(long lastJoined) { this.lastJoined = lastJoined; }
     public void setCommandsSent(int commandsSent) { this.commandsSent = commandsSent; }
@@ -141,4 +149,8 @@ public class PlayerProfile {
     public void setBanUntil(Long until) { this.banUntil = until; }
     public void setBanReason(String reason) { this.banReason = reason; }
     public void setBanActor(String actor) { this.banActor = actor; }
+
+    // Dirty tracking helpers
+    public boolean isRankDirty() { return rankDirty; }
+    public void clearRankDirty() { this.rankDirty = false; }
 }

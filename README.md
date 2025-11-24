@@ -128,7 +128,34 @@ Development notes and scripts
 - Build: mvn clean package
 - Clean only: mvn clean
 - Install to local repo: mvn install
-- TODO: Add a dev server run script/docker-compose for spinning up a Paper test server with mounted plugins and a PostgreSQL container.
+- Dev server with Docker (Paper + PostgreSQL)
+  - Prerequisites: Docker Desktop
+  - What you get:
+    - A PostgreSQL 16 container (db) with database "jebaited", user "user", password "password".
+    - A Paper 1.21.1 server container with your built JAR mounted into /data/plugins/JebaitedCore.jar
+    - Bind mounts for persistent data under ./dev (./dev/server for Paper data, ./dev/postgres for DB data, ./dev/plugins for extra plugins)
+  - First time setup:
+    1) Build the plugin JAR:
+       mvn clean package
+    2) Configure the plugin to use the DB inside Docker by setting these in plugins/JebaitedCore/config.yml (or src/main/resources/config.yml before first run):
+       database:
+         enabled: true
+         host: "db"        # service name inside docker-compose network
+         port: 5432
+         database: "jebaited"
+         username: "user"
+         password: "password"
+    3) Start the stack:
+       docker compose up -d
+    4) Connect your Minecraft client to localhost:25565
+  - Iterating on the plugin:
+    - Rebuild after changes: mvn package
+    - Restart the Paper container to pick up the updated JAR:
+      docker compose restart paper
+    - You can drop additional plugins into ./dev/plugins to mount them into the server at /data/plugins
+  - Stopping and cleanup:
+    - Stop containers: docker compose down
+    - Persistent data is stored under ./dev; delete those folders to reset state.
 
 License
 - No license file is present. TODO: Add a LICENSE file (e.g., MIT/Apache-2.0) and update this section accordingly.
