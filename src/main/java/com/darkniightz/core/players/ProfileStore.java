@@ -136,4 +136,36 @@ public class ProfileStore {
         PlayerProfile p = profileCache.get(uuid);
         if (p != null) dao.savePlayerProfile(p);
     }
+
+    /**
+     * Clears the cache and reloads profiles for all currently online players from the database.
+     * If a player is not found in DB, a new profile is created using the provided default rank.
+     * This is used by the reload command to refresh in-memory state after config changes.
+     *
+     * @param defaultRank The default rank to use when creating new profiles
+     */
+    public void reloadOnlineFromDatabase(String defaultRank) {
+        if (!plugin.getDatabaseManager().isEnabled()) return;
+
+        // Clear cache but do not save here (caller should have flushed already)
+        profileCache.clear();
+
+        // Re-hydrate all online players
+        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            UUID uuid = p.getUniqueId();
+            PlayerProfile profile = dao.loadPlayerProfile(uuid);
+            if (profile == null) {
+                profile = new PlayerProfile(uuid, p.getName());
+                profile.setRank(defaultRank);
+                long now = System.currentTimeMillis();
+                profile.setFirstJoined(now);
+                profile.setLastJoined(now);
+                dao.savePlayerProfile(profile);
+            } else {
+                profile.setLastJoined(System.currentTimeMillis());
+                dao.savePlayerProfile(profile);
+            }
+            profileCache.put(uuid, profile);
+        }
+    }
 }

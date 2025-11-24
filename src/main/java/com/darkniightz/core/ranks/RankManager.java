@@ -36,18 +36,20 @@ public class RankManager {
     }
 
     public boolean isAtLeast(String subjectRank, String minimumRank) {
-        if (subjectRank == null) return false;
-        Integer s = rankIndex.get(subjectRank.toLowerCase(Locale.ROOT));
-        Integer m = rankIndex.get(minimumRank.toLowerCase(Locale.ROOT));
+        String sNorm = normalizeGroup(subjectRank);
+        String mNorm = normalizeGroup(minimumRank);
+        if (sNorm == null || mNorm == null) return false;
+        Integer s = rankIndex.get(sNorm);
+        Integer m = rankIndex.get(mNorm);
         if (s == null || m == null) return false;
         return s <= m; // higher up the ladder means lower index
     }
 
     public RankStyle getStyle(String rank) {
-        if (rank == null) rank = defaultGroup;
+        rank = normalizeGroup(rank);
         ConfigurationSection styles = plugin.getConfig().getConfigurationSection("rank_styles");
         if (styles == null) return RankStyle.defaultStyle();
-        ConfigurationSection sec = styles.getConfigurationSection(rank.toLowerCase(Locale.ROOT));
+        ConfigurationSection sec = styles.getConfigurationSection(rank);
         if (sec == null) return RankStyle.defaultStyle();
 
         // Rainbow config
@@ -73,8 +75,9 @@ public class RankManager {
     }
 
     public int indexOf(String rank) {
-        if (rank == null) return Integer.MAX_VALUE;
-        Integer idx = rankIndex.get(rank.toLowerCase(Locale.ROOT));
+        String norm = normalizeGroup(rank);
+        if (norm == null) return Integer.MAX_VALUE;
+        Integer idx = rankIndex.get(norm);
         return idx == null ? Integer.MAX_VALUE : idx;
     }
 
@@ -82,6 +85,64 @@ public class RankManager {
         int a = indexOf(actorRank);
         int t = indexOf(targetRank);
         return a < t; // smaller index = higher rank; must be strictly higher
+    }
+
+    /**
+     * Normalizes legacy/aliased rank values (including old color-code based ranks)
+     * into a canonical ladder key present in rankIndex. Returns lower-case group name
+     * or defaultGroup if input is null/unknown.
+     */
+    public String normalizeGroup(String input) {
+        if (input == null || input.isBlank()) return defaultGroup;
+        String s = input.trim().toLowerCase(Locale.ROOT);
+
+        // Direct hit
+        if (rankIndex.containsKey(s)) return s;
+
+        // Known aliases from older configs
+        if (s.equals("default")) return defaultGroup;
+        if (s.equals("srmoderator") || s.equals("srmod")) return "moderator";
+
+        // Color-code based legacy values: allow with or without '§' or '&'
+        // Extract last color code character if present
+        char code = 0;
+        if (s.startsWith("§") || s.startsWith("&")) {
+            if (s.length() >= 2) code = s.charAt(1);
+        } else if (s.length() == 1) {
+            // sometimes stored as just 'd', '5', etc.
+            code = s.charAt(0);
+        }
+        if (code != 0) {
+            switch (code) {
+                case 'd':
+                    return ladderContains("friend") ? "friend" : defaultGroup;
+                case '5': // dark purple used previously for VIP
+                case '6': // gold often used for VIP
+                    return ladderContains("vip") ? "vip" : defaultGroup;
+                case 'b': // aqua -> helper in new config
+                    return ladderContains("helper") ? "helper" : defaultGroup;
+                case 'a': // green -> moderator (approx)
+                    return ladderContains("moderator") ? "moderator" : defaultGroup;
+                case 'c': // red -> admin/mod
+                case '4': // dark red -> admin
+                    if (ladderContains("admin")) return "admin";
+                    if (ladderContains("moderator")) return "moderator";
+                    break;
+                case '9': // blue -> builder
+                    return ladderContains("builder") ? "builder" : defaultGroup;
+                case 'e': // yellow -> supporter tier
+                    if (ladderContains("supporter1")) return "supporter1";
+                    if (ladderContains("supporter")) return "supporter"; // fallback
+                    break;
+            }
+        }
+
+        // As a last resort, if not recognized, fall back to default
+        return defaultGroup;
+    }
+
+    private boolean ladderContains(String key) {
+        return rankIndex.containsKey(key);
     }
 
     public static final class RankStyle {

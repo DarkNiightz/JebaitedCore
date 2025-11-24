@@ -166,8 +166,12 @@ public class PlayerProfileDAO {
                 "ON CONFLICT (uuid) DO UPDATE SET " +
                 "username = EXCLUDED.username, rank = EXCLUDED.rank, last_joined = EXCLUDED.last_joined;";
 
+        // Note: In the no-rank-update path, we still provide a rank value for INSERTs,
+        // but on conflict we do NOT update the rank. This avoids referencing EXCLUDED
+        // in the VALUES clause (which is not allowed in PostgreSQL) and fixes the
+        // "missing FROM-clause entry for table 'excluded'" error.
         String playerUpsertNoRank = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
-                "VALUES (?, ?, COALESCE((SELECT rank FROM players WHERE uuid = EXCLUDED.uuid), EXCLUDED.rank), ?, ?) " +
+                "VALUES (?, ?, ?, ?, ?) " +
                 "ON CONFLICT (uuid) DO UPDATE SET " +
                 "username = EXCLUDED.username, last_joined = EXCLUDED.last_joined;";
 
@@ -189,11 +193,21 @@ public class PlayerProfileDAO {
                  PreparedStatement psStats = conn.prepareStatement(statsUpsertSql)) {
 
                 // Player data
-                psPlayer.setString(1, profile.getUuid().toString());
-                psPlayer.setString(2, profile.getName());
-                psPlayer.setString(3, profile.getRank());
-                psPlayer.setLong(4, profile.getFirstJoined());
-                psPlayer.setLong(5, profile.getLastJoined());
+                if (updateRank) {
+                    // Matches 5 placeholders in playerUpsertWithRank
+                    psPlayer.setString(1, profile.getUuid().toString());
+                    psPlayer.setString(2, profile.getName());
+                    psPlayer.setString(3, profile.getRank());
+                    psPlayer.setLong(4, profile.getFirstJoined());
+                    psPlayer.setLong(5, profile.getLastJoined());
+                } else {
+                    // Matches 5 placeholders in playerUpsertNoRank
+                    psPlayer.setString(1, profile.getUuid().toString());
+                    psPlayer.setString(2, profile.getName());
+                    psPlayer.setString(3, profile.getRank());
+                    psPlayer.setLong(4, profile.getFirstJoined());
+                    psPlayer.setLong(5, profile.getLastJoined());
+                }
                 psPlayer.executeUpdate();
                 // Clear rank dirty flag after successful write
                 if (updateRank) profile.clearRankDirty();
