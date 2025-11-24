@@ -48,9 +48,9 @@ public class RankManager {
     public RankStyle getStyle(String rank) {
         rank = normalizeGroup(rank);
         ConfigurationSection styles = plugin.getConfig().getConfigurationSection("rank_styles");
-        if (styles == null) return RankStyle.defaultStyle();
+        if (styles == null) return fallbackStyle(rank);
         ConfigurationSection sec = styles.getConfigurationSection(rank);
-        if (sec == null) return RankStyle.defaultStyle();
+        if (sec == null) return fallbackStyle(rank);
 
         // Rainbow config
         ConfigurationSection rainbow = sec.getConfigurationSection("name_rainbow");
@@ -68,6 +68,43 @@ public class RankManager {
         boolean bold = sec.getBoolean("name_bold", false);
         String prefix = sec.getString("prefix", "");
         return RankStyle.colored(prefix, color, bold);
+    }
+
+    /**
+     * Built-in fallback styles used when rank_styles is missing from config or
+     * the requested group key is not present. This ensures prefixes and name
+     * colors still work out-of-the-box and after migrations.
+     */
+    private RankStyle fallbackStyle(String group) {
+        String g = group == null ? defaultGroup : group.toLowerCase(Locale.ROOT);
+        switch (g) {
+            case "owner":
+                return RankStyle.colored("§4§lOWNER", "§4", true);
+            case "developer":
+                return RankStyle.rainbow("§5§lDEV", List.of("4","c","6","e","2","a","b","3","1","9","d","5"), true);
+            case "admin":
+                return RankStyle.colored("§c§lADMIN", "§c", true);
+            case "moderator":
+                return RankStyle.colored("§a§lMOD", "§a", true);
+            case "helper":
+                return RankStyle.colored("§b§lHELPER", "§b", false);
+            case "vip":
+                return RankStyle.colored("§6§lVIP", "§6", false);
+            case "friend":
+                return RankStyle.colored("§d§lFRIEND", "§d", false);
+            case "builder":
+                return RankStyle.colored("§9§lBUILDER", "§9", false);
+            case "supporter1":
+                return RankStyle.colored("§e§lSUP1", "§e", false);
+            case "supporter2":
+                return RankStyle.colored("§e§lSUP2", "§e", false);
+            case "supporter3":
+                return RankStyle.colored("§e§lSUP3", "§e", false);
+            default:
+                // For any unknown group, fall back to default group recursively to keep consistency
+                if (!g.equals(defaultGroup)) return fallbackStyle(defaultGroup);
+                return RankStyle.defaultStyle();
+        }
     }
 
     public List<String> getLadder() {
