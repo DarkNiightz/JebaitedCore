@@ -14,6 +14,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 public class WarnCommand implements CommandExecutor {
     private final ProfileStore profiles;
     private final RankManager ranks;
@@ -27,19 +29,40 @@ public class WarnCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
-        PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
-        if (args.length < 2) { sender.sendMessage("§eUsage: §7/"+label+" <player> <reason>"); return true; }
+        String actorName = sender instanceof Player p ? p.getName() : "_console_";
+        UUID actorUuid = sender instanceof Player p ? p.getUniqueId() : UUID.fromString("00000000-0000-0000-0000-000000000000");
+        boolean isConsole = !(sender instanceof Player);
+
+        if (!isConsole) {
+            Player p = (Player) sender;
+            PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("§eUsage: §7/" + label + " <player> <reason>");
+            return true;
+        }
+
         OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
-        if (target.getUniqueId() == null) { sender.sendMessage("§cPlayer not found: §e"+args[0]); return true; }
+        if (target.getUniqueId() == null) {
+            sender.sendMessage("§cPlayer not found: §e" + args[0]);
+            return true;
+        }
+
         String reason = String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length));
-        profiles.getOrCreate(target, ranks.getDefaultGroup());
-        var entry = ModerationLogger.entry("warn", p.getName(), p.getUniqueId(), reason, null, null);
+
+        var entry = ModerationLogger.entry("warn", actorName, actorUuid, reason, null, null);
         ModerationLogger.log(target.getUniqueId(), entry);
-        if (target.isOnline()) target.getPlayer().sendMessage("§eYou have been warned: §f"+reason);
-        sender.sendMessage("§aWarned §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7for: §f"+reason);
+
+        if (target.isOnline()) {
+            target.getPlayer().sendMessage("§eYou have been warned: §f" + reason);
+        }
+        sender.sendMessage("§aWarned §e" + (target.getName() != null ? target.getName() : target.getUniqueId()) + " §7for: §f" + reason);
         return true;
     }
 }

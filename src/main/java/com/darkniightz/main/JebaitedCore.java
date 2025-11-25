@@ -185,7 +185,6 @@ public final class JebaitedCore extends JavaPlugin {
         getCommand("setrank").setExecutor(new SetRankCommand(profileStore, rankManager, devModeManager));
         getCommand("tickets").setExecutor(new TicketsCommand(profileStore, rankManager, devModeManager));
         getCommand("stats").setExecutor(new StatsCommand(profileStore, rankManager));
-        getCommand("coins").setExecutor(new com.darkniightz.core.commands.CoinsCommand(profileStore, rankManager, devModeManager));
         getCommand("devmode").setExecutor(new DevModeCommand(devModeManager));
         getCommand("jebaited").setExecutor(new JebaitedCommand(profileStore, rankManager, devModeManager));
         // Reload

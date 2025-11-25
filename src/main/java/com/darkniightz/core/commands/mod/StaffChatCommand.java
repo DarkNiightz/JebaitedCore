@@ -13,6 +13,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 public class StaffChatCommand implements CommandExecutor {
     private final ProfileStore profiles;
     private final RankManager ranks;
@@ -28,20 +30,32 @@ public class StaffChatCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
-        PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) { sender.sendMessage(Messages.noPerm()); return true; }
+        String actorName = sender instanceof Player p ? p.getName() : "_console_";
+        boolean isConsole = !(sender instanceof Player);
+
+        if (!isConsole) {
+            Player p = (Player) sender;
+            PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+        }
 
         if (args.length == 0) {
+            if (isConsole) {
+                sender.sendMessage("§cCannot toggle staff chat from console.");
+                return true;
+            }
+            Player p = (Player) sender;
             boolean on = moderation.toggleStaffChat(p.getUniqueId());
             p.sendMessage(on ? "§dStaffChat: §aON" : "§dStaffChat: §cOFF");
             return true;
         }
 
-        // Send immediate staff message
         String msg = String.join(" ", args);
-        String out = "§d[Staff] §7" + p.getName() + ": §f" + msg;
+        String out = "§d[Staff] §7" + actorName + ": §f" + msg;
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             PlayerProfile vp = profiles.getOrCreate(viewer, ranks.getDefaultGroup());
             boolean staff = ranks.isAtLeast(vp.getPrimaryRank(), "helper") || (devMode != null && devMode.isActive(viewer.getUniqueId()));

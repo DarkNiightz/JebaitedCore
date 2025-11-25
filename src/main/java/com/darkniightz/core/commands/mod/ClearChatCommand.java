@@ -12,6 +12,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 public class ClearChatCommand implements CommandExecutor {
     private final ProfileStore profiles;
     private final RankManager ranks;
@@ -26,34 +28,39 @@ public class ClearChatCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player p)) { sender.sendMessage("§cIn-game only."); return true; }
-        PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
+        String actorName = sender instanceof Player p ? p.getName() : "_console_";
+        boolean isConsole = !(sender instanceof Player);
 
-        // Configurable minimum rank for using /clearchat
-        String minStaffRank = p.getServer().getPluginManager().getPlugin("JebaitedCore")
-                .getConfig().getString("moderation.clearchat.min_staff_rank", "helper");
+        if (!isConsole) {
+            Player p = (Player) sender;
+            PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
+            String minRank = p.getServer().getPluginManager().getPlugin("JebaitedCore")
+                    .getConfig().getString("moderation.clearchat.min_staff_rank", "helper");
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), minRank)) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+        }
 
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), minStaffRank)) { sender.sendMessage(Messages.noPerm()); return true; }
-
-        // Cooldown
-        int cooldownSec = p.getServer().getPluginManager().getPlugin("JebaitedCore")
+        int cooldownSec = Bukkit.getPluginManager().getPlugin("JebaitedCore")
                 .getConfig().getInt("moderation.clearchat.cooldown_seconds", 5);
         long now = System.currentTimeMillis();
         long remaining = (lastClearAt + cooldownSec * 1000L) - now;
-        if (!bypass && remaining > 0) {
+        if (!isConsole && remaining > 0) {
             long secs = (remaining + 999) / 1000;
-            p.sendMessage("§eClearChat cooldown: §7wait §e" + secs + "§7s");
+            sender.sendMessage("§eClearChat cooldown: §7wait §e" + secs + "§7s");
             return true;
         }
 
-        int blankLines = p.getServer().getPluginManager().getPlugin("JebaitedCore")
+        int blankLines = Bukkit.getPluginManager().getPlugin("JebaitedCore")
                 .getConfig().getInt("moderation.clearchat.blank_lines", 150);
-        String notice = "§7Chat was cleared by §e" + p.getName();
-        String filler = "§r"; // visible reset so clients actually push lines
+        String notice = "§7Chat was cleared by §e" + actorName;
+        String filler = "§r";
+
         for (Player online : Bukkit.getOnlinePlayers()) {
             PlayerProfile prof = profiles.getOrCreate(online, ranks.getDefaultGroup());
-            boolean staff = ranks.isAtLeast(prof.getPrimaryRank(), minStaffRank) || (devMode != null && devMode.isActive(online.getUniqueId()));
+            boolean staff = ranks.isAtLeast(prof.getPrimaryRank(), "helper") || (devMode != null && devMode.isActive(online.getUniqueId()));
             if (!staff) {
                 for (int i = 0; i < blankLines; i++) online.sendMessage(filler);
             }
