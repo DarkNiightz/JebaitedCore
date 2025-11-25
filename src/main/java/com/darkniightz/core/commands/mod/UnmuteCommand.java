@@ -37,7 +37,7 @@ public class UnmuteCommand implements CommandExecutor {
         tp.setMuteUntil(null); tp.setMuteReason(null); tp.setMuteActor(null);
         profiles.save(target.getUniqueId());
         var entry = com.darkniightz.core.moderation.ModerationLogger.entry("unmute", p.getName(), p.getUniqueId(), null, null, null);
-        ModerationLogger.log(profiles, target.getUniqueId(), entry);
+        ModerationLogger.log(target.getUniqueId(), entry);
         if (target.isOnline()) target.getPlayer().sendMessage("§aYou have been unmuted.");
         sender.sendMessage("§aUnmuted §e" + (target.getName()!=null?target.getName():target.getUniqueId()));
         return true;

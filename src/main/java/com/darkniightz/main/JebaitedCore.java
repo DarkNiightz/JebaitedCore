@@ -22,7 +22,7 @@ import com.darkniightz.core.commands.MenuCommand;
 import com.darkniightz.core.cosmetics.CosmeticsManager;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
 import com.darkniightz.core.commands.CosmeticsCommand;
-import com.darkniightz.main.database.dao.PlayerProfileDAO;
+import com.darkniightz.main.PlayerProfileDAO;
 import com.darkniightz.main.database.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -70,49 +70,9 @@ public final class JebaitedCore extends JavaPlugin {
             initializeDatabaseTables();
         }
 
-        // Register listeners (chat renderer + first-join setup)
-        Bukkit.getPluginManager().registerEvents(new ChatListener(this, rankManager, profileStore, moderationManager, devModeManager), this);
-        Bukkit.getPluginManager().registerEvents(new JoinListener(this, rankManager, profileStore), this);
-        Bukkit.getPluginManager().registerEvents(new CommandTrackingListener(profileStore, rankManager), this);
-        Bukkit.getPluginManager().registerEvents(new ModerationListener(profileStore, rankManager, moderationManager, this), this);
-        // GUI + Hub Hotbar
-        Bukkit.getPluginManager().registerEvents(new MenuListener(), this);
-        Bukkit.getPluginManager().registerEvents(new HotbarNavigatorListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new HubProtectionListener(this, profileStore, rankManager), this);
-        // Start cosmetics engine (particles/trails)
-        cosmeticsEngine.start();
-
-        // Register commands
-        getCommand("rank").setExecutor(new RankCommand(profileStore, rankManager, devModeManager));
-        getCommand("setrank").setExecutor(new SetRankCommand(profileStore, rankManager, devModeManager));
-        getCommand("tickets").setExecutor(new TicketsCommand(profileStore, rankManager, devModeManager));
-        getCommand("stats").setExecutor(new StatsCommand(profileStore, rankManager));
-        getCommand("devmode").setExecutor(new DevModeCommand(devModeManager));
-        getCommand("jebaited").setExecutor(new JebaitedCommand(profileStore, rankManager, devModeManager));
-        // Hub menu commands (aliases share executor)
-        MenuCommand menuCmd = new MenuCommand(this);
-        getCommand("menu").setExecutor(menuCmd);
-        getCommand("servers").setExecutor(menuCmd);
-        getCommand("navigator").setExecutor(menuCmd);
-        // Wardrobe/cosmetics
-        CosmeticsCommand cosCmd = new CosmeticsCommand(this, cosmeticsManager, profileStore);
-        getCommand("cosmetics").setExecutor(cosCmd);
-        getCommand("wardrobe").setExecutor(cosCmd);
-        // Moderation
-        getCommand("kick").setExecutor(new KickCommand(profileStore, rankManager, devModeManager));
-        getCommand("warn").setExecutor(new WarnCommand(profileStore, rankManager, devModeManager));
-        getCommand("mute").setExecutor(new MuteCommand(profileStore, rankManager, devModeManager, true));
-        getCommand("tempmute").setExecutor(new MuteCommand(profileStore, rankManager, devModeManager, false));
-        getCommand("unmute").setExecutor(new UnmuteCommand(profileStore, rankManager, devModeManager));
-        getCommand("ban").setExecutor(new BanCommand(profileStore, rankManager, devModeManager, true));
-        getCommand("tempban").setExecutor(new BanCommand(profileStore, rankManager, devModeManager, false));
-        getCommand("unban").setExecutor(new UnbanCommand(profileStore, rankManager, devModeManager));
-        getCommand("freeze").setExecutor(new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager));
-        getCommand("vanish").setExecutor(new VanishCommand(profileStore, rankManager, devModeManager, moderationManager));
-        getCommand("staffchat").setExecutor(new StaffChatCommand(profileStore, rankManager, devModeManager, moderationManager));
-        getCommand("clearchat").setExecutor(new ClearChatCommand(profileStore, rankManager, devModeManager));
-        getCommand("slowmode").setExecutor(new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
-        getCommand("history").setExecutor(new HistoryCommand(profileStore, rankManager, devModeManager));
+        // Register listeners and commands
+        registerListeners();
+        registerCommands();
 
         getLogger().info("§6JebaitedCore v1.0.0 §aENABLED! §7Hub/core foundation loaded on Paper 1.21.8");
     }
@@ -195,5 +155,88 @@ public final class JebaitedCore extends JavaPlugin {
         } catch (SQLException e) {
             getLogger().log(Level.SEVERE, "Could not create database tables!", e);
         }
+    }
+
+    // ----- Internal helpers for registration -----
+    private void registerListeners() {
+        // Chat renderer + join handling
+        Bukkit.getPluginManager().registerEvents(new ChatListener(this, rankManager, profileStore, moderationManager, devModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new JoinListener(this, rankManager, profileStore), this);
+        Bukkit.getPluginManager().registerEvents(new CommandTrackingListener(profileStore, rankManager), this);
+        Bukkit.getPluginManager().registerEvents(new ModerationListener(profileStore, rankManager, moderationManager, this), this);
+        // GUI + Hub Hotbar
+        Bukkit.getPluginManager().registerEvents(new MenuListener(), this);
+        Bukkit.getPluginManager().registerEvents(new HotbarNavigatorListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new HubProtectionListener(this, profileStore, rankManager), this);
+        // Start cosmetics engine (particles/trails)
+        if (cosmeticsEngine != null) cosmeticsEngine.stop();
+        cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager, rankManager);
+        cosmeticsEngine.start();
+    }
+
+    private void registerCommands() {
+        // Core/help
+        getCommand("rank").setExecutor(new RankCommand(profileStore, rankManager, devModeManager));
+        getCommand("setrank").setExecutor(new SetRankCommand(profileStore, rankManager, devModeManager));
+        getCommand("tickets").setExecutor(new TicketsCommand(profileStore, rankManager, devModeManager));
+        getCommand("stats").setExecutor(new StatsCommand(profileStore, rankManager));
+        getCommand("devmode").setExecutor(new DevModeCommand(devModeManager));
+        getCommand("jebaited").setExecutor(new JebaitedCommand(profileStore, rankManager, devModeManager));
+        // Reload
+        getCommand("jreload").setExecutor(new com.darkniightz.core.commands.ReloadCommand(this, profileStore, rankManager, devModeManager));
+        // Hub menu commands (aliases share executor)
+        MenuCommand menuCmd = new MenuCommand(this);
+        getCommand("menu").setExecutor(menuCmd);
+        getCommand("servers").setExecutor(menuCmd);
+        getCommand("navigator").setExecutor(menuCmd);
+        // Wardrobe/cosmetics
+        CosmeticsCommand cosCmd = new CosmeticsCommand(this, cosmeticsManager, profileStore);
+        getCommand("cosmetics").setExecutor(cosCmd);
+        getCommand("wardrobe").setExecutor(cosCmd);
+        // Moderation
+        getCommand("kick").setExecutor(new KickCommand(profileStore, rankManager, devModeManager));
+        getCommand("warn").setExecutor(new WarnCommand(profileStore, rankManager, devModeManager));
+        getCommand("mute").setExecutor(new MuteCommand(profileStore, rankManager, devModeManager, true));
+        getCommand("tempmute").setExecutor(new MuteCommand(profileStore, rankManager, devModeManager, false));
+        getCommand("unmute").setExecutor(new UnmuteCommand(profileStore, rankManager, devModeManager));
+        getCommand("ban").setExecutor(new BanCommand(profileStore, rankManager, devModeManager, true));
+        getCommand("tempban").setExecutor(new BanCommand(profileStore, rankManager, devModeManager, false));
+        getCommand("unban").setExecutor(new UnbanCommand(profileStore, rankManager, devModeManager));
+        getCommand("freeze").setExecutor(new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager));
+        getCommand("vanish").setExecutor(new VanishCommand(profileStore, rankManager, devModeManager, moderationManager));
+        getCommand("staffchat").setExecutor(new StaffChatCommand(profileStore, rankManager, devModeManager, moderationManager));
+        getCommand("clearchat").setExecutor(new ClearChatCommand(profileStore, rankManager, devModeManager));
+        getCommand("slowmode").setExecutor(new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
+        getCommand("history").setExecutor(new HistoryCommand(profileStore, rankManager, devModeManager));
+    }
+
+    /**
+     * Reloads config-driven components and refreshes cached player profiles from the database.
+     * Restricted by command side, but callable from API too.
+     */
+    public void reloadCore() {
+        // Persist current cache before reloading
+        if (profileStore != null) profileStore.flushAll();
+
+        // Reload config from disk
+        reloadConfig();
+
+        // Re-create config-driven managers
+        this.rankManager = new RankManager(this);
+        this.devModeManager = new DevModeManager(this);
+        // Keep existing moderation state; no need to recreate moderationManager
+
+        // Refresh cache from DB for all online players using the new default group
+        if (profileStore != null) {
+            profileStore.reloadOnlineFromDatabase(rankManager.getDefaultGroup());
+        }
+
+        // Re-register listeners with updated manager instances
+        org.bukkit.event.HandlerList.unregisterAll(this);
+        registerListeners();
+        // Re-register commands so executors carry updated manager references
+        registerCommands();
+
+        getLogger().info("JebaitedCore reloaded: config, listeners, commands, and caches have been refreshed.");
     }
 }

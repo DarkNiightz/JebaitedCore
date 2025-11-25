@@ -5,6 +5,10 @@ api-version: 1.21
 author: DarkNiightz
 description: Jebaited Core Plugin.
 
+libraries:
+  - com.zaxxer:HikariCP:5.1.0
+  - org.postgresql:postgresql:42.7.3
+
 commands:
   # Core/help
   jebaited:
@@ -86,6 +90,9 @@ commands:
   wardrobe:
     description: Open the Wardrobe (cosmetics) GUI
     usage: /wardrobe
+  jreload:
+    description: Reload JebaitedCore config and refresh DB caches (developers+)
+    usage: /jreload
 
 permissions:
   jebaited.core.use:
@@ -94,3 +101,5 @@ permissions:
     default: true
   jebaited.cosmetics.open:
     default: true
+  jebaited.reload:
+    default: op

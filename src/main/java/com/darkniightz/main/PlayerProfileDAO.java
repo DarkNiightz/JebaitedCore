@@ -1,8 +1,7 @@
-package com.darkniightz.main.database.dao;
+package com.darkniightz.main;
 
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.main.database.DatabaseManager;
-import org.bukkit.entity.Player;
 
 import java.sql.*;
 import java.util.HashSet;
@@ -111,7 +110,8 @@ public class PlayerProfileDAO {
                 ResultSet rs = pstmt.executeQuery();
                 if (rs.next()) {
                     profile = new PlayerProfile(uuid, rs.getString("username"));
-                    profile.setRank(rs.getString("rank"));
+                    // Use special setter that does not mark the rank as dirty on load
+                    profile.setRankLoaded(rs.getString("rank"));
                     profile.setFirstJoined(rs.getLong("first_joined"));
                     profile.setLastJoined(rs.getLong("last_joined"));
                 }
@@ -159,10 +159,21 @@ public class PlayerProfileDAO {
     }
 
     public void savePlayerProfile(PlayerProfile profile) {
-        String playerUpsertSql = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
+        // If the rank hasn't been changed in-memory, avoid overwriting the DB value.
+        // Use two variants: one that updates rank (when dirty or inserting new), and one that leaves it untouched.
+        String playerUpsertWithRank = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
                 "VALUES (?, ?, ?, ?, ?) " +
                 "ON CONFLICT (uuid) DO UPDATE SET " +
                 "username = EXCLUDED.username, rank = EXCLUDED.rank, last_joined = EXCLUDED.last_joined;";
+
+        // Note: In the no-rank-update path, we still provide a rank value for INSERTs,
+        // but on conflict we do NOT update the rank. This avoids referencing EXCLUDED
+        // in the VALUES clause (which is not allowed in PostgreSQL) and fixes the
+        // "missing FROM-clause entry for table 'excluded'" error.
+        String playerUpsertNoRank = "INSERT INTO players (uuid, username, rank, first_joined, last_joined) " +
+                "VALUES (?, ?, ?, ?, ?) " +
+                "ON CONFLICT (uuid) DO UPDATE SET " +
+                "username = EXCLUDED.username, last_joined = EXCLUDED.last_joined;";
 
         String statsUpsertSql = "INSERT INTO player_stats (uuid, commands_sent) " +
                 "VALUES (?, ?) " +
@@ -176,16 +187,30 @@ public class PlayerProfileDAO {
         try (Connection conn = dbManager.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
-            try (PreparedStatement psPlayer = conn.prepareStatement(playerUpsertSql);
+            boolean updateRank = profile.isRankDirty();
+            String playerSql = updateRank ? playerUpsertWithRank : playerUpsertNoRank;
+            try (PreparedStatement psPlayer = conn.prepareStatement(playerSql);
                  PreparedStatement psStats = conn.prepareStatement(statsUpsertSql)) {
 
                 // Player data
-                psPlayer.setString(1, profile.getUuid().toString());
-                psPlayer.setString(2, profile.getName());
-                psPlayer.setString(3, profile.getRank());
-                psPlayer.setLong(4, profile.getFirstJoined());
-                psPlayer.setLong(5, profile.getLastJoined());
+                if (updateRank) {
+                    // Matches 5 placeholders in playerUpsertWithRank
+                    psPlayer.setString(1, profile.getUuid().toString());
+                    psPlayer.setString(2, profile.getName());
+                    psPlayer.setString(3, profile.getRank());
+                    psPlayer.setLong(4, profile.getFirstJoined());
+                    psPlayer.setLong(5, profile.getLastJoined());
+                } else {
+                    // Matches 5 placeholders in playerUpsertNoRank
+                    psPlayer.setString(1, profile.getUuid().toString());
+                    psPlayer.setString(2, profile.getName());
+                    psPlayer.setString(3, profile.getRank());
+                    psPlayer.setLong(4, profile.getFirstJoined());
+                    psPlayer.setLong(5, profile.getLastJoined());
+                }
                 psPlayer.executeUpdate();
+                // Clear rank dirty flag after successful write
+                if (updateRank) profile.clearRankDirty();
 
                 // Stats data
                 psStats.setString(1, profile.getUuid().toString());
@@ -222,5 +247,43 @@ public class PlayerProfileDAO {
             logger.log(Level.SEVERE, "Failed to save player profile for " + profile.getUuid(), e);
         }
     }
+
+    /**
+     * Fetches moderation history entries for a target player, newest first.
+     *
+     * @param target The target player's UUID
+     * @param limit  Max number of rows to return (use a sane upper bound like 100)
+     * @return List of rows as maps compatible with ModerationLogger.entry() keys
+     */
+    public java.util.List<java.util.Map<String, Object>> getModerationHistory(UUID target, int limit) {
+        String sql = "SELECT type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp FROM moderation_history " +
+                "WHERE target_uuid = ? ORDER BY timestamp DESC LIMIT ?;";
+        java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, target.toString());
+            ps.setInt(2, Math.max(1, Math.min(500, limit)));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("ts", rs.getLong("timestamp"));
+                    m.put("type", rs.getString("type"));
+                    String actor = rs.getString("actor");
+                    if (actor != null && !actor.isEmpty()) m.put("actor", actor);
+                    String actorUuid = rs.getString("actor_uuid");
+                    if (actorUuid != null && !actorUuid.isEmpty()) m.put("actorUuid", actorUuid);
+                    String reason = rs.getString("reason");
+                    if (reason != null && !reason.isEmpty()) m.put("reason", reason);
+                    long duration = rs.getLong("duration_ms");
+                    if (!rs.wasNull()) m.put("durationMs", duration);
+                    long expires = rs.getLong("expires_at");
+                    if (!rs.wasNull()) m.put("expiresAt", expires);
+                    rows.add(m);
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Failed to fetch moderation history for " + target, e);
+        }
+        return rows;
     }
 }

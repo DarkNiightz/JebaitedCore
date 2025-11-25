@@ -1,14 +1,72 @@
 # Core Plugin Configuration
 
-# Rank Colors (Minecraft color codes: &a for green, etc.)
+# Ranks configuration
+# Define the ladder order (highest to lowest) and the default group for new players
 ranks:
-  default: '&a'  # Green
-  friend: '&d'   # Pink
-  vip: '&5'      # Purple
-  moderator: '&c'  # Red
-  srmoderator: '&4'  # Dark red
-  admin: '&4&l'    # Dark red bold
-  # Developer rainbow is hardcoded (no single color)
+  ladder:
+    - owner
+    - developer
+    - admin
+    - moderator
+    - helper
+    - vip
+    - friend
+    - builder
+    - supporter1
+    - supporter2
+    - supporter3
+  default: friend
+
+# Rank styles (used for prefixes and name colors in chat and join messages)
+# Use the '§' section sign color codes here.
+rank_styles:
+  owner:
+    prefix: "§4§lOWNER"
+    name_color: "§4"
+    name_bold: true
+  developer:
+    prefix: "§5§lDEV"
+    name_rainbow:
+      enabled: true
+      # List of single-character color codes without the '§' sign
+      colors: ["4","c","6","e","2","a","b","3","1","9","d","5"]
+      bold_each_char: true
+  admin:
+    prefix: "§c§lADMIN"
+    name_color: "§c"
+    name_bold: true
+  moderator:
+    prefix: "§a§lMOD"
+    name_color: "§a"
+    name_bold: true
+  helper:
+    prefix: "§b§lHELPER"
+    name_color: "§b"
+    name_bold: false
+  vip:
+    prefix: "§6§lVIP"
+    name_color: "§6"
+    name_bold: false
+  friend:
+    prefix: "§d§lFRIEND"
+    name_color: "§d"
+    name_bold: false
+  builder:
+    prefix: "§9§lBUILDER"
+    name_color: "§9"
+    name_bold: false
+  supporter1:
+    prefix: "§e§lSUP1"
+    name_color: "§e"
+    name_bold: false
+  supporter2:
+    prefix: "§e§lSUP2"
+    name_color: "§e"
+    name_bold: false
+  supporter3:
+    prefix: "§e§lSUP3"
+    name_color: "§e"
+    name_bold: false
 
 # Messages (customize text/colors)
 messages:
@@ -30,6 +88,16 @@ logging:
 
 # Other
 staff-message-color: '&b'  # Already set, but configurable if you want changes
+
+# Chat formatting (used by ChatListener)
+chat:
+  enabled: true
+  separator: '§7»§r'
+  format: '{prefix}{styled_name} {separator} {message_colored}'
+  message_color_policy:
+    min_rank_aqua: helper
+    aqua_code: '§b'
+    default_code: '§f'
 
 # Moderation
 moderation:
@@ -108,17 +176,6 @@ teleport:
     set-message: "&aSpawn set at your location!"
     no-permission: "&cNo permission!"
 
-# --------------------
-# Hub Chat Formatting (added for hub-only policy)
-# --------------------
-chat:
-  enabled: true
-  format: "{prefix}{styled_name} {separator} {message_colored}"
-  separator: "§7»§r"
-  message_color_policy:
-    min_rank_aqua: "helper"
-    aqua_code: "§b"
-    default_code: "§f"
 
 # --------------------
 # Developer Mode (bypass for allowlisted accounts)
@@ -126,6 +183,7 @@ chat:
 devmode:
   allowed_uuids:
     - "2ea2bb31-acf0-495c-9ca5-423d80f14e30"
+    - "3e8e6677-db6b-462a-9e53-7171367aaa67"
   grant_op: true
   enabled_by_default: false
 

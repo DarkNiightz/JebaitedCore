@@ -47,6 +47,11 @@ public class DatabaseManager {
             hikariConfig.setUsername(config.getString("database.username"));
             hikariConfig.setPassword(config.getString("database.password"));
 
+            // Explicitly set the PostgreSQL driver class. Paper should auto-load the
+            // dependency via plugin.yml libraries, but setting this removes any ambiguity
+            // and avoids "No suitable driver" if auto-loading fails.
+            hikariConfig.setDriverClassName("org.postgresql.Driver");
+
             // Set connection pool settings from config
             hikariConfig.setMaximumPoolSize(config.getInt("database.pool-settings.maximum-pool-size", 10));
             hikariConfig.setMinimumIdle(config.getInt("database.pool-settings.minimum-idle", 5));

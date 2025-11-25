@@ -48,7 +48,7 @@ public class BanCommand implements CommandExecutor {
             tp.setBanActor(p.getName());
             profiles.save(target.getUniqueId());
             var entry = ModerationLogger.entry("ban", p.getName(), p.getUniqueId(), reason, null, Long.MAX_VALUE);
-            ModerationLogger.log(profiles, target.getUniqueId(), entry);
+            ModerationLogger.log(target.getUniqueId(), entry);
             if (target.isOnline()) target.getPlayer().kick(Component.text("§cYou are banned.§7 Reason: §e"+reason));
             sender.sendMessage("§aBanned §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7(permanent)");
         } else {
@@ -65,7 +65,7 @@ public class BanCommand implements CommandExecutor {
             tp.setBanActor(p.getName());
             profiles.save(target.getUniqueId());
             var entry = ModerationLogger.entry("tempban", p.getName(), p.getUniqueId(), reason, dur, until);
-            ModerationLogger.log(profiles, target.getUniqueId(), entry);
+            ModerationLogger.log(target.getUniqueId(), entry);
             if (target.isOnline()) target.getPlayer().kick(Component.text("§cYou are temporarily banned for §e"+ TimeUtil.formatDurationShort(dur) + "§7. Reason: §f"+reason));
             sender.sendMessage("§aTemporarily banned §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7for §e"+ TimeUtil.formatDurationShort(dur));
         }

@@ -1,7 +1,7 @@
 package com.darkniightz.core.moderation;
 
 import com.darkniightz.main.JebaitedCore;
-import com.darkniightz.main.database.dao.PlayerProfileDAO;
+import com.darkniightz.main.PlayerProfileDAO;
 
 import java.util.HashMap;
 import java.util.Map;

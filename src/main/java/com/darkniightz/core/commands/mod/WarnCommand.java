@@ -37,7 +37,7 @@ public class WarnCommand implements CommandExecutor {
         String reason = String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length));
         profiles.getOrCreate(target, ranks.getDefaultGroup());
         var entry = ModerationLogger.entry("warn", p.getName(), p.getUniqueId(), reason, null, null);
-        ModerationLogger.log(profiles, target.getUniqueId(), entry);
+        ModerationLogger.log(target.getUniqueId(), entry);
         if (target.isOnline()) target.getPlayer().sendMessage("§eYou have been warned: §f"+reason);
         sender.sendMessage("§aWarned §e" + (target.getName()!=null?target.getName():target.getUniqueId()) + " §7for: §f"+reason);
         return true;
