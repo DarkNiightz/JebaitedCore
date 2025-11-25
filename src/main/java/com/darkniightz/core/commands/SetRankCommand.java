@@ -70,7 +70,14 @@ public class SetRankCommand implements CommandExecutor {
         profiles.save(tuid);
         sender.sendMessage("§aSet §e" + (target.getName() != null ? target.getName() : target.getUniqueId()) + "§a to group §b" + newGroup + "§a.");
         if (target.isOnline()) {
-            target.getPlayer().sendMessage("§aYour rank has been set to §b" + newGroup + "§a.");
+            var online = target.getPlayer();
+            online.sendMessage("§aYour rank has been set to §b" + newGroup + "§a.");
+            // Update tab list styling immediately
+            var style = ranks.getStyle(newGroup);
+            String styledName = com.darkniightz.core.chat.ChatUtil.buildStyledName(online.getName(), style);
+            String prefix = (style.prefix == null || style.prefix.isEmpty()) ? "" : style.prefix + " ";
+            var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+            online.playerListName(legacy.deserialize(prefix + styledName));
         }
         return true;
     }

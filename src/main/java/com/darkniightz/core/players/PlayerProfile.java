@@ -26,6 +26,11 @@ public class PlayerProfile {
     private int cosmeticEquips;
     private int cosmeticTickets;
     private int wardrobeOpens;
+    private int cosmeticCoins; // Wallet: cosmetic coins
+
+    // Session-only timestamps for auto-off timers (not persisted yet)
+    private Long particleActivatedAt;
+    private Long trailActivatedAt;
 
     // Data from 'player_cosmetics' table
     private Set<String> unlockedCosmetics = new HashSet<>();
@@ -59,6 +64,9 @@ public class PlayerProfile {
     public int getCosmeticEquips() { return cosmeticEquips; }
     public int getCosmeticTickets() { return cosmeticTickets; }
     public int getWardrobeOpens() { return wardrobeOpens; }
+    public int getCosmeticCoins() { return cosmeticCoins; }
+    public Long getParticleActivatedAt() { return particleActivatedAt; }
+    public Long getTrailActivatedAt() { return trailActivatedAt; }
 
     // Cosmetics
     public boolean hasUnlocked(String key) {
@@ -96,6 +104,9 @@ public class PlayerProfile {
     public void setMessagesSent(int messagesSent) { this.messagesSent = messagesSent; }
     public void setCosmeticTickets(int tickets) { this.cosmeticTickets = tickets; }
     public void setWardrobeOpens(int opens) { this.wardrobeOpens = opens; }
+    public void setCosmeticCoins(int coins) { this.cosmeticCoins = Math.max(0, coins); }
+    public void setParticleActivatedAt(Long ts) { this.particleActivatedAt = ts; }
+    public void setTrailActivatedAt(Long ts) { this.trailActivatedAt = ts; }
 
     public void setUnlockedCosmetics(Set<String> unlockedCosmetics) {
         this.unlockedCosmetics = unlockedCosmetics;
@@ -134,6 +145,13 @@ public class PlayerProfile {
     public void incMessages() { this.messagesSent++; }
     public void addCosmeticTickets(int delta) { this.cosmeticTickets += delta; }
     public void incWardrobeOpens() { this.wardrobeOpens++; }
+    public void addCosmeticCoins(int delta) { this.cosmeticCoins = Math.max(0, this.cosmeticCoins + delta); }
+    public boolean spendCosmeticCoins(int amount) {
+        if (amount <= 0) return true;
+        if (this.cosmeticCoins < amount) return false;
+        this.cosmeticCoins -= amount;
+        return true;
+    }
 
     // Moderation fields accessors
     public Long getMuteUntil() { return muteUntil; }
