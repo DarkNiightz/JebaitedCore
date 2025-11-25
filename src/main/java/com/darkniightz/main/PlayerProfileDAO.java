@@ -127,6 +127,11 @@ public class PlayerProfileDAO {
                 ResultSet rs = pstmt.executeQuery();
                 if (rs.next()) {
                     profile.setCommandsSent(rs.getInt("commands_sent"));
+                    // Optional column: cosmetic_coins (migration adds it). Handle absence safely
+                    try {
+                        int coins = rs.getInt("cosmetic_coins");
+                        if (!rs.wasNull()) profile.setCosmeticCoins(coins);
+                    } catch (SQLException ignore) { /* older schema */ }
                 }
             }
 
@@ -175,10 +180,10 @@ public class PlayerProfileDAO {
                 "ON CONFLICT (uuid) DO UPDATE SET " +
                 "username = EXCLUDED.username, last_joined = EXCLUDED.last_joined;";
 
-        String statsUpsertSql = "INSERT INTO player_stats (uuid, commands_sent) " +
-                "VALUES (?, ?) " +
+        String statsUpsertSql = "INSERT INTO player_stats (uuid, commands_sent, cosmetic_coins) " +
+                "VALUES (?, ?, ?) " +
                 "ON CONFLICT (uuid) DO UPDATE SET " +
-                "commands_sent = EXCLUDED.commands_sent;";
+                "commands_sent = EXCLUDED.commands_sent, cosmetic_coins = EXCLUDED.cosmetic_coins;";
 
         // We handle cosmetics separately by clearing and re-inserting active state
         String cosmeticsUpdateSql = "UPDATE player_cosmetics SET is_active = false WHERE player_uuid = ?;";
@@ -215,6 +220,7 @@ public class PlayerProfileDAO {
                 // Stats data
                 psStats.setString(1, profile.getUuid().toString());
                 psStats.setInt(2, profile.getCommandsSent());
+                psStats.setInt(3, profile.getCosmeticCoins());
                 psStats.executeUpdate();
 
                 // Cosmetics data
@@ -245,6 +251,21 @@ public class PlayerProfileDAO {
             }
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Failed to save player profile for " + profile.getUuid(), e);
+        }
+    }
+
+    /** Unlocks a cosmetic for the given player if not already present. */
+    public void unlockCosmetic(UUID uuid, String cosmeticId, String cosmeticType) {
+        String sql = "INSERT INTO player_cosmetics (player_uuid, cosmetic_id, cosmetic_type, is_active) VALUES (?,?,?,false) " +
+                "ON CONFLICT (player_uuid, cosmetic_id, cosmetic_type) DO NOTHING;";
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, cosmeticId);
+            ps.setString(3, cosmeticType);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Failed to unlock cosmetic '" + cosmeticId + "' for " + uuid, e);
         }
     }
 

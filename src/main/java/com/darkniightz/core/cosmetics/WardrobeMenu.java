@@ -4,6 +4,7 @@ import com.darkniightz.core.gui.BaseMenu;
 import com.darkniightz.core.gui.ItemBuilder;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
+import com.darkniightz.main.JebaitedCore;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -18,7 +19,10 @@ public class WardrobeMenu extends BaseMenu {
     private CosmeticsManager.Category current = CosmeticsManager.Category.PARTICLES;
 
     public WardrobeMenu(Plugin plugin, CosmeticsManager cosmetics, ProfileStore profiles) {
-        super(plugin, "§d§lWardrobe", 36);
+        super(plugin,
+                plugin.getConfig().getString("menus.cosmetics.title", "§d§lCosmetics"),
+                Math.max(9, Math.min(54, plugin.getConfig().getInt("menus.cosmetics.size", 54)))
+        );
         this.cosmetics = cosmetics;
         this.profiles = profiles;
     }
@@ -27,7 +31,7 @@ public class WardrobeMenu extends BaseMenu {
     protected void populate(Player viewer) {
         Inventory inv = getInventory();
 
-        // Category selector
+        // Category selector (fixed top row)
         inv.setItem(2, new ItemBuilder(Material.BLAZE_POWDER).name("§6Particles").build());
         inv.setItem(4, new ItemBuilder(Material.FEATHER).name("§5Trails").build());
         inv.setItem(6, new ItemBuilder(Material.FIREWORK_ROCKET).name("§dGadgets").build());
@@ -46,10 +50,36 @@ public class WardrobeMenu extends BaseMenu {
         int idx = 0;
         for (CosmeticsManager.Cosmetic c : list) {
             if (idx >= slots.length) break;
+            boolean unlocked = prof.hasUnlocked(c.key);
             boolean equipped = isEquipped(prof, c);
-            String state = equipped ? " §a(Equipped)" : (prof.hasUnlocked(c.key) || true) ? "" : " §8(Locked)"; // treat all as unlocked for MVP
-            inv.setItem(slots[idx++], new ItemBuilder(c.icon).name(c.name + state).lore(c.lore).build());
+            String state = equipped ? " §a(Equipped)" : (!unlocked ? " §8(Locked)" : "");
+            ItemBuilder ib = new ItemBuilder(c.icon).name(c.name + state);
+            // Lore: include price if locked
+            java.util.ArrayList<String> lore = new java.util.ArrayList<>();
+            if (c.lore != null) lore.addAll(c.lore);
+            if (!unlocked) lore.add("§7Price: §6" + c.price + " coins");
+            ib.lore(lore);
+            inv.setItem(slots[idx++], ib.build());
         }
+
+        // Gold bar with coins balance (bottom-right)
+        var goldConf = plugin.getConfig().getConfigurationSection("menus.cosmetics.gold_bar");
+        int goldSlot = goldConf != null ? goldConf.getInt("slot", 53) : 53;
+        String message = goldConf != null ? goldConf.getString("message", "§6Earn cosmetic coins by playing minigames!") : "§6Earn cosmetic coins by playing minigames!";
+        inv.setItem(goldSlot, new ItemBuilder(Material.GOLD_INGOT)
+                .name("§6Cosmetic Coins: §e" + prof.getCosmeticCoins())
+                .lore(java.util.List.of("§7Click for info", message))
+                .build());
+
+        // Disable-all button (center bottom by default)
+        var disConf = plugin.getConfig().getConfigurationSection("menus.cosmetics.disable_all");
+        int disSlot = disConf != null ? disConf.getInt("slot", 49) : 49;
+        String disName = disConf != null ? disConf.getString("name", "§cDisable All Effects") : "§cDisable All Effects";
+        java.util.List<String> disLore = disConf != null ? disConf.getStringList("lore") : java.util.List.of("§7Click to turn off all your particles and trails.");
+        String iconName = disConf != null ? disConf.getString("icon", "BARRIER") : "BARRIER";
+        Material icon;
+        try { icon = Material.valueOf(iconName.toUpperCase(java.util.Locale.ROOT)); } catch (IllegalArgumentException e) { icon = Material.BARRIER; }
+        inv.setItem(disSlot, new ItemBuilder(icon).name(disName).lore(disLore).build());
     }
 
     private boolean isEquipped(PlayerProfile prof, CosmeticsManager.Cosmetic c) {
@@ -66,6 +96,35 @@ public class WardrobeMenu extends BaseMenu {
         if (slot == 4) { current = CosmeticsManager.Category.TRAILS; populate(who); who.updateInventory(); return true; }
         if (slot == 6) { current = CosmeticsManager.Category.GADGETS; populate(who); who.updateInventory(); return true; }
 
+        // Gold bar click: show message
+        var goldConf = plugin.getConfig().getConfigurationSection("menus.cosmetics.gold_bar");
+        int goldSlot = goldConf != null ? goldConf.getInt("slot", 53) : 53;
+        if (slot == goldSlot) {
+            String message = goldConf != null ? goldConf.getString("message", "§6Earn cosmetic coins by playing minigames and events!") : "§6Earn cosmetic coins by playing minigames and events!";
+            who.sendMessage(message);
+            return true;
+        }
+
+        // Disable-all click: clear active particle/trail
+        var disConf = plugin.getConfig().getConfigurationSection("menus.cosmetics.disable_all");
+        int disSlot = disConf != null ? disConf.getInt("slot", 49) : 49;
+        if (slot == disSlot) {
+            PlayerProfile prof = profiles.getOrCreate(who, plugin.getConfig().getString("ranks.default", "friend"));
+            if (prof != null) {
+                boolean had = false;
+                if (prof.getEquippedParticles() != null) { prof.setEquippedParticles(null); prof.setParticleActivatedAt(null); had = true; }
+                if (prof.getEquippedTrail() != null) { prof.setEquippedTrail(null); prof.setTrailActivatedAt(null); had = true; }
+                if (had) {
+                    profiles.save(who.getUniqueId());
+                    who.sendMessage("§aAll your cosmetic effects have been disabled.");
+                } else {
+                    who.sendMessage("§7You have no active effects.");
+                }
+            }
+            populate(who); who.updateInventory();
+            return true;
+        }
+
         if (slot >= 9) {
             PlayerProfile prof = profiles.getOrCreate(who, plugin.getConfig().getString("ranks.default", "friend"));
             if (prof == null) return true; // DB disabled
@@ -79,12 +138,36 @@ public class WardrobeMenu extends BaseMenu {
             for (int i = 0; i < slots.length; i++) if (slots[i] == slot) { index = i; break; }
             if (index >= 0 && index < list.size()) {
                 CosmeticsManager.Cosmetic pick = list.get(index);
+                boolean unlocked = prof.getUnlockedCosmetics().contains(pick.key);
+                if (!unlocked) {
+                    // Attempt purchase
+                    int price = pick.price;
+                    if (!pick.enabled) { who.sendMessage("§cThis item is currently disabled."); return true; }
+                    if (!prof.spendCosmeticCoins(price)) {
+                        who.sendMessage("§cNot enough coins. §7Price: §6" + price + " coins");
+                        return true;
+                    }
+                    // Persist coin deduction
+                    profiles.save(who.getUniqueId());
+                    // Unlock in DB and cache
+                    String type = switch (pick.category) {
+                        case PARTICLES -> "particle";
+                        case TRAILS -> "trail";
+                        case GADGETS -> "gadget";
+                    };
+                    JebaitedCore.getInstance().getPlayerProfileDAO().unlockCosmetic(who.getUniqueId(), pick.key, type);
+                    prof.getUnlockedCosmetics().add(pick.key);
+                    who.sendMessage("§aPurchased §e" + pick.name + " §afor §6" + price + " coins§a.");
+                }
+
+                // Equip now
                 switch (pick.category) {
-                    case PARTICLES -> prof.setEquippedParticles(pick.key);
-                    case TRAILS -> prof.setEquippedTrail(pick.key);
+                    case PARTICLES -> { prof.setEquippedParticles(pick.key); prof.setParticleActivatedAt(System.currentTimeMillis()); }
+                    case TRAILS -> { prof.setEquippedTrail(pick.key); prof.setTrailActivatedAt(System.currentTimeMillis()); }
                     case GADGETS -> prof.setEquippedGadget(pick.key);
                 }
                 prof.incCosmeticEquips();
+                profiles.save(who.getUniqueId());
                 who.sendMessage("§aEquipped §e" + pick.name + "§a.");
                 populate(who); who.updateInventory();
                 return true;

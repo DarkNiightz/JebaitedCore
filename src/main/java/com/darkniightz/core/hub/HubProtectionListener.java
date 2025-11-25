@@ -11,6 +11,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
@@ -46,6 +49,14 @@ public class HubProtectionListener implements Listener {
 
     private boolean respawnAtSpawn() {
         return plugin.getConfig().getBoolean("hub.protection.on_death_teleport_spawn", true);
+    }
+
+    private boolean disableMobBlockDamage() {
+        return plugin.getConfig().getBoolean("hub.protection.disable_mob_block_damage", true);
+    }
+
+    private boolean disableMobTargeting() {
+        return plugin.getConfig().getBoolean("hub.protection.disable_mob_targeting", true);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -89,5 +100,30 @@ public class HubProtectionListener implements Listener {
         Location spawn = event.getPlayer().getWorld().getSpawnLocation();
         if (spawn == null) spawn = Bukkit.getWorlds().get(0).getSpawnLocation();
         if (spawn != null) event.setRespawnLocation(spawn);
+    }
+
+    // Prevent explosions from destroying blocks in hub
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        if (!disableMobBlockDamage()) return;
+        event.blockList().clear();
+    }
+
+    // Prevent withers, endermen, ravagers etc. from modifying blocks
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (!disableMobBlockDamage()) return;
+        if (!(event.getEntity() instanceof org.bukkit.entity.Player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    // Prevent any mob from targeting players in hub
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onEntityTargetPlayer(EntityTargetLivingEntityEvent event) {
+        if (!disableMobTargeting()) return;
+        if (event.getTarget() instanceof org.bukkit.entity.Player) {
+            event.setCancelled(true);
+        }
     }
 }

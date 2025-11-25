@@ -45,6 +45,11 @@ public class JoinListener implements Listener {
             String fmt = plugin.getConfig().getString("join_leave.join_format", "§9[§a+§9] {styled_name}");
             String msg = fmt.replace("{styled_name}", styledName);
             event.joinMessage(legacy.deserialize(msg));
+
+            // Also apply styled prefix + name to the player list (tab list)
+            String prefix = (style.prefix == null || style.prefix.isEmpty()) ? "" : style.prefix + " ";
+            String tab = prefix + styledName;
+            p.playerListName(legacy.deserialize(tab));
         }
     }
 

@@ -267,6 +267,10 @@ hub:
     disable_hunger: true
     # On death/respawn, send players to world spawn
     on_death_teleport_spawn: true
+    # Prevent explosions and mobs from changing blocks
+    disable_mob_block_damage: true
+    # Prevent mobs from targeting players in the hub
+    disable_mob_targeting: true
 
 # --------------------
 # Database (PostgreSQL)

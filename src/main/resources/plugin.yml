@@ -31,6 +31,10 @@ commands:
   stats:
     description: View your (or another player's) hub stats
     usage: /stats [player]
+  coins:
+    description: View or manage Cosmetic Coins
+    usage: /coins | /coins give <player> <amount>
+    aliases: [coin]
   # Moderation suite
   kick:
     description: Kick a player
@@ -65,12 +69,15 @@ commands:
   staffchat:
     description: Toggle staff chat or send a message
     usage: /staffchat [message]
+    aliases: [sc]
   clearchat:
     description: Clear public chat for non-staff
     usage: /clearchat
+    aliases: [cc]
   slowmode:
     description: Set global chat slowmode
     usage: /slowmode <seconds|off>
+    aliases: [sm]
   history:
     description: View moderation history for a player
     usage: /history [player]
@@ -78,21 +85,27 @@ commands:
   menu:
     description: Open the Servers Navigator GUI
     usage: /menu
+    aliases: [m]
   servers:
     description: Open the Servers Navigator GUI
     usage: /servers
+    aliases: [sv]
   navigator:
     description: Open the Servers Navigator GUI
     usage: /navigator
+    aliases: [nav]
   cosmetics:
     description: Open the Wardrobe (cosmetics) GUI
     usage: /cosmetics
+    aliases: [cos]
   wardrobe:
     description: Open the Wardrobe (cosmetics) GUI
     usage: /wardrobe
+    aliases: [wd]
   jreload:
     description: Reload JebaitedCore config and refresh DB caches (developers+)
     usage: /jreload
+    aliases: [jr]
 
 permissions:
   jebaited.core.use:

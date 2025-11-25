@@ -152,6 +152,8 @@ public final class JebaitedCore extends JavaPlugin {
             stmt.execute(playerStatsSql);
             stmt.execute(moderationHistorySql);
             stmt.execute(playerCosmeticsSql);
+            // Schema migrations
+            stmt.execute("ALTER TABLE IF EXISTS player_stats ADD COLUMN IF NOT EXISTS cosmetic_coins INT NOT NULL DEFAULT 0;");
         } catch (SQLException e) {
             getLogger().log(Level.SEVERE, "Could not create database tables!", e);
         }
@@ -172,6 +174,9 @@ public final class JebaitedCore extends JavaPlugin {
         if (cosmeticsEngine != null) cosmeticsEngine.stop();
         cosmeticsEngine = new CosmeticsEngine(this, profileStore, moderationManager, rankManager);
         cosmeticsEngine.start();
+
+        // Apply styled tab list names for all online players (prefix + styled name)
+        applyStyledTabForOnline();
     }
 
     private void registerCommands() {
@@ -180,6 +185,7 @@ public final class JebaitedCore extends JavaPlugin {
         getCommand("setrank").setExecutor(new SetRankCommand(profileStore, rankManager, devModeManager));
         getCommand("tickets").setExecutor(new TicketsCommand(profileStore, rankManager, devModeManager));
         getCommand("stats").setExecutor(new StatsCommand(profileStore, rankManager));
+        getCommand("coins").setExecutor(new com.darkniightz.core.commands.CoinsCommand(profileStore, rankManager, devModeManager));
         getCommand("devmode").setExecutor(new DevModeCommand(devModeManager));
         getCommand("jebaited").setExecutor(new JebaitedCommand(profileStore, rankManager, devModeManager));
         // Reload
@@ -238,5 +244,18 @@ public final class JebaitedCore extends JavaPlugin {
         registerCommands();
 
         getLogger().info("JebaitedCore reloaded: config, listeners, commands, and caches have been refreshed.");
+    }
+
+    private void applyStyledTabForOnline() {
+        final var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            var prof = profileStore.getOrCreate(p, rankManager.getDefaultGroup());
+            String rank = prof == null || prof.getPrimaryRank() == null ? rankManager.getDefaultGroup() : prof.getPrimaryRank();
+            var style = rankManager.getStyle(rank);
+            String styledName = com.darkniightz.core.chat.ChatUtil.buildStyledName(p.getName(), style);
+            String prefix = (style.prefix == null || style.prefix.isEmpty()) ? "" : style.prefix + " ";
+            String tab = prefix + styledName;
+            p.playerListName(legacy.deserialize(tab));
+        }
     }
 }
