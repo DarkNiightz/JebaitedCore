@@ -102,6 +102,9 @@ commands:
     description: Open the Wardrobe (cosmetics) GUI
     usage: /wardrobe
     aliases: [wd]
+  generatepassword:
+    description: Generate a web panel password for yourself
+    usage: /generatepassword
   jreload:
     description: Reload JebaitedCore config and refresh DB caches (developers+)
     usage: /jreload

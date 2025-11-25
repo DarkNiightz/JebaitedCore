@@ -291,6 +291,13 @@ database:
     max-lifetime: 1800000 # 30 minutes
 
 # --------------------
+# Web panel provisioning (for /generatepassword)
+# --------------------
+webpanel:
+  url: "http://localhost:3001"
+  provision_secret: "test1234" # Set this to match PROVISION_SECRET env on the web panel
+
+# --------------------
 # Cosmetics catalog and rules (DB‑ready structure)
 # --------------------
 cosmetics:

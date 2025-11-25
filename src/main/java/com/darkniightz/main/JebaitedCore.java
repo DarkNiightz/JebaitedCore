@@ -22,6 +22,7 @@ import com.darkniightz.core.commands.MenuCommand;
 import com.darkniightz.core.cosmetics.CosmeticsManager;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
 import com.darkniightz.core.commands.CosmeticsCommand;
+import com.darkniightz.core.commands.GeneratePasswordCommand;
 import com.darkniightz.main.PlayerProfileDAO;
 import com.darkniightz.main.database.DatabaseManager;
 import org.bukkit.Bukkit;
@@ -199,6 +200,7 @@ public final class JebaitedCore extends JavaPlugin {
         getCommand("cosmetics").setExecutor(cosCmd);
         getCommand("wardrobe").setExecutor(cosCmd);
         // Moderation
+        getCommand("generatepassword").setExecutor(new GeneratePasswordCommand(profileStore, rankManager, devModeManager));
         getCommand("kick").setExecutor(new KickCommand(profileStore, rankManager, devModeManager));
         getCommand("warn").setExecutor(new WarnCommand(profileStore, rankManager, devModeManager));
         getCommand("mute").setExecutor(new MuteCommand(profileStore, rankManager, devModeManager, true));

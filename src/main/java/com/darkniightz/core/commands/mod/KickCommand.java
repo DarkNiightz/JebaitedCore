@@ -11,7 +11,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -30,10 +29,10 @@ public class KickCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        // Determine actor name and UUID (console = "_console_")
+        // Console support
         String actorName = sender instanceof Player p ? p.getName() : "_console_";
         UUID actorUuid = sender instanceof Player p ? p.getUniqueId() : UUID.fromString("00000000-0000-0000-0000-000000000000");
-        boolean isConsole = sender instanceof ConsoleCommandSender;
+        boolean isConsole = !(sender instanceof Player);
 
         // Permission check
         if (!isConsole) {
@@ -57,7 +56,13 @@ public class KickCommand implements CommandExecutor {
             return true;
         }
 
-        // Outrank check (skip for console or DevMode)
+        // Prevent self-kick
+        if (target.getUniqueId().equals(actorUuid) && !isConsole) {
+            sender.sendMessage("§cYou cannot kick yourself.");
+            return true;
+        }
+
+        // Outrank check (skip for console and DevMode)
         if (!isConsole) {
             Player p = (Player) sender;
             PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
@@ -71,11 +76,11 @@ public class KickCommand implements CommandExecutor {
 
         String reason = args.length >= 2 ? String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)) : "Kicked by staff";
 
-        // Log to DB as _console_ if from console
+        // Log
         var entry = ModerationLogger.entry("kick", actorName, actorUuid, reason, null, null);
         ModerationLogger.log(target.getUniqueId(), entry);
 
-        // Kick player
+        // Kick
         target.kick(Component.text("§cYou were kicked.\n§7Reason: §f" + reason));
 
         sender.sendMessage("§aKicked §e" + target.getName() + " §7for: §f" + reason);
