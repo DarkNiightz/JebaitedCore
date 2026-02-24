@@ -39,9 +39,8 @@ public class ProfileStore {
 
         UUID uuid = player.getUniqueId();
         // 1. Check cache
-        if (profileCache.containsKey(uuid)) {
-            return profileCache.get(uuid);
-        }
+        PlayerProfile cached = profileCache.get(uuid);
+        if (cached != null) return cached;
 
         // 2. Not in cache, try loading from DB
         PlayerProfile profile = dao.loadPlayerProfile(uuid);
@@ -74,7 +73,8 @@ public class ProfileStore {
         }
         UUID uuid = player.getUniqueId();
         if (uuid == null) return null;
-        if (profileCache.containsKey(uuid)) return profileCache.get(uuid);
+        PlayerProfile cached = profileCache.get(uuid);
+        if (cached != null) return cached;
 
         PlayerProfile profile = dao.loadPlayerProfile(uuid);
         if (profile == null) {

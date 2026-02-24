@@ -28,6 +28,14 @@ public class ChatListener implements Listener {
 
     private final LegacyComponentSerializer sectionSerializer = LegacyComponentSerializer.legacySection();
 
+    // Config values cached at construction time (listener is recreated on reload)
+    private final boolean chatEnabled;
+    private final String separator;
+    private final String minRankForAqua;
+    private final String aquaCode;
+    private final String defaultCode;
+    private final String chatFormat;
+
     public ChatListener(Plugin plugin, RankManager rankManager, ProfileStore profileStore,
                         ModerationManager moderation, DevModeManager devMode) {
         this.plugin = plugin;
@@ -35,11 +43,18 @@ public class ChatListener implements Listener {
         this.profileStore = profileStore;
         this.moderation = moderation;
         this.devMode = devMode;
+        // Cache config values once; the listener is recreated on /jreload so values stay fresh
+        this.chatEnabled = plugin.getConfig().getBoolean("chat.enabled", true);
+        this.separator = plugin.getConfig().getString("chat.separator", "§7»§r");
+        this.minRankForAqua = plugin.getConfig().getString("chat.message_color_policy.min_rank_aqua", "helper");
+        this.aquaCode = plugin.getConfig().getString("chat.message_color_policy.aqua_code", "§b");
+        this.defaultCode = plugin.getConfig().getString("chat.message_color_policy.default_code", "§f");
+        this.chatFormat = plugin.getConfig().getString("chat.format", "{prefix}{styled_name} {separator} {message_colored}");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAsyncChat(AsyncChatEvent event) {
-        if (!plugin.getConfig().getBoolean("chat.enabled", true)) return;
+        if (!chatEnabled) return;
 
         final var sender = event.getPlayer();
         final PlayerProfile profile = profileStore.getOrCreate(sender, rankManager.getDefaultGroup());
@@ -85,14 +100,8 @@ public class ChatListener implements Listener {
         RankStyle style = rankManager.getStyle(rank);
         String styledName = ChatUtil.buildStyledName(sender.getName(), style);
 
-        // Separator
-        String sep = plugin.getConfig().getString("chat.separator", "§7»§r");
-
         // Message color policy: helper+ aqua, else white
-        String minAqua = plugin.getConfig().getString("chat.message_color_policy.min_rank_aqua", "helper");
-        String aquaCode = plugin.getConfig().getString("chat.message_color_policy.aqua_code", "§b");
-        String defaultCode = plugin.getConfig().getString("chat.message_color_policy.default_code", "§f");
-        boolean isAqua = rankManager.isAtLeast(rank, minAqua);
+        boolean isAqua = rankManager.isAtLeast(rank, minRankForAqua);
 
         // Strip any formatting from original message, re-apply policy color
         Component original = event.message();
@@ -101,21 +110,19 @@ public class ChatListener implements Listener {
         boolean looksLikeCommand = plain.startsWith("/");
         String coloredMessage = (isAqua ? aquaCode : defaultCode) + plain;
 
-        // Tracking: increment message count and persist
+        // Tracking: increment message count (persisted lazily on quit/shutdown)
         if (!looksLikeCommand) {
             profile.incMessages();
-            profileStore.save(sender.getUniqueId());
         }
 
         // Prefix from style (+ space if non-empty)
         String prefix = (style.prefix == null || style.prefix.isEmpty()) ? "" : style.prefix + " ";
 
         // Final legacy string based on format
-        String format = plugin.getConfig().getString("chat.format", "{prefix}{styled_name} {separator} {message_colored}");
-        String legacy = format
+        String legacy = chatFormat
                 .replace("{prefix}", prefix)
                 .replace("{styled_name}", styledName)
-                .replace("{separator}", sep)
+                .replace("{separator}", separator)
                 .replace("{message_colored}", coloredMessage);
 
         Component finalComponent = sectionSerializer.deserialize(legacy);

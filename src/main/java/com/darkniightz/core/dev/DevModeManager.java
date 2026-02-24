@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Simple developer mode manager, gated by allowed UUIDs from config.
@@ -15,7 +16,7 @@ public class DevModeManager {
     private final Plugin plugin;
     private final Set<UUID> allowed;
     private final boolean grantOp;
-    private final Map<UUID, Boolean> active = new HashMap<>();
+    private final Map<UUID, Boolean> active = new ConcurrentHashMap<>();
     private final Set<UUID> opGranted = new HashSet<>();
 
     public DevModeManager(Plugin plugin) {

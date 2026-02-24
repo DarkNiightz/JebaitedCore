@@ -22,10 +22,18 @@ public class JoinListener implements Listener {
 
     private final LegacyComponentSerializer legacy = LegacyComponentSerializer.legacySection();
 
+    // Config values cached at construction time (listener is recreated on reload)
+    private final boolean joinLeaveEnabled;
+    private final String joinFormat;
+    private final String quitFormat;
+
     public JoinListener(Plugin plugin, RankManager rankManager, ProfileStore profileStore) {
         this.plugin = plugin;
         this.rankManager = rankManager;
         this.profileStore = profileStore;
+        this.joinLeaveEnabled = plugin.getConfig().getBoolean("join_leave.enabled", true);
+        this.joinFormat = plugin.getConfig().getString("join_leave.join_format", "§9[§a+§9] {styled_name}");
+        this.quitFormat = plugin.getConfig().getString("join_leave.quit_format", "§9[§c-§9] {styled_name}");
     }
 
     @EventHandler
@@ -38,12 +46,11 @@ public class JoinListener implements Listener {
             profileStore.save(p.getUniqueId());
         }
 
-        if (plugin.getConfig().getBoolean("join_leave.enabled", true)) {
+        if (joinLeaveEnabled) {
             String rank = profile.getPrimaryRank() == null ? rankManager.getDefaultGroup() : profile.getPrimaryRank().toLowerCase(Locale.ROOT);
             RankStyle style = rankManager.getStyle(rank);
             String styledName = ChatUtil.buildStyledName(p.getName(), style);
-            String fmt = plugin.getConfig().getString("join_leave.join_format", "§9[§a+§9] {styled_name}");
-            String msg = fmt.replace("{styled_name}", styledName);
+            String msg = joinFormat.replace("{styled_name}", styledName);
             event.joinMessage(legacy.deserialize(msg));
 
             // Also apply styled prefix + name to the player list (tab list)
@@ -56,14 +63,14 @@ public class JoinListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         var p = event.getPlayer();
-        var profile = profileStore.getOrCreate(p, rankManager.getDefaultGroup());
-        if (plugin.getConfig().getBoolean("join_leave.enabled", true)) {
+        var profile = profileStore.get(p.getUniqueId());
+        if (profile != null && joinLeaveEnabled) {
             String rank = profile.getPrimaryRank() == null ? rankManager.getDefaultGroup() : profile.getPrimaryRank().toLowerCase(Locale.ROOT);
             RankStyle style = rankManager.getStyle(rank);
             String styledName = ChatUtil.buildStyledName(p.getName(), style);
-            String fmt = plugin.getConfig().getString("join_leave.quit_format", "§9[§c-§9] {styled_name}");
-            String msg = fmt.replace("{styled_name}", styledName);
+            String msg = quitFormat.replace("{styled_name}", styledName);
             event.quitMessage(legacy.deserialize(msg));
         }
+        profileStore.unload(p.getUniqueId());
     }
 }

@@ -5,13 +5,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ModerationManager {
     private final Plugin plugin;
     private final Set<UUID> vanished = new HashSet<>();
     private final Set<UUID> frozen = new HashSet<>();
-    private final Set<UUID> staffChat = new HashSet<>();
-    private final Map<UUID, Long> lastChatAt = new HashMap<>();
+    private final Set<UUID> staffChat = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> lastChatAt = new ConcurrentHashMap<>();
     private int slowmodeSeconds = 0; // 0 = off
 
     public ModerationManager(Plugin plugin) {
