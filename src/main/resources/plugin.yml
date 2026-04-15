@@ -1,0 +1,313 @@
+# Supported Paper range: 1.21.9-1.21.11
+name: JebaitedCore
+main: com.darkniightz.main.JebaitedCore
+version: 1.0.0-SNAPSHOT
+api-version: 1.21
+author: DarkNiightz
+description: Jebaited Core Plugin for Paper 1.21.9-1.21.11.
+
+libraries:
+  - com.zaxxer:HikariCP:5.1.0
+  - org.postgresql:postgresql:42.7.3
+
+commands:
+  # Core/help
+  jebaited:
+    description: Permission-aware command list for Jebaited Core
+    usage: /jebaited
+  help:
+    description: Permission-aware command list for Jebaited Core
+    usage: /help
+  devmode:
+    description: Toggle developer bypass mode (allowed UUIDs only)
+    usage: /devmode <on|off|toggle>
+    aliases: [dev]
+  # Ranks & coins & stats
+  rank:
+    description: Manage or view player ranks
+    usage: /rank <get|set> ...
+  setrank:
+    description: Sets a player's rank
+    usage: /setrank <player> <group>
+  setdonor:
+    description: Sets a player's donor rank (admin+)
+    usage: /setdonor <player> <rank|none>
+  togglerank:
+    description: Toggle chat prefix between staff and donor rank
+    usage: /togglerank
+  stats:
+    description: Open the stats GUI
+    usage: /stats [player]
+  settings:
+    description: Open your personal settings menu
+    usage: /settings
+    aliases: [prefs, preferences]
+  coins:
+    description: View or manage Cosmetic Coins
+    usage: /coins [player] | /coins <give|take|remove|set> <player> <amount>
+    aliases: [coin]
+  balance:
+    description: View your money balance or check another player's balance
+    usage: /balance [player]
+    aliases: [bal, money]
+  pay:
+    description: Send money to another online player
+    usage: /pay <player> <amount>
+  eco:
+    description: Administrative economy controls
+    usage: /eco <give|take|set> <player> <amount>
+  balancetop:
+    description: Show the richest players
+    usage: /balancetop [limit]
+    aliases: [baltop]
+  sethome:
+    description: Create or update one of your homes
+    usage: /sethome [name]
+  home:
+    description: Teleport to one of your homes
+    usage: /home [name]
+  delhome:
+    description: Delete one of your homes
+    usage: /delhome <name>
+  homes:
+    description: List your homes
+    usage: /homes
+  nick:
+    description: Set or clear player nicknames
+    usage: /nick <name|off> or /nick <player> <name|off>
+  tag:
+    description: Set your customizable cosmetic tag text
+    usage: /tag <text with & colors> | /tag clear
+  whois:
+    description: Show diagnostic player information
+    usage: /whois <player>
+  near:
+    description: List nearby players
+    usage: /near [radius]
+  rules:
+    description: Show server rules
+    usage: /rules
+  rtp:
+    description: Teleport to a random location in SMP
+    usage: /rtp
+  message:
+    description: Send a private message to another player
+    usage: /message <player> <message>
+    aliases: [msg, tell, whisper, w]
+  reply:
+    description: Reply to the last player who messaged you
+    usage: /reply <message>
+    aliases: [r]
+  maintenance:
+    description: Toggle or inspect server maintenance mode
+    usage: /maintenance <on|off|status|add|remove|list>
+    aliases: [maint]
+  notes:
+    description: View staff notes for a player
+    usage: /notes <player>
+  warp:
+    description: Teleport to a public warp
+    usage: /warp <name>
+  warps:
+    description: List all public warps
+    usage: /warps
+  setwarp:
+    description: Create or update a public warp
+    usage: /setwarp <name> [cost]
+  delwarp:
+    description: Delete a public warp
+    usage: /delwarp <name>
+  # Moderation suite
+  kick:
+    description: Kick a player
+    usage: /kick <player> [reason]
+  warn:
+    description: Warn a player
+    usage: /warn <player> <reason>
+  mute:
+    description: Permanently mute a player
+    usage: /mute <player> [reason]
+  tempmute:
+    description: Temporarily mute a player
+    usage: /tempmute <player> <duration> [reason]
+  unmute:
+    description: Unmute a player
+    usage: /unmute <player>
+  ban:
+    description: Permanently ban a player
+    usage: /ban <player> [reason]
+  tempban:
+    description: Temporarily ban a player
+    usage: /tempban <player> <duration> [reason]
+  unban:
+    description: Unban a player
+    usage: /unban <player>
+  freeze:
+    description: Toggle freeze on a player
+    usage: /freeze <player>
+  vanish:
+    description: Toggle staff vanish
+    usage: /vanish
+  staffchat:
+    description: Toggle staff chat or send a message
+    usage: /staffchat [message]
+    aliases: [sc]
+  clearchat:
+    description: Clear public chat for non-staff
+    usage: /clearchat
+    aliases: [cc]
+  slowmode:
+    description: Set global chat slowmode
+    usage: /slowmode <seconds|off>
+    aliases: [sm]
+  history:
+    description: View moderation history for a player
+    usage: /history [player]
+  # Hub menus
+  menu:
+    description: Open the Servers Navigator GUI
+    usage: /menu
+    aliases: [m]
+  servers:
+    description: Open the Servers Navigator GUI
+    usage: /servers
+    aliases: [sv]
+  navigator:
+    description: Open the Servers Navigator GUI
+    usage: /navigator
+    aliases: [nav]
+  cosmetics:
+    description: Open the Cosmetics Lounge
+    usage: /cosmetics
+    aliases: [cos]
+  wardrobe:
+    description: Open the Wardrobe
+    usage: /wardrobe
+    aliases: [wd]
+  spawn:
+    description: Return to the configured spawn
+    usage: /spawn
+  hub:
+    description: Return to the hub world
+    usage: /hub
+  smp:
+    description: Travel to the SMP world
+    usage: /smp
+  trade:
+    description: Request or accept a nearby item trade
+    usage: "/trade <player> | /trade accept <player> | /trade deny <player>"
+  grave:
+    description: Track your latest active grave
+    usage: /grave
+  graves:
+    description: List your active graves
+    usage: /graves
+  worldstatus:
+    description: Show world routing and load status
+    usage: /worldstatus
+  compat:
+    description: Show startup, database, and world conversion compatibility status
+    usage: /compat
+    aliases: [compatreport]
+  leaderboard:
+    description: Set or remove persistent hologram leaderboards
+    usage: "/leaderboard set <category> [id] | /leaderboard remove <id> | /leaderboard list | /leaderboard refresh [id] | /leaderboard debug <id>"
+  setspawn:
+    description: Set the configured spawn location
+    usage: /setspawn
+  loadout:
+    description: Save, apply, or clear cosmetic loadouts
+    usage: /loadout <save|apply|clear|list> [name]
+  previewpedestal:
+    description: Place or manage the preview pedestal
+    usage: /previewpedestal [set|clear|status]
+    aliases: [setpreviewpedestal]
+  preview:
+    description: Preview cosmetics or open the collection browser
+    usage: /preview [featured|cosmeticKey]
+  event:
+    description: Full event control panel command
+    usage: /event <status|list|start|stop|complete|setup>
+    aliases: [eventmode]
+  generatepassword:
+    description: Generate a web panel password for yourself
+    usage: /generatepassword
+  restart:
+    description: Schedule or cancel a server restart with countdown
+    usage: /restart [<time>] [<reason...>] | /restart cancel | /restart status
+    aliases: [srestart, serverrestart]
+  jreload:
+    description: Reload JebaitedCore config and refresh DB caches (developers+)
+    usage: /jreload
+    aliases: [jr]
+  debug:
+    description: Open the developer debug cockpit
+    usage: /debug [menu|system|commands|listeners|cosmetics|preview|actions|events]
+    aliases: [devdebug]
+
+permissions:
+  # ── Core ──────────────────────────────────────────────
+  jebaited.core.use:
+    description: Base plugin access
+    default: true
+  jebaited.menu.use:
+    description: Open the Servers Navigator GUI
+    default: true
+  jebaited.cosmetics.open:
+    description: Open the Wardrobe cosmetics GUI
+    default: true
+  jebaited.reload:
+    description: Reload JebaitedCore config (developer+)
+    default: op
+
+  # ── Moderation (match web-panel permission keys) ──────
+  jebaited.mod.kick:
+    description: Kick players (helper+)
+    default: false
+  jebaited.mod.warn:
+    description: Warn players (helper+)
+    default: false
+  jebaited.mod.tempmute:
+    description: Temporarily mute players (moderator+)
+    default: false
+  jebaited.mod.tempban:
+    description: Temporarily ban players (helper+)
+    default: false
+  jebaited.mod.mute:
+    description: Permanently mute players (moderator+)
+    default: false
+  jebaited.mod.ban:
+    description: Permanently ban players (moderator+)
+    default: false
+  jebaited.mod.unban:
+    description: Unban players (moderator+)
+    default: false
+  jebaited.mod.unmute:
+    description: Unmute players (moderator+)
+    default: false
+  jebaited.mod.freeze:
+    description: Freeze/unfreeze players (moderator+)
+    default: false
+  jebaited.mod.vanish:
+    description: Toggle vanish mode (helper+)
+    default: false
+  jebaited.mod.staffchat:
+    description: Use staff chat (helper+)
+    default: false
+  jebaited.mod.clearchat:
+    description: Clear public chat (helper+)
+    default: false
+  jebaited.mod.slowmode:
+    description: Set chat slowmode (moderator+)
+    default: false
+  jebaited.mod.history:
+    description: View moderation history (helper+)
+    default: false
+
+  # ── Ranks ─────────────────────────────────────────────
+  jebaited.rank.set:
+    description: Directly set player ranks (must outrank target)
+    default: false
+  jebaited.rank.view:
+    description: View player rank info
+    default: true

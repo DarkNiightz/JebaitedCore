@@ -1,0 +1,940 @@
+# Core Plugin Configuration
+
+# Ranks configuration
+ranks:
+  ladder:
+    - owner
+    - developer
+    - admin
+    - srmod
+    - moderator
+    - helper
+    - vip
+    - builder
+    - grandmaster
+    - legend
+    - diamond
+    - gold
+    - pleb
+  default: pleb
+
+# Rank styles
+rank_styles:
+  owner:
+    prefix: "§4§lOWNER"
+    name_color: "§4"
+    name_bold: true
+  developer:
+    prefix: "§5§lDEV"
+    name_rainbow:
+      enabled: true
+      colors: ["4", "c", "6", "e", "2", "a", "b", "3", "1", "9", "d", "5"]
+      bold_each_char: true
+  admin:
+    prefix: "§4§lADMIN"
+    name_color: "§4"
+    name_bold: true
+  srmod:
+    prefix: "§c§lSR.MOD"
+    name_color: "§c"
+    name_bold: true
+  moderator:
+    prefix: "§c§lMOD"
+    name_color: "§c"
+    name_bold: false
+  helper:
+    prefix: "§b§lHELPER"
+    name_color: "§b"
+    name_bold: false
+  vip:
+    prefix: "§6§lVIP"
+    name_color: "§6"
+    name_bold: false
+  friend:
+    prefix: "§d§lFRIEND"
+    name_color: "§d"
+    name_bold: false
+  builder:
+    prefix: "§9§lBUILDER"
+    name_color: "§9"
+    name_bold: false
+  grandmaster:
+    prefix: "§4§l✦GM✦"
+    name_color: "§4"
+    name_bold: true
+  legend:
+    prefix: "§d§lLEGEND"
+    name_color: "§d"
+    name_bold: false
+  diamond:
+    prefix: "§b§lDIAMOND"
+    name_color: "§b"
+    name_bold: false
+  gold:
+    prefix: "§6§lGOLD"
+    name_color: "§6"
+    name_bold: false
+  pleb:
+    prefix: "§7§lPLEB"
+    name_color: "§7"
+    name_bold: false
+
+# Near command
+near:
+  min_rank: vip
+  radius: 200
+
+# Priority join queue — kicks the lowest-priority non-staff player when a higher-priority
+# player connects to a full server. Staff ranks are always immune.
+priority_queue:
+  enabled: true
+  # Sent to the player who is displaced when someone with a higher donor rank joins
+  kicked_message: "§cYou were removed to make room for a higher-priority player joining."
+  # Sent to the joining player when the server is full and nobody can be displaced
+  full_message: "§cThe server is full. Purchase a donor rank at §ejebaited.net §cfor priority access."
+
+# Messages
+messages:
+  prefix: "§8[§bJebaited§8] §7"
+  muted: "&cYou've been muted!"
+  unmuted: "&aYou've been unmuted!"
+  kicked: "&cYou were kicked by staff."
+  banned: "&cYou were banned by staff."
+  no_permission: "§cYou don't have permission to use this command."
+  hub_only_command: "§cThat command is only available in the Hub world."
+  broadcast-prefix: "&9[&4GLOBAL&9] &b&l"
+  staff-chat-prefix: "&b[Staff] &f"
+
+# Logging Toggles
+logging:
+  enable: true
+  log-joins: true
+  log-chat: true
+  log-moderation: true
+
+protection:
+  command_spam:
+    enabled: true
+    default_cooldown_ms: 250
+    feedback_cooldown_ms: 1200
+    heavy_cooldown_ms: 1500
+    external_cooldown_ms: 5000
+
+staff-message-color: "&b"
+
+# Chat formatting
+chat:
+  enabled: true
+  separator: "§7»§r"
+  format: "{prefix}{styled_name} {separator} {message_colored}"
+  message_color_policy:
+    min_rank_aqua: helper
+    aqua_code: "§b"
+    default_code: "§f"
+
+private_messages:
+  color_codes:
+    enabled: true
+    min_rank: gold
+
+# Moderation
+moderation:
+  reasons:
+    - hacking
+    - griefing
+    - chat violation
+    - being a cock
+  times:
+    - 30m
+    - 1h
+    - 1d
+    - 7d
+    - permanent
+  clearchat:
+    min_staff_rank: helper
+    blank_lines: 150
+    cooldown_seconds: 5
+
+# Pets
+pets:
+  types:
+    - dog
+    - cat
+    - parrot
+  staff_types:
+    - guardian
+    - flying_dragon
+  feed_item: BONE
+
+# MOTD Settings
+motd:
+  enabled: true
+  server-list: |
+    &6Jebaited Server
+    &aPlayers: {online}/{max}
+  player-join:
+    - "&eWelcome back, {player}!"
+    - "&aYour rank: {rank}"
+    - "&bOnline: {online} players"
+
+# Auto Broadcaster
+broadcaster:
+  enabled: true
+  interval-seconds: 300
+  messages:
+    - "&eTip: Don't forget to vote for rewards!"
+    - "&aJoin our Discord: discord.gg/jebaited"
+    - "&bServer rules: No griefing!"
+
+# BossBar
+bossbar:
+  enabled: true
+  interval-seconds: 30
+  messages:
+    - "Welcome to Jebaited!"
+    - "This is a test"
+    - "Another Config TesTTTTTT"
+
+event_mode:
+  automation:
+    enabled: true
+  interval-seconds: 300
+  world: "events"
+  world_border_size: 10000
+  use_superflat_world: true
+  coin_reward: 1
+  broadcast_prefix: "&9[&dEVENT&9] &f"
+  hub_broadcast_template: "&dEvent on {server}: &f{event}&7. Use &a/smp &7to join."
+  announcements:
+    - "&dA fresh event started on {server}."
+    - "&eMode: {event}"
+    - "&bJoin now and earn coins."
+  events:
+    koth:
+      enabled: true
+      display_name: "KOTH"
+      target_server: "SMP"
+      coin_reward: 100
+      min_players: 2
+      max_players: 32
+    ffa:
+      enabled: true
+      display_name: "FFA"
+      target_server: "SMP"
+      coin_reward: 60
+      min_players: 2
+      max_players: 24
+    duels:
+      enabled: true
+      display_name: "Duels"
+      target_server: "SMP"
+      coin_reward: 40
+      min_players: 2
+      max_players: 2
+    hardcore:
+      enabled: true
+      display_name: "Hardcore FFA"
+      target_server: "SMP"
+      coin_reward: 150
+      min_players: 2
+      max_players: 24
+    hardcore_ffa:
+      enabled: true
+      display_name: "Hardcore FFA"
+      target_server: "SMP"
+      coin_reward: 150
+      min_players: 2
+      max_players: 24
+    hardcore_duels:
+      enabled: true
+      display_name: "Hardcore Duels"
+      target_server: "SMP"
+      coin_reward: 120
+      min_players: 2
+      max_players: 2
+    hardcore_koth:
+      enabled: true
+      display_name: "Hardcore KOTH"
+      target_server: "SMP"
+      coin_reward: 200
+      min_players: 2
+      max_players: 32
+    chat_scrabble:
+      enabled: true
+      display_name: "Chat Game: Scrabble"
+      target_server: "SMP"
+      coin_reward: 35
+    chat_math:
+      enabled: true
+      display_name: "Chat Game: Math Question"
+      target_server: "SMP"
+      coin_reward: 50
+    chat_quiz:
+      enabled: true
+      display_name: "Chat Game: Quiz"
+      target_server: "SMP"
+      coin_reward: 40
+  koth:
+    duration_seconds: 120
+    world: "smp"
+    # Configure with /event setup koth pos1 and /event setup koth pos2
+    # pos1:
+    #   x: 0
+    #   y: 64
+    #   z: 0
+    # pos2:
+    #   x: 10
+    #   y: 70
+    #   z: 10
+  hardcore_koth:
+    duration_seconds: 120
+    world: "smp"
+    # Configure with /event setup hardcore_koth pos1 and /event setup hardcore_koth pos2
+  arenas:
+    ffa:
+      spawns: []
+    duels:
+      spawns: []
+    hardcore:
+      spawns: []
+    hardcore_ffa:
+      spawns: []
+    hardcore_duels:
+      spawns: []
+  chat:
+    scrabble_words:
+      - "minecraft"
+      - "diamond"
+      - "creeper"
+      - "survival"
+      - "redstone"
+      - "enderdragon"
+      - "nether"
+      - "potion"
+      - "enchantment"
+      - "furnace"
+      - "obsidian"
+      - "villager"
+    quiz:
+      q1:
+        question: "What ore drops lapis lazuli?"
+        answer: "lapis ore"
+      q2:
+        question: "How many obsidian are needed for a nether portal frame minimum?"
+        answer: "10"
+      q3:
+        question: "Which mob explodes when it gets close to you?"
+        answer: "creeper"
+      q4:
+        question: "Which block can be used to respawn the Ender Dragon?"
+        answer: "end crystal"
+      q5:
+        question: "Which enchantment allows you to walk on water by turning it into ice?"
+        answer: "frost walker"
+      q6:
+        question: "Which food item can be used to breed pigs?"
+        answer: "carrot"
+      q7:
+        question: "Which item is required to craft a beacon?"
+        answer: "nether star"
+      q8:
+        question: "Which mob can be sheared for its wool?"
+        answer: "sheep"
+
+scoreboard:
+  enabled: true
+  title: "&b&lJebaited"
+  title_frames:
+    - "&3&lJ&b&le&f&lb&b&la&3&li&b&lt&f&le&b&ld"
+    - "&b&lJ&3&le&b&lb&f&la&b&li&3&lt&b&le&f&ld"
+    - "&f&lJ&b&le&3&lb&b&la&f&li&b&lt&3&le&b&ld"
+  server_name: "&fJebaited Network"
+  footer: "&fplay.jebaited.net"
+  update_ticks: 40
+  nametag_max_length: 48
+  nametag_extra_format: " §8• §d{tag}"
+
+# Join/Quit Messages
+join-quit:
+  join: "&a{player} ({rank}) joined the server!"
+  quit: "&c{player} ({rank}) left the server."
+
+# Teleport
+teleport:
+  permission-message: "&cNo permission to teleport!"
+  spawn:
+    location: null
+    message: "&aTeleported to spawn!"
+    set-message: "&aSpawn set at your location!"
+    no-permission: "&cNo permission!"
+
+# Main economy (separate from cosmetic coins)
+economy:
+  currency_symbol: "$"
+  starting_balance: 100.0
+  pay:
+    enabled: true
+    min_amount: 0.01
+
+homes:
+  teleport_delay_seconds: 0
+  limits:
+    default: 1
+    legend: 10
+    diamond: 5
+    gold: 3
+    grandmaster: 999
+    builder: 3
+    vip: 3
+    helper: 4
+    moderator: 5
+    srmod: 5
+    admin: 10
+    developer: 10
+    owner: 10
+
+warps:
+  teleport_delay_seconds: 0
+  allow_cost: true
+
+nick:
+  enabled: true
+  self_min_rank: pleb
+  others_min_rank: helper
+
+near:
+  radius: 120
+  min_rank: diamond
+
+rules:
+  header: "§6§lServer Rules"
+  lines:
+    - "§7- Be respectful to other players."
+    - "§7- No cheating, exploiting, or unfair clients."
+    - "§7- No griefing, stealing, or bypass attempts."
+    - "§7- Keep chat clean and follow staff instructions."
+
+rtp:
+  smp_only: true
+  min_radius: 300
+  max_radius: 2500
+  max_attempts: 16
+
+graves:
+  enabled: true
+  ttl_seconds: 600
+
+combatlog:
+  quit_broadcast: "&c%player% combat logged and died."
+
+tags:
+  enabled: true
+  default_position: "prefix"
+  prefix:
+    chat_format: "§8[§d{tag}§8] "
+    tab_format: "§8[§d{tag}§8] "
+  suffix:
+    chat_format: " §8[§d{tag}§8]"
+    tab_format: " §8[§d{tag}§8]"
+
+# Developer Mode
+devmode:
+  allowed_uuids:
+    - "2ea2bb31-acf0-495c-9ca5-423d80f14e30"
+    - "3e8e6677-db6b-462a-9e53-7171367aaa67"
+  grant_op: true
+  enabled_by_default: false
+
+# Feature flags & Hub Navigator
+feature_flags:
+  hub:
+    hotbar_navigator: true
+    portals: true
+    npcs: true
+    chat_games: true
+    cosmetics: true
+    tutorial_tips: true
+
+hotbar:
+  navigator:
+    enabled: true
+    slot: 4
+    item: COMPASS
+    name: "§b§lNavigator"
+    lore:
+      - "§7Open the network menu"
+  toybox:
+    enabled: true
+    slot: 2
+    item: FIREWORK_ROCKET
+    name: "§d§lToybox"
+    lore:
+      - "§7Right-click to use your active gadget"
+      - "§8Switch toys in /cosmetics"
+  cosmetics:
+    enabled: true
+    slot: 6
+    item: BOOK
+    name: "§5§lCosmetics"
+    lore:
+      - "§7Open your lounge"
+      - "§8Preview, pin, and equip looks"
+
+# Servers menu
+menus:
+  servers:
+    title: "§b§lServer Navigator"
+    items:
+      hub:
+        enabled: true
+        icon: NETHER_STAR
+        name: "§aHub"
+        lore:
+          - "§7You are here"
+      survival:
+        enabled: true
+        icon: OAK_SAPLING
+        name: "§2Survival"
+        lore:
+          - "§7Coming soon"
+      pvp:
+        enabled: true
+        icon: IRON_SWORD
+        name: "§cPvP"
+        lore:
+          - "§7Coming soon"
+      creative:
+        enabled: true
+        icon: BRICKS
+        name: "§dCreative"
+        lore:
+          - "§7Coming soon"
+
+  cosmetics:
+    title: "§d§lCosmetics Lounge"
+    wardrobe_title: "§b§lWardrobe"
+    collection_title: "§5§lCollection Book"
+    size: 54
+    tabs:
+      wardrobe:
+        name: "§aWardrobe"
+        icon: LEATHER_CHESTPLATE
+        slot: 10
+        enabled: true
+        lore:
+          - "§7Open your current outfits and unlocks."
+          - "§8Everything lives here."
+      particles:
+        name: "§bParticles"
+        icon: BLAZE_POWDER
+        slot: 12
+        enabled: true
+        lore:
+          - "§7Sparkles, halos, and orbiting effects."
+          - "§8Pick your vibe."
+      trails:
+        name: "§eTrails"
+        icon: FEATHER
+        slot: 14
+        enabled: true
+        lore:
+          - "§7Leave a little flourish behind every step."
+          - "§8Leave a memorable wake."
+      gadgets:
+        name: "§dToybox"
+        icon: FIREWORK_ROCKET
+        slot: 16
+        enabled: true
+        lore:
+          - "§7Little toys for harmless chaos."
+          - "§8Right-click to play."
+      tags:
+        name: "§5Tags"
+        icon: NAME_TAG
+        slot: 20
+        enabled: true
+        lore:
+          - "§7Prefix and suffix name cosmetics."
+          - "§8Use /tag for your customizable tag."
+      book:
+        name: "§5Collection Book"
+        icon: BOOK
+        slot: 26
+        enabled: true
+        lore:
+          - "§7Browse every cosmetic."
+          - "§8Preview and pin favourites."
+    gold_bar:
+      icon: GOLD_INGOT
+      slot: 53
+      message: "§6Earn cosmetic coins by playing minigames and events!"
+    disable_all:
+      icon: BARRIER
+      slot: 49
+      name: "§cDisable All Effects"
+      lore:
+        - "§7Turn off particles, trails, and gadgets."
+        - "§8A clean slate whenever you want one."
+    favorites_bar:
+      max_items: 7
+
+# Hub protections
+hub:
+  protection:
+    min_rank_build: admin
+    disable_damage: true
+    disable_hunger: true
+    on_death_teleport_spawn: true
+    disable_mob_block_damage: true
+    disable_mob_targeting: true
+  preview_pedestal:
+    enabled: true
+    location: null
+    cooldown_ms: 8000
+    open_delay_ticks: 2
+
+# World routing
+worlds:
+  hub: "world"
+  smp: "smp"
+  route_join_to_hub: true
+  smp_settings:
+    create_if_missing: true
+    environment: "NORMAL"
+    generate_structures: true
+    # Optional fixed seed for deterministic SMP generation; omit for random.
+    # seed: 123456789
+
+# Database
+database:
+  enabled: true
+  host: "postgres"
+  port: 5432
+  database: "jebaited"
+  username: "user"
+  password: "mqJVcJrukDRC7eiH3pMykLEM"
+  pool-settings:
+    maximum-pool-size: 10
+    minimum-idle: 5
+    connection-timeout: 30000
+    idle-timeout: 600000
+    max-lifetime: 1800000
+
+# Ops alerting (optional)
+alerts:
+  enabled: false
+  webhook_url: ""
+  cooldown_ms: 60000
+
+# Minecraft runtime support / update tracking
+minecraft_support:
+  target_family: "1.21.x"
+  minimum_runtime_family: "1.21.x"
+  version_alerts:
+    enabled: true
+    fetch_latest_release: true
+    latest_known_version: "1.21.1"
+    notify_min_rank: "developer"
+    check_interval_hours: 12
+
+# ── Restart system ────────────────────────────────────────────────────────────
+restart:
+  # Scheduled automatic restart
+  schedule:
+    enabled: false
+    # If use-time is true, restarts daily at the specified wall-clock time (server timezone).
+    # If false, restarts every interval-hours after server start.
+    use-time: false
+    time: "04:00"              # HH:mm — used when use-time: true
+    interval-hours: 12         # used when use-time: false
+    countdown-seconds: 300     # countdown length before the scheduled restart fires
+    reason: "Scheduled restart"
+
+  # /restart command defaults
+  default-countdown-seconds: 300   # 5 min when /restart called with no args
+
+  # Message shown in the announce broadcasts
+  # Supports § colour codes.
+  announce-prefix: "§c§l[SERVER] §r"
+
+  # Message sent to each player when they are kicked on restart
+  kick-message: "§cThe server is restarting — be right back! ✦"
+
+  # Notify the web panel on restart events (restart_scheduled / restart_executing / restart_cancelled)
+  panel-notify: true
+
+# Web panel provisioning
+webpanel:
+  url: "http://localhost:3001"
+  public_url: "http://localhost:3001"
+  internal_url: "http://host.docker.internal:3001"
+  provision_secret: "CHr5jd59T5PkQF3SaDBvDH4GEhFbui8h"
+
+# Cosmetics catalog and rules
+cosmetics:
+  catalog:
+    particles:
+      ember_sparks:
+        enabled: true
+        price: 100
+        display_name: "§6Ember Sparks"
+        icon: BLAZE_POWDER
+        lore:
+          - "§7Warm ember particles."
+        pattern: spiral
+        particle: FLAME
+        radius: 0.6
+        speed: 0.2
+        density: 12
+      leaf_whirl:
+        enabled: true
+        price: 100
+        display_name: "§2Leaf Whirl"
+        icon: OAK_LEAVES
+        lore:
+          - "§7A calm forest drift."
+        pattern: ring
+        particle: VILLAGER_HAPPY
+        radius: 0.8
+        speed: 0.1
+        density: 16
+      aqua_bubbles:
+        enabled: true
+        price: 100
+        display_name: "§bAqua Bubbles"
+        icon: HEART_OF_THE_SEA
+        lore:
+          - "§7Soft bubbles and watery motion."
+        pattern: pulse
+        particle: BUBBLE_POP
+        radius: 0.65
+        speed: 0.18
+        density: 14
+      prism_glow:
+        enabled: true
+        price: 125
+        display_name: "§dPrism Glow"
+        icon: AMETHYST_SHARD
+        lore:
+          - "§7Crystal light with a pastel edge."
+        pattern: helix
+        particle: REDSTONE
+        color: "123,186,255"
+        color_to: "255,123,230"
+        radius: 0.62
+        speed: 0.24
+        density: 14
+      aurora_ribbon:
+        enabled: true
+        price: 150
+        display_name: "§3Aurora Ribbon"
+        icon: PRISMARINE_SHARD
+        lore:
+          - "§7A cool ribbon of shifting color."
+        pattern: double_helix
+        particle: REDSTONE
+        color: "80,255,210"
+        color_to: "120,110,255"
+        radius: 0.58
+        speed: 0.28
+        density: 16
+      cherry_drift:
+        enabled: true
+        price: 110
+        display_name: "§dCherry Drift"
+        icon: CHERRY_SAPLING
+        lore:
+          - "§7Soft petals with a spring breeze."
+        pattern: spiral
+        particle: VILLAGER_HAPPY
+        radius: 0.64
+        speed: 0.17
+        density: 12
+    trails:
+      rune_trail:
+        enabled: true
+        price: 100
+        display_name: "§5Rune Trail"
+        icon: ENCHANTED_BOOK
+        lore:
+          - "§7Magical ink behind your steps."
+        particle: END_ROD
+        move_min_delta: 0.08
+        density: 8
+      star_trail:
+        enabled: true
+        price: 100
+        display_name: "§eStar Trail"
+        icon: NETHER_STAR
+        lore:
+          - "§7Tiny stars everywhere."
+        particle: CRIT
+        move_min_delta: 0.08
+        density: 8
+      ember_tail:
+        enabled: true
+        price: 110
+        display_name: "§6Ember Tail"
+        icon: MAGMA_CREAM
+        lore:
+          - "§7A hot ember wake."
+        particle: FLAME
+        move_min_delta: 0.08
+        density: 8
+      bubble_stream:
+        enabled: true
+        price: 110
+        display_name: "§bBubble Stream"
+        icon: TROPICAL_FISH
+        lore:
+          - "§7A bubbly little wake."
+        particle: BUBBLE_POP
+        move_min_delta: 0.08
+        density: 8
+    gadgets:
+      firework_popper:
+        enabled: true
+        price: 100
+        display_name: "§dFirework Popper"
+        icon: FIREWORK_ROCKET
+        lore:
+          - "§7Burst into sparkles on right-click."
+        action: firework_popper
+        cooldown_seconds: 3
+      slime_launcher:
+        enabled: true
+        price: 100
+        display_name: "§aSlime Launcher"
+        icon: SLIME_BALL
+        lore:
+          - "§7Boing yourself into the air."
+        action: slime_launcher
+        cooldown_seconds: 4
+      bubble_wand:
+        enabled: true
+        price: 110
+        display_name: "§bBubble Wand"
+        icon: BLAZE_ROD
+        lore:
+          - "§7Pop a cloud of bubbles."
+        action: bubble_wand
+        cooldown_seconds: 2
+      prism_ping:
+        enabled: true
+        price: 125
+        display_name: "§dPrism Ping"
+        icon: AMETHYST_SHARD
+        lore:
+          - "§7Ping the air with a prism burst."
+        action: prism_ping
+        cooldown_seconds: 3
+      confetti_cannon:
+        enabled: true
+        price: 150
+        display_name: "§6Confetti Cannon"
+        icon: CAKE
+        lore:
+          - "§7Turn any lobby into a tiny party."
+        action: confetti_cannon
+        cooldown_seconds: 5
+    tags:
+      animal_lover:
+        enabled: true
+        price: 140
+        display_name: "§aAnimal Lover"
+        icon: NAME_TAG
+        position: prefix
+        lore:
+          - "§7For players with a soft spot for every creature."
+      event_champion:
+        enabled: true
+        price: 170
+        display_name: "§6Event Champion"
+        icon: NAME_TAG
+        position: prefix
+        lore:
+          - "§7A flex tag for top event grinders."
+      holiday_spirit:
+        enabled: true
+        price: 150
+        display_name: "§cHoliday Spirit"
+        icon: NAME_TAG
+        position: prefix
+        lore:
+          - "§7Seasonal tag slot for annual events."
+      legacy_member:
+        enabled: true
+        price: 180
+        display_name: "§bLegacy Member"
+        icon: NAME_TAG
+        position: suffix
+        lore:
+          - "§7A clean suffix for long-time players."
+      chaos_goblin:
+        enabled: true
+        price: 160
+        display_name: "§dChaos Goblin"
+        icon: NAME_TAG
+        position: suffix
+        lore:
+          - "§7For players who bring the fun and mayhem."
+      tag_custom:
+        enabled: true
+        price: 300
+        display_name: "§5Custom Tag"
+        icon: NAME_TAG
+        position: prefix
+        lore:
+          - "§7Unlocks /tag to set your own colored text."
+          - "§8Use & color codes and activate anytime."
+    wardrobe:
+      frog:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          jump_boost: 3
+      ravers:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          rainbow_aura: true
+      cloud:
+        enabled: true
+        price_each: 100
+        full_set_bonus:
+          double_jump:
+            cooldown_ms: 1000
+  rules:
+    price_default: 100
+    disable_when_vanished: true
+    gadget_cooldown_default: 3
+    particles:
+      auto_off_minutes: 5
+      per_tick_cap: 100
+      global_toggle_default: true
+leaderboards:
+  definitions:
+    kills:
+      category: kills
+      world: world
+      x: 946.3312295719766
+      y: 74.49390748022948
+      z: 10057.408655565865
+    playtime:
+      category: playtime_ms
+      world: world
+      x: 940.9198604082773
+      y: 74.49390748022948
+      z: 10057.408655565865
+    blocks_broken:
+      category: blocks_broken
+      world: world
+      x: 950.2078779678912
+      y: 74.49390748022948
+      z: 10057.408655565865
+    mcmmo_level:
+      category: mcmmo_level
+      world: world
+      x: 954.4807409205554
+      y: 73.37378271200545
+      z: 10056.886685815609

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: jebaited-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jebaited
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: mqJVcJrukDRC7eiH3pMykLEM
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  paper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jebaited-paper
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: "PAPER"
+      VERSION: "LATEST"
+      MEMORY: "4G"
+      JVM_XX_OPTS: "-XX:+UseG1GC"
+    volumes:
+      - minecraft-data:/data
+
+volumes:
+  postgres-data:
+  minecraft-data:

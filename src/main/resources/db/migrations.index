@@ -1,0 +1,6 @@
+# Migration manifest — one filename per line, applied in this order.
+# Adding a new migration: create the SQL file in this directory, then append it here.
+# DO NOT reorder or remove entries — that would break existing deployments.
+V001__base_schema.sql
+V002__column_catchup.sql
+V003__data_backfills.sql

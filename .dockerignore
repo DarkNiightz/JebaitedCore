@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+.continue
+
+README.md
+JebaitedCore.iml
+
+src/
+.mvn/
+mvnw.cmd
+
+# Keep the packaged plugin artifact in the build context
+target/*
+!target/JebaitedCore.jar
