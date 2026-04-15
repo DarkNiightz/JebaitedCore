@@ -5,13 +5,16 @@ I live in the plugin repo. I know every package, every manager, every wiring pat
 This is a Paper 1.21.11 / Java 21 Minecraft plugin. These instructions are loaded automatically on every Copilot chat in this workspace. Follow them without being prompted.
 
 ## Project identifiers
-- **Repo:** `c:\Users\jamie\OneDrive\Documents\Vibe Code\IdeaProjects\JebaitedCore`
+- **Repo:** `c:\Users\jamie\OneDrive\Documents\Vibe Code\IdeaProjects\JebaitedCore` (VS Code workspace)
 - **Source root:** `src/main/java/com/darkniightz/`
 - **Resources:** `src/main/resources/` — `plugin.yml`, `config.yml`
-- **Build:** `.\mvnw.cmd -DskipTests package` → `target/JebaitedCore.jar`
-- **Deploy:** copy to `c:\Users\jamie\OneDrive\Documents\Vibe Code\MC Server\plugins\JebaitedCore.jar`
+- **Build:** see Build & deploy section below — JAVA_HOME must be set first
+- **Deploy:** copy to `C:\Users\jamie\Documents\Vibe Code\MC Server\plugins\JebaitedCore.jar` (**NOT** OneDrive path — MC Server is outside OneDrive)
+- **MC Server:** `C:\Users\jamie\Documents\Vibe Code\MC Server` — docker-compose.yml lives here, NOT in the plugin repo
+- **Web admin:** `C:\Users\jamie\Documents\Vibe Code\web-admin` — Node.js/Express, runs on port 3001
 - **Target:** Paper API `1.21.11-R0.1-SNAPSHOT`, Java 21, `api-version: 1.21` in plugin.yml
 - **DB:** HikariCP + PostgreSQL via `DatabaseManager` — always use try-with-resources, never open raw connections
+- **Migrations:** V001–V009 applied. Next available: **V010**
 
 ## Package map
 
@@ -86,10 +89,15 @@ try { AuditLogService.getInstance().log(actor, action, detail); } catch (Excepti
 
 ## Build & deploy
 ```powershell
-Set-Location "c:\Users\jamie\OneDrive\Documents\Vibe Code\IdeaProjects\JebaitedCore"
+# JAVA_HOME must be set — mvnw.cmd will fail silently without it
+$env:JAVA_HOME = "C:\Users\jamie\.jdk\jdk-21.0.8"
+$env:PATH = "$env:JAVA_HOME\bin;" + $env:PATH
+Set-Location "C:\Users\jamie\OneDrive\Documents\Vibe Code\IdeaProjects\JebaitedCore"
 .\mvnw.cmd -DskipTests package
-Copy-Item "target\JebaitedCore.jar" "c:\Users\jamie\OneDrive\Documents\Vibe Code\MC Server\plugins\JebaitedCore.jar" -Force
+Copy-Item "target\JebaitedCore.jar" "C:\Users\jamie\Documents\Vibe Code\MC Server\plugins\JebaitedCore.jar" -Force
 ```
+
+> ⚠️ MC Server path is `C:\Users\jamie\Documents\Vibe Code\MC Server` — NOT the OneDrive path. Using the OneDrive path here causes Docker volume mount failures (containers get the path baked in and refuse to recreate cleanly).
 
 ## Key singletons & services
 
@@ -118,6 +126,9 @@ All obtained via `JebaitedCore.getInstance().getXxx()`:
 | `CombatTagManager` | Combat tag state |
 | `BossBarManager` | Persistent boss bars |
 | `BroadcasterManager` | Scheduled broadcasts |
+| `FriendManager` | Friend request/accept/deny/remove lifecycle, cache load on join |
+| `FriendDAO` | `loadFriends`, `loadInboundRequests`, `insertRequest`, `deleteRequest`, `insertFriendship`, `deleteFriendship` |
+| `PrivateVaultManager` | Per-UUID paginated vault cache, async load/save via `ItemStack.serializeItemsAsBytes`, donor rank page limits |
 | `LeaderboardManager` | Cached leaderboard queries |
 | `OverallStatsManager` | Server-wide aggregate stats |
 | `ServerScoreboardManager` | Per-player sidebar scoreboard |
@@ -162,8 +173,7 @@ Data shape: <JSON example>
 | Soon | Custom TP/TPA/enchant/gamemode commands replacing Paper defaults |
 | Soon | PvP/Duels expansion — kit selection, coin/item reward chooser, scoreboard integration |
 | Soon | Spawner system — custom spawner ownership, GUI config, DB-backed |
-| Soon | Friends system — DB-backed, cached, GUI, party invite hooks |
-| Soon | Party system — in-memory session, party stats DB, XP share, custom drop rates |
+| **Next** | **Party system — V010 migration, PartyManager, PartyCommand, PartyMenu, party stats** |
 | Soon | Recruit-a-Friend — referral codes, qualifying playtime gate, cosmetic coin reward |
 | Soon | Server/Personal Boosters — timed server-wide XP/drop multipliers, custom items |
 | Soon | Player Profile overhaul (/stats) — tabbed 54-slot GUI, friend/party/settings buttons |
@@ -185,4 +195,7 @@ Data shape: <JSON example>
 | P6 | srmod rank — config.yml ladder + style, CommandSecurityListener, SetRankCommand, GeneratePasswordCommand |
 | P7 | Donor rank pipeline — SetDonorCommand, rankDisplayMode field, SettingsMenu toggle, buildTabDisplay fix |
 | P8 | HC events — HARDCORE_FFA/DUELS/KOTH config, LeaderboardManager O(n) fix, arena key normalization |
+| P9 | Friends system — FriendManager, FriendDAO, FriendCache, FriendListener, FriendCommand, FriendsMenu, V009__friends.sql, plugin.yml entries for friend/friends/fl |
+| P10 | Private Vaults — PrivateVaultManager, PrivateVaultHolder, PrivateVaultListener, PvCommand, V004__player_vaults.sql, donor rank page limits (gold=1, diamond=3, legend=5, grandmaster=10) |
+| P11 | NightSkipListener, restart.ps1 overhaul (Docker check → mysql → postgres force-recreate → web-admin → start.bat), ROADMAP.md updated to V009/Friends+PV shipped |
 
