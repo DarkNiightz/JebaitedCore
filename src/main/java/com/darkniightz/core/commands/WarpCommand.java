@@ -2,6 +2,7 @@ package com.darkniightz.core.commands;
 
 import com.darkniightz.core.Messages;
 import com.darkniightz.core.system.EconomyManager;
+import com.darkniightz.core.system.TeleportWarmupManager;
 import com.darkniightz.core.system.WarpsManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -10,6 +11,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
 public class WarpCommand implements CommandExecutor {
@@ -59,11 +61,13 @@ public class WarpCommand implements CommandExecutor {
         }
 
         player.sendMessage(Messages.prefixed("§7Teleporting to warp §e" + name + " §7in §f" + (delayTicks / 20L) + "s§7..."));
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            TeleportWarmupManager.complete(player.getUniqueId());
             if (!player.isOnline()) return;
             player.teleport(target);
             player.sendMessage(Messages.prefixed("§aTeleported to warp §e" + name + "§a."));
         }, delayTicks);
+        TeleportWarmupManager.register(player.getUniqueId(), task);
         return true;
     }
 }

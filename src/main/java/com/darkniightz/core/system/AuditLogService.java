@@ -92,7 +92,21 @@ public class AuditLogService implements Listener {
     }
 
     public void logCommand(UUID playerUuid, String playerName, String rawCommand) {
-        queueInsert("INSERT INTO command_logs (player_uuid, player_name, command) VALUES (?, ?, ?);", playerUuid, playerName, rawCommand);
+        if (databaseManager == null || !databaseManager.isEnabled() || playerUuid == null || rawCommand == null || rawCommand.isBlank()) return;
+        final long ts = System.currentTimeMillis();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try (Connection conn = databaseManager.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO player_command_log (uuid, username, command, timestamp) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING;")) {
+                ps.setString(1, playerUuid.toString());
+                ps.setString(2, playerName == null ? "unknown" : playerName);
+                ps.setString(3, rawCommand);
+                ps.setLong(4, ts);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to insert command log row", e);
+            }
+        });
     }
 
     private void queueInsert(String sql, UUID playerUuid, String playerName, String payload) {
@@ -119,13 +133,19 @@ public class AuditLogService implements Listener {
         if (databaseManager == null || !databaseManager.isEnabled()) {
             return;
         }
-        cleanupTable("chat_logs");
-        cleanupTable("command_logs");
+        cleanupTable("chat_logs", "created_at", false);
+        cleanupTable("player_command_log", "timestamp", true);
     }
 
-    private void cleanupTable(String tableName) {
-        String deleteOld = "DELETE FROM " + tableName + " WHERE created_at < NOW() - INTERVAL '30 days';";
-        String capRows = "DELETE FROM " + tableName + " WHERE id NOT IN (SELECT id FROM " + tableName + " ORDER BY created_at DESC, id DESC LIMIT 10000);";
+    /**
+     * @param timestampCol  column name holding the time value
+     * @param epochMs       true if the column is a BIGINT epoch-ms value, false if it's a TIMESTAMPTZ
+     */
+    private void cleanupTable(String tableName, String timestampCol, boolean epochMs) {
+        String deleteOld = epochMs
+            ? "DELETE FROM " + tableName + " WHERE " + timestampCol + " < (EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days') * 1000)::bigint;"
+            : "DELETE FROM " + tableName + " WHERE " + timestampCol + " < NOW() - INTERVAL '30 days';";
+        String capRows = "DELETE FROM " + tableName + " WHERE id NOT IN (SELECT id FROM " + tableName + " ORDER BY " + timestampCol + " DESC, id DESC LIMIT 10000);";
         try (Connection conn = databaseManager.getConnection();
              PreparedStatement psOld = conn.prepareStatement(deleteOld);
              PreparedStatement psCap = conn.prepareStatement(capRows)) {

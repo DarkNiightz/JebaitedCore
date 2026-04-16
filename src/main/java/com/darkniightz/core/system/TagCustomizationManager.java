@@ -77,6 +77,16 @@ public class TagCustomizationManager {
         return true;
     }
 
+    /**
+     * Sets a tag earned via an achievement tier reward, but only if the player
+     * has no existing custom tag (never overwrites a player's chosen tag).
+     */
+    public synchronized void unlockAchievementTag(UUID uuid, String tagText) {
+        if (uuid == null || tagText == null || tagText.isBlank()) return;
+        if (getCustomTag(uuid) != null) return; // preserve the player's own tag choice
+        setCustomTag(uuid, tagText);
+    }
+
     public synchronized boolean clearCustomTag(UUID uuid) {
         if (uuid == null) return false;
 

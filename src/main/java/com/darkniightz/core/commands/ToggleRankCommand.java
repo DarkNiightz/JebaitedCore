@@ -46,12 +46,34 @@ public class ToggleRankCommand implements CommandExecutor {
         profiles.save(p.getUniqueId());
 
         String shownRank = currentlyDonor ? profile.getPrimaryRank() : profile.getDonorRank();
-        sender.sendMessage(Messages.prefixed("§aChat prefix now showing: §b" + shownRank
-                + " §7(" + (currentlyDonor ? "staff" : "donor") + " rank)"));
+        String typeLabel = currentlyDonor ? "Regular Rank" : "Donator Rank";
+        sender.sendMessage(Messages.prefixed("§aChat prefix now showing: " + formatRankDisplay(shownRank)
+                + " §7(" + typeLabel + ")"));
 
         if (JebaitedCore.getInstance() != null) {
             JebaitedCore.getInstance().refreshPlayerPresentation(p);
         }
         return true;
+    }
+
+    /** Returns a coloured, properly capitalised rank label for the feedback message. */
+    private static String formatRankDisplay(String rank) {
+        if (rank == null) return "§7None";
+        return switch (rank.toLowerCase()) {
+            case "owner"      -> "§4Owner";
+            case "developer"  -> "§5Developer";
+            case "admin"      -> "§cAdmin";
+            case "srmod"      -> "§6Sr. Mod";
+            case "moderator"  -> "§6Moderator";
+            case "helper"     -> "§eHelper";
+            case "vip"        -> "§bVIP";
+            case "builder"    -> "§3Builder";
+            case "grandmaster"-> "§5Grand Master";
+            case "legend"     -> "§6Legend";
+            case "diamond"    -> "§bDiamond";
+            case "gold"       -> "§6Gold";
+            case "pleb"       -> "§7Pleb";
+            default           -> "§7" + rank;
+        };
     }
 }

@@ -82,6 +82,9 @@ public class PlayerProfile {
     private Set<String> previewedCosmetics = new LinkedHashSet<>();
     private Map<String, String> cosmeticLoadouts = new LinkedHashMap<>();
 
+    // Kit cooldowns: kit name → last-used epoch ms (loaded from / persisted to players.kit_cooldowns JSONB)
+    private final Map<String, Long> kitCooldowns = new LinkedHashMap<>();
+
     // Moderation fields (not persisted in current DAO, but used by commands/runtime)
     private Long muteUntil; // null = not muted, Long.MAX_VALUE = permanent
     private String muteReason;
@@ -180,8 +183,10 @@ public class PlayerProfile {
 
     /** Returns the rank that should be shown in chat prefix. */
     public String getDisplayRank() {
+        if (rankDisplayMode == null || "primary".equals(rankDisplayMode)) return rank;
         if ("donor".equals(rankDisplayMode) && donorRank != null) return donorRank;
-        return rank;
+        // rankDisplayMode holds an explicit rank name chosen via the rank-display selector
+        return rankDisplayMode;
     }
     public String getRankDisplayMode() { return rankDisplayMode == null ? "primary" : rankDisplayMode; }
     public void setRankDisplayMode(String mode) { this.rankDisplayMode = mode; this.rankDisplayModeDirty = true; }
@@ -470,6 +475,30 @@ public class PlayerProfile {
 
     private double roundMoney(double value) {
         return Math.round(value * 100D) / 100D;
+    }
+
+    // --- Kit cooldown accessors ---
+    /** Returns the last-used epoch ms for the given kit, or 0 if never used. */
+    public long getKitLastUsed(String kitName) {
+        return kitCooldowns.getOrDefault(kitName == null ? "" : kitName.toLowerCase(), 0L);
+    }
+
+    /** Records a kit use timestamp (call after giving items). Does NOT persist — use DAO async. */
+    public void setKitLastUsed(String kitName, long epochMs) {
+        if (kitName != null && !kitName.isBlank()) {
+            kitCooldowns.put(kitName.toLowerCase(), epochMs);
+        }
+    }
+
+    /** Returns an unmodifiable view of all kit cooldown entries. */
+    public Map<String, Long> getKitCooldowns() {
+        return java.util.Collections.unmodifiableMap(kitCooldowns);
+    }
+
+    /** Bulk-loads cooldowns from DB (DAO only). Clears existing entries first. */
+    public void setKitCooldownsLoaded(Map<String, Long> loaded) {
+        kitCooldowns.clear();
+        if (loaded != null) kitCooldowns.putAll(loaded);
     }
 
     // Moderation fields accessors

@@ -16,15 +16,17 @@ public class MenuListener implements Listener {
         BaseMenu menu = MenuService.get().getOpen(player);
         if (menu == null) return;
         if (event.getClickedInventory() == null) { event.setCancelled(true); return; }
-        if (!event.getView().getTopInventory().equals(menu.getInventory())) return; // only handle top inventory
+        // Always cancel to prevent items being moved out of the menu view
+        event.setCancelled(true);
+        // Only dispatch handleClick for clicks on the menu itself, not the player's own inventory
+        if (!menu.getInventory().equals(event.getClickedInventory())) return;
 
         int slot = event.getRawSlot();
         boolean left = event.isLeftClick();
         boolean shift = event.isShiftClick();
         boolean right = event.isRightClick();
         boolean handled = menu.handleClick(player, slot, left, shift, right);
-        if (handled) event.setCancelled(true);
-        else event.setCancelled(true); // menus are read-only by default
+        // already cancelled above; no need to re-cancel
     }
 
     @EventHandler

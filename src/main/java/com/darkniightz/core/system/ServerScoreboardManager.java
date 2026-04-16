@@ -87,7 +87,7 @@ public class ServerScoreboardManager {
         String domain = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("scoreboard.footer", "&fplay.jebaited.net"));
         int online = Bukkit.getOnlinePlayers().size();
         String rank = profile != null ? prettyRank(profile.getPrimaryRank()) : prettyRank(ranks.getDefaultGroup());
-        String worldTag = worldManager.isHub(player) ? "HUB" : (worldManager.isSmp(player) ? "SMP" : player.getWorld().getName());
+        String worldTag = worldManager.getWorldLabel(player);
         boolean hub = worldManager.isHub(player);
         String resourceLabel = hub ? "Coins" : "Balance";
         String resourceValue = hub
@@ -159,7 +159,7 @@ public class ServerScoreboardManager {
         if (player == null || player.getWorld() == null) {
             return "";
         }
-        String worldTag = worldManager.isHub(player) ? "HUB" : (worldManager.isSmp(player) ? "SMP" : player.getWorld().getName());
+        String worldTag = worldManager.getWorldLabel(player);
         String activeTag = resolveActiveTag(profile);
         String equipped = resolveEquipped(profile);
         String balance = profile == null ? "$0" : compactNumber(profile.getBalance());

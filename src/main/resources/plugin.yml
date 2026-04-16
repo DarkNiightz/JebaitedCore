@@ -202,6 +202,32 @@ commands:
   graves:
     description: List your active graves
     usage: /graves
+  back:
+    description: Teleport to your last death location (Grandmaster only, one-use)
+    usage: /back
+  deathtp:
+    description: Teleport to your last death location (Legend+ donor perk, one-use)
+    usage: /deathtp
+    aliases: [dtp]
+  feed:
+    description: Restore your hunger and saturation to maximum (Diamond+ donor perk)
+    usage: /feed
+  repair:
+    description: Repair the item in your hand, or all items with /repair all (Grandmaster donor perk)
+    usage: /repair [all]
+  enderchest:
+    description: Open your ender chest from anywhere (Gold+ donor perk)
+    usage: /enderchest
+    aliases: [ec]
+  craft:
+    description: Open a portable crafting table (Gold+ donor perk)
+    usage: /craft
+  anvil:
+    description: Open a portable anvil (Gold+ donor perk)
+    usage: /anvil
+  kit:
+    description: Claim your donor kit
+    usage: /kit [tier]
   worldstatus:
     description: Show world routing and load status
     usage: /worldstatus
@@ -244,11 +270,37 @@ commands:
     description: Open the developer debug cockpit
     usage: /debug [menu|system|commands|listeners|cosmetics|preview|actions|events]
     aliases: [devdebug]
+  party:
+    description: Party management
+    usage: /party <create|invite|join|accept|deny|kick|leave|disband|transfer|chat|list|warp|setwarp|clearwarp|open|ff|gui>
+    aliases: [pa]
+  p:
+    description: Send a message to your party chat
+    usage: /p <message>
+  friend:
+    description: Friend management
+    usage: /friend <add|remove|accept|deny|list|pending|info|gui>
+    aliases: [f]
+  friends:
+    description: Open your friends list
+    usage: /friends
+    aliases: [fl]
+  pv:
+    description: Open your private vault
+    usage: /pv [page]
+    aliases: [vault]
+  achievements:
+    description: View your achievement progress
+    usage: /achievements [player]
+    aliases: [ach, achieve]
 
 permissions:
   # ── Core ──────────────────────────────────────────────
   jebaited.core.use:
     description: Base plugin access
+    default: true
+  jebaited.achievements.use:
+    description: View own achievements
     default: true
   jebaited.menu.use:
     description: Open the Servers Navigator GUI

@@ -152,6 +152,17 @@ public final class JebaitedCore extends JavaPlugin {
     private HotbarNavigatorListener hotbarNavigatorListener;
     private StatsTrackingListener statsTrackingListener;
     private com.darkniightz.core.system.RestartManager restartManager;
+    private com.darkniightz.core.system.PrivateVaultManager privateVaultManager;
+    private com.darkniightz.core.system.FriendManager friendManager;
+    private com.darkniightz.core.party.PartyManager partyManager;
+    private com.darkniightz.core.party.PartyStatDAO partyStatDAO;
+    private com.darkniightz.core.system.BackManager backManager;
+    private com.darkniightz.core.system.KitManager kitManager;
+    private com.darkniightz.core.achievements.AchievementDAO achievementDAO;
+    private com.darkniightz.core.achievements.AchievementManager achievementManager;
+    private final java.util.List<String> startupMessages = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private com.darkniightz.main.database.SchemaManager.MigrationResult migrationResult;
+    private int commandCount = 0;
     private int dirtyFlushTaskId = -1;
     private int dbRetryTaskId = -1;
     private boolean dbDependentServicesStarted = false;
@@ -161,6 +172,14 @@ public final class JebaitedCore extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        // Buffer all INFO-level messages during startup; flush as a single block at the end
+        getLogger().setFilter(r -> {
+            if (r.getLevel().intValue() < java.util.logging.Level.WARNING.intValue()) {
+                startupMessages.add(r.getMessage());
+                return false;
+            }
+            return true;
+        });
         this.panelConnectorService = new com.darkniightz.core.system.PanelConnectorService(this);
         this.opsAlertService = new OpsAlertService(this);
         this.minecraftVersionMonitor = new MinecraftVersionMonitor(this, this.opsAlertService);
@@ -207,6 +226,14 @@ public final class JebaitedCore extends JavaPlugin {
         this.warpsManager = new WarpsManager(this);
         this.previewPedestalManager = new PreviewPedestalManager(this);
         this.scoreboardManager = new ServerScoreboardManager(this, profileStore, rankManager, worldManager);
+        this.privateVaultManager = new com.darkniightz.core.system.PrivateVaultManager(this);
+        this.backManager = new com.darkniightz.core.system.BackManager();
+        this.kitManager = new com.darkniightz.core.system.KitManager(this, rankManager);
+        this.friendManager = new com.darkniightz.core.system.FriendManager(this, databaseManager, profileStore, rankManager);
+        this.partyStatDAO = new com.darkniightz.core.party.PartyStatDAO(databaseManager, getLogger());
+        this.partyManager = new com.darkniightz.core.party.PartyManager(this, profileStore, rankManager);
+        this.achievementDAO = new com.darkniightz.core.achievements.AchievementDAO(databaseManager, getLogger());
+        this.achievementManager = new com.darkniightz.core.achievements.AchievementManager(this, achievementDAO, profileStore, rankManager);
 
         if (databaseManager.isEnabled()) {
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
@@ -226,6 +253,7 @@ public final class JebaitedCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        getLogger().setFilter(null); // ensure startup buffer filter is cleared
         if (dirtyFlushTaskId != -1) {
             Bukkit.getScheduler().cancelTask(dirtyFlushTaskId);
             dirtyFlushTaskId = -1;
@@ -287,9 +315,16 @@ public final class JebaitedCore extends JavaPlugin {
     public MinecraftVersionMonitor getMinecraftVersionMonitor() { return minecraftVersionMonitor; }
     public com.darkniightz.core.system.PanelConnectorService getPanelConnectorService() { return panelConnectorService; }
     public com.darkniightz.core.system.RestartManager getRestartManager() { return restartManager; }
+    public com.darkniightz.core.system.PrivateVaultManager getPrivateVaultManager() { return privateVaultManager; }
+    public com.darkniightz.core.system.BackManager getBackManager() { return backManager; }
+    public com.darkniightz.core.system.KitManager getKitManager() { return kitManager; }
+    public com.darkniightz.core.system.FriendManager getFriendManager() { return friendManager; }
+    public com.darkniightz.core.party.PartyManager getPartyManager() { return partyManager; }
+    public com.darkniightz.core.party.PartyStatDAO getPartyStatDAO() { return partyStatDAO; }
+    public com.darkniightz.core.achievements.AchievementManager getAchievementManager() { return achievementManager; }
 
     private void initializeDatabaseTables() {
-        new com.darkniightz.main.database.SchemaManager(databaseManager, getLogger()).runMigrations();
+        migrationResult = new com.darkniightz.main.database.SchemaManager(databaseManager, getLogger()).runMigrations();
     }
 
     private void finishEnable() {
@@ -297,8 +332,7 @@ public final class JebaitedCore extends JavaPlugin {
         startRuntimeServices();
         registerCommands();
         startBackgroundFlushTask();
-        logStartupSummary();
-        getLogger().info("JebaitedCore enabled.");
+        printStartupBlock();
     }
 
     // ----- Internal helpers for registration -----
@@ -309,7 +343,7 @@ public final class JebaitedCore extends JavaPlugin {
         if (auditLogService != null) Bukkit.getPluginManager().registerEvents(auditLogService, this);
         if (maintenanceManager != null) Bukkit.getPluginManager().registerEvents(maintenanceManager, this);
         Bukkit.getPluginManager().registerEvents(new CommandTrackingListener(profileStore, rankManager, debugFeedManager, overallStatsManager), this);
-        this.statsTrackingListener = new StatsTrackingListener(this, profileStore, rankManager);
+        this.statsTrackingListener = new StatsTrackingListener(this, profileStore, rankManager, friendManager);
         Bukkit.getPluginManager().registerEvents(statsTrackingListener, this);
         Bukkit.getPluginManager().registerEvents(new ModerationListener(profileStore, rankManager, moderationManager, this, debugFeedManager), this);
         // GUI + Hub Hotbar
@@ -322,13 +356,20 @@ public final class JebaitedCore extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PreviewPedestalListener(this, previewPedestalManager, cosmeticPreviewService, cosmeticsManager, profileStore, toyboxManager), this);
         Bukkit.getPluginManager().registerEvents(new WorldChangeListener(this, worldManager, spawnManager, cosmeticsEngine, toyboxManager, hotbarNavigatorListener), this);
         Bukkit.getPluginManager().registerEvents(new EventModeChatListener(this, eventModeManager), this);
-        Bukkit.getPluginManager().registerEvents(new EventModeCombatListener(eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new EventModeCombatListener(eventModeManager, this), this);
         Bukkit.getPluginManager().registerEvents(new EventWorldProtectionListener(this, eventModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CommandSecurityListener(this, profileStore, rankManager, devModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CombatTagListener(this, combatTagManager), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.playerjoin.PriorityJoinListener(this, joinPriorityManager), this);
         Bukkit.getPluginManager().registerEvents(new GraveListener(this, graveManager), this);
         Bukkit.getPluginManager().registerEvents(new PlayerSettingsListener(this), this);
+        com.darkniightz.core.world.NightSkipListener nightSkipListener = new com.darkniightz.core.world.NightSkipListener(this);
+        Bukkit.getPluginManager().registerEvents(nightSkipListener, this);
+        nightSkipListener.start();
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.gui.PrivateVaultListener(privateVaultManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.system.FriendListener(friendManager, this), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.party.PartyListener(partyManager, this), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.achievements.AchievementListener(this, achievementManager, profileStore, rankManager), this);
     }
 
     private void startRuntimeServices() {
@@ -347,6 +388,7 @@ public final class JebaitedCore extends JavaPlugin {
             scheduleDbDependentRetry();
         }
         if (graveManager != null) graveManager.start();
+        if (achievementManager != null) achievementManager.start();
         if (toyboxManager != null) refreshToyboxesForOnline();
         applyStyledTabForOnline();
     }
@@ -361,6 +403,7 @@ public final class JebaitedCore extends JavaPlugin {
         if (bossBarManager != null) bossBarManager.stop();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (leaderboardManager != null) leaderboardManager.stop();
+        if (achievementManager != null) achievementManager.stop();
         if (auditLogService != null) auditLogService.stop();
         if (minecraftVersionMonitor != null) minecraftVersionMonitor.stop();
         if (graveManager != null) graveManager.stop();
@@ -391,6 +434,11 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("delhome", new DelHomeCommand(this, homesManager));
         bindCommand("homes", new HomesCommand(this, homesManager));
         bindCommand("nick", new NickCommand(this, profileStore, rankManager, devModeManager, nicknameManager));
+        bindCommand("pv", new com.darkniightz.core.commands.PvCommand(this, privateVaultManager));
+        com.darkniightz.core.commands.FriendCommand friendCmd = new com.darkniightz.core.commands.FriendCommand(this, friendManager, profileStore);
+        bindCommand("friend", friendCmd);
+        bindCommand("friends", friendCmd);
+        bindCommand("fl", friendCmd);
         bindCommand("tag", new com.darkniightz.core.commands.TagCommand(this, profileStore, rankManager, tagCustomizationManager));
         bindCommand("whois", new WhoisCommand(profileStore, rankManager, devModeManager, economyManager, nicknameManager));
         bindCommand("leaderboard", new com.darkniightz.core.commands.LeaderboardCommand(leaderboardManager, profileStore, rankManager, devModeManager));
@@ -411,6 +459,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("setwarp", new SetWarpCommand(this, warpsManager, profileStore, rankManager, devModeManager));
         bindCommand("delwarp", new DelWarpCommand(this, warpsManager, profileStore, rankManager, devModeManager));
         bindCommand("stats", new StatsCommand(this, profileStore, rankManager, devModeManager));
+        bindCommand("achievements", new com.darkniightz.core.commands.AchievementsCommand(this, achievementManager, profileStore, rankManager));
         bindCommand("settings", new SettingsCommand(this));
         // Backwards-compatible alias: coin -> coins
         bindCommand("coin", new CoinsCommand(profileStore, rankManager, devModeManager));
@@ -446,6 +495,9 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("devdebug", new com.darkniightz.core.commands.DebugCommand(this));
         // Moderation
         bindCommand("generatepassword", new GeneratePasswordCommand(profileStore, rankManager, devModeManager));
+        // Paper's built-in /restart lives in the CommandMap at a higher priority than plugin commands.
+        // Evict it first so our plugin command wins when the player types /restart.
+        evictBuiltInCommand("restart");
         bindCommand("restart", new com.darkniightz.core.commands.mod.RestartCommand(restartManager, profileStore, rankManager, devModeManager));
         bindCommand("kick", new KickCommand(profileStore, rankManager, devModeManager));
         bindCommand("warn", new WarnCommand(this, profileStore, rankManager, devModeManager));
@@ -461,6 +513,21 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("clearchat", new ClearChatCommand(profileStore, rankManager, devModeManager));
         bindCommand("slowmode", new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("history", new HistoryCommand(profileStore, rankManager, devModeManager));
+        // Party
+        com.darkniightz.core.commands.PartyCommand partyCmd =
+            new com.darkniightz.core.commands.PartyCommand(this, partyManager, profileStore);
+        bindCommand("party", partyCmd);
+        bindCommand("pa", partyCmd);
+        bindCommand("p", partyCmd);
+        // Donor perks
+        bindCommand("back", new com.darkniightz.core.commands.BackCommand(this));
+        bindCommand("deathtp", new com.darkniightz.core.commands.DeathTpCommand(this));
+        bindCommand("feed", new com.darkniightz.core.commands.FeedCommand(this));
+        bindCommand("repair", new com.darkniightz.core.commands.RepairCommand(this));
+        bindCommand("enderchest", new com.darkniightz.core.commands.EnderchestCommand(this));
+        bindCommand("craft", new com.darkniightz.core.commands.CraftCommand(this));
+        bindCommand("anvil", new com.darkniightz.core.commands.AnvilCommand(this));
+        bindCommand("kit", new com.darkniightz.core.commands.KitCommand(this));
     }
 
     private void bindCommand(String name, CommandExecutor executor) {
@@ -471,6 +538,31 @@ public final class JebaitedCore extends JavaPlugin {
         }
         cmd.setExecutor(executor);
         if (executor instanceof TabCompleter tc) cmd.setTabCompleter(tc);
+        commandCount++;
+    }
+
+    /**
+     * Removes Paper's built-in command from the SimpleCommandMap so our plugin
+     * command wins when players type /{name} without a namespace prefix.
+     */
+    @SuppressWarnings("unchecked")
+    private void evictBuiltInCommand(String name) {
+        try {
+            org.bukkit.command.CommandMap commandMap = Bukkit.getServer().getCommandMap();
+            java.lang.reflect.Field knownField = commandMap.getClass().getDeclaredField("knownCommands");
+            knownField.setAccessible(true);
+            java.util.Map<String, org.bukkit.command.Command> known =
+                    (java.util.Map<String, org.bukkit.command.Command>) knownField.get(commandMap);
+            // Remove all namespaced variants that aren't our plugin command
+            known.entrySet().removeIf(e -> {
+                String key = e.getKey();
+                org.bukkit.command.Command cmd = e.getValue();
+                return (key.equals(name) || key.endsWith(":" + name))
+                        && !(cmd instanceof PluginCommand pc && pc.getPlugin() == this);
+            });
+        } catch (Exception e) {
+            getLogger().warning("Could not evict built-in command '" + name + "': " + e.getMessage());
+        }
     }
 
     private void startBackgroundFlushTask() {
@@ -742,20 +834,133 @@ public final class JebaitedCore extends JavaPlugin {
         }, 200L, 200L).getTaskId();
     }
 
-    private void logStartupSummary() {
-        String hubName = worldManager == null ? "world" : worldManager.getHubWorldName();
-        String smpName = worldManager == null ? "smp" : worldManager.getSmpWorldName();
-        boolean hubLoaded = Bukkit.getWorld(hubName) != null;
-        boolean smpLoaded = Bukkit.getWorld(smpName) != null;
+    private void printStartupBlock() {
+        getLogger().setFilter(null); // remove buffer filter — block prints directly
+
+        // ── Gather facts ──────────────────────────────────────────────────────
         boolean dbEnabled = databaseManager != null && databaseManager.isEnabled();
-        boolean dbReady = databaseManager != null && databaseManager.canAcquireConnection();
-        String currentMc = Bukkit.getMinecraftVersion();
-        String latestKnownMc = minecraftVersionMonitor == null ? currentMc : minecraftVersionMonitor.getLatestKnownVersion();
-        String versionState = minecraftVersionMonitor != null && minecraftVersionMonitor.isOutdated() ? "update-available" : "ok";
-        getLogger().info("Startup health | db=" + (dbEnabled ? (dbReady ? "ready" : "deferred") : "disabled")
-                + " | hub=" + hubName + ":" + (hubLoaded ? "loaded" : "missing")
-                + " | smp=" + smpName + ":" + (smpLoaded ? "loaded" : "missing")
-                + " | db-services=" + (dbDependentServicesStarted ? "active" : "pending")
-                + " | mc=" + currentMc + "->" + latestKnownMc + ":" + versionState);
+        boolean dbReady   = databaseManager != null && databaseManager.canAcquireConnection();
+        String dbStatus   = dbEnabled ? (dbReady ? "READY" : "DEFERRED (retry loop active)") : "DISABLED";
+
+        String migInfo;
+        if (!dbEnabled) {
+            migInfo = "n/a (DB disabled)";
+        } else if (migrationResult == null) {
+            migInfo = "pending";
+        } else {
+            migInfo = migrationResult.total() + " applied" +
+                (migrationResult.applied() > 0 ? ", " + migrationResult.applied() + " new this start" : ", schema up to date") +
+                " | latest: " + migrationResult.latestMigration();
+        }
+
+        String hubName   = worldConfigManager == null ? "world" : worldConfigManager.getHubWorldName();
+        String smpName   = worldConfigManager == null ? "smp"   : worldConfigManager.getSmpWorldName();
+        String evtName   = getConfig().getString("event_mode.event_world", "event");
+        String smpNether = worldManager == null ? smpName + "_nether" : worldManager.getSmpNetherWorldName();
+        String smpEnd    = worldManager == null ? smpName + "_the_end" : worldManager.getSmpEndWorldName();
+        boolean hubOk    = org.bukkit.Bukkit.getWorld(hubName) != null;
+        boolean smpOk    = org.bukkit.Bukkit.getWorld(smpName) != null;
+        boolean netherOk = org.bukkit.Bukkit.getWorld(smpNether) != null;
+        boolean endOk    = org.bukkit.Bukkit.getWorld(smpEnd) != null;
+        boolean evtOk    = org.bukkit.Bukkit.getWorld(evtName) != null;
+        boolean hubSpawn = spawnManager != null && spawnManager.getSpawnForWorld(hubName) != null;
+        boolean smpSpawn = spawnManager != null && spawnManager.getSpawnForWorld(smpName) != null;
+        java.util.List<String> allWorldNames = org.bukkit.Bukkit.getWorlds().stream()
+            .map(w -> w.getName()).collect(java.util.stream.Collectors.toList());
+
+        java.util.List<String> eventKeys = eventModeManager == null
+            ? java.util.List.of() : eventModeManager.getConfiguredEventKeys();
+
+        int rankCount       = rankManager == null ? 0 : rankManager.getLadder().size();
+        int cosParticles    = cosmeticsManager == null ? 0 : cosmeticsManager.getByCategory(com.darkniightz.core.cosmetics.CosmeticsManager.Category.PARTICLES).size();
+        int cosTrails       = cosmeticsManager == null ? 0 : cosmeticsManager.getByCategory(com.darkniightz.core.cosmetics.CosmeticsManager.Category.TRAILS).size();
+        int cosGadgets      = cosmeticsManager == null ? 0 : cosmeticsManager.getByCategory(com.darkniightz.core.cosmetics.CosmeticsManager.Category.GADGETS).size();
+        int cosTags         = cosmeticsManager == null ? 0 : cosmeticsManager.getByCategory(com.darkniightz.core.cosmetics.CosmeticsManager.Category.TAGS).size();
+        int achieveCount    = achievementManager == null ? 0 : achievementManager.getDefinitions().size();
+        int warpCount       = warpsManager == null ? 0 : warpsManager.listWarps().size();
+        boolean maintenance = maintenanceManager != null && maintenanceManager.isEnabled();
+        boolean outdated    = minecraftVersionMonitor != null && minecraftVersionMonitor.isOutdated();
+        String currentMc   = org.bukkit.Bukkit.getMinecraftVersion();
+        String latestMc    = minecraftVersionMonitor == null ? currentMc : minecraftVersionMonitor.getLatestKnownVersion();
+
+        // Collect any warnings that should be prominently flagged
+        java.util.List<String> warns = new java.util.ArrayList<>();
+        if (!hubOk)    warns.add("WARN  Hub world '" + hubName + "' is NOT loaded — cosmetics/spawns will fail");
+        if (!smpOk)    warns.add("WARN  SMP world '" + smpName + "' is NOT loaded — SMP features will fail");
+        if (!netherOk) warns.add("INFO  SMP nether '" + smpNether + "' not yet loaded — will appear once entered");
+        if (!endOk)    warns.add("INFO  SMP end '"    + smpEnd    + "' not yet loaded — will appear once entered");
+        if (!hubSpawn) warns.add("WARN  Hub spawn is NOT set — players will land at world origin");
+        if (!smpSpawn) warns.add("WARN  SMP spawn is NOT set — players will land at world origin");
+        if (!dbReady && dbEnabled) warns.add("WARN  DB not yet ready — services deferred, retry loop started");
+        if (maintenance) warns.add("WARN  Server is in MAINTENANCE MODE");
+        if (outdated)    warns.add("INFO  MC update available: " + currentMc + " -> " + latestMc);
+        // Also sweep for any schema-specific issues that were logged at WARNING level
+        // (they would have already fired immediately via the WARN passthrough in the filter)
+
+        // ── Box layout ────────────────────────────────────────────────────────
+        String W = "\u2502  "; // left bar
+        String SEP = "\u251c" + "\u2500".repeat(54) + "\u2524";
+        getLogger().info("\u250c" + "\u2500".repeat(54) + "\u2510");
+        getLogger().info("\u2502" + center("JebaitedCore — Startup Report", 54) + "\u2502");
+        getLogger().info(SEP);
+
+        // Buffered init messages (schema, DB pool, etc.)
+        if (!startupMessages.isEmpty()) {
+            for (String msg : startupMessages) getLogger().info(W + msg);
+            getLogger().info(SEP);
+        }
+
+        // Database
+        getLogger().info(W + "DATABASE");
+        getLogger().info(W + "  Status     : " + dbStatus);
+        getLogger().info(W + "  Migrations : " + migInfo);
+        getLogger().info(SEP);
+
+        // Worlds
+        getLogger().info(W + "WORLDS");
+        getLogger().info(W + "  hub      : " + hubName    + padTo(hubName, 16)    + (hubOk    ? "[OK]     " : "[MISSING]") + " spawn=" + (hubSpawn ? "set" : "NOT SET"));
+        getLogger().info(W + "  smp      : " + smpName    + padTo(smpName, 16)    + (smpOk    ? "[OK]     " : "[MISSING]") + " spawn=" + (smpSpawn ? "set" : "NOT SET"));
+        getLogger().info(W + "  nether   : " + smpNether  + padTo(smpNether, 16)  + (netherOk ? "[OK]     " : "[lazy \u2014 created on first entry]"));
+        getLogger().info(W + "  end      : " + smpEnd     + padTo(smpEnd, 16)     + (endOk    ? "[OK]     " : "[lazy \u2014 created on first entry]"));
+        getLogger().info(W + "  event    : " + evtName    + padTo(evtName, 16)    + (evtOk    ? "[OK]" : "[MISSING \u2014 created on event start if configured]"));
+        getLogger().info(W + "  All loaded : " + String.join(", ", allWorldNames));
+        getLogger().info(SEP);
+
+        // Services
+        getLogger().info(W + "SERVICES");
+        getLogger().info(W + "  Ranks       : " + rankCount + " configured   (" + String.join(", ", rankManager == null ? java.util.List.of() : rankManager.getLadder()) + ")");
+        getLogger().info(W + "  Cosmetics   : " + (cosParticles + cosTrails + cosGadgets + cosTags) + " total   (particles=" + cosParticles + ", trails=" + cosTrails + ", gadgets=" + cosGadgets + ", tags=" + cosTags + ")");
+        getLogger().info(W + "  Achievements: " + (achieveCount > 0 ? achieveCount + " definitions" : "0 — check achievements.categories in config.yml"));
+        getLogger().info(W + "  Warps       : " + warpCount + " loaded");
+        getLogger().info(W + "  Events      : " + (eventKeys.isEmpty() ? "0 configured" : eventKeys.size() + " types   (" + String.join(", ", eventKeys) + ")"));
+        getLogger().info(W + "  Maintenance : " + (maintenance ? "ON" : "off"));
+        getLogger().info(W + "  DB-services : " + (dbDependentServicesStarted ? "active" : "pending (will activate on DB ready)"));
+        getLogger().info(SEP);
+
+        // Commands + version
+        getLogger().info(W + "COMMANDS    : " + commandCount + " registered");
+        getLogger().info(W + "MC VERSION  : " + currentMc + (outdated ? " \u2192 " + latestMc + " (update available!)" : " (current)"));
+        getLogger().info(SEP);
+
+        // Warnings — always present even if empty so you know they were checked
+        getLogger().info(W + "WARNINGS    : " + (warns.isEmpty() ? "none" : ""));
+        for (String w : warns) getLogger().info(W + "  " + w);
+
+        getLogger().info("\u2514" + "\u2500".repeat(54) + "\u2518");
+        startupMessages.clear();
+    }
+
+    /** Pad name with spaces to reach targetWidth so columns align. */
+    private static String padTo(String name, int targetWidth) {
+        int pad = targetWidth - name.length();
+        return pad > 0 ? " ".repeat(pad) : " ";
+    }
+
+    /** Centre a string inside a fixed width using spaces. */
+    private static String center(String text, int width) {
+        int pad = Math.max(0, width - text.length());
+        int left = pad / 2;
+        int right = pad - left;
+        return " ".repeat(left) + text + " ".repeat(right);
     }
 }

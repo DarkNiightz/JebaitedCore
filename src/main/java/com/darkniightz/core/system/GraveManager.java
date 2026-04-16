@@ -30,6 +30,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GraveManager {
+    /** Sentinel expiresAt value meaning this grave never expires (Legend/GM insurance). */
+    public static final long TTL_INSURED = Long.MAX_VALUE;
+
     private final JebaitedCore plugin;
     private final Map<UUID, Grave> gravesById = new ConcurrentHashMap<>();
     private final Map<String, UUID> graveIdByBlock = new ConcurrentHashMap<>();
@@ -86,17 +89,24 @@ public class GraveManager {
         if (placed == null || placed.getWorld() == null) return null;
 
         long now = System.currentTimeMillis();
-        long ttlMs = Math.max(60_000L, plugin.getConfig().getLong("graves.ttl_seconds", 600L) * 1000L);
+
+        // Determine TTL — Legend/GM donors get insured graves that never expire.
+        boolean insured = isInsuredRank(owner);
+        long expiresAt = insured
+                ? TTL_INSURED
+                : now + Math.max(60_000L, plugin.getConfig().getLong("graves.ttl_seconds", 600L) * 1000L);
+
+        List<ItemStack> sanitized = sanitize(contents);
         Grave grave = new Grave(
                 UUID.randomUUID(),
                 owner.getUniqueId(),
                 null,
                 placed,
                 now,
-                now + ttlMs,
+                expiresAt,
                 false,
                 false,
-                sanitize(contents)
+                sanitized
         );
         placeMarker(grave.location());
         register(grave);
@@ -106,7 +116,80 @@ public class GraveManager {
 
         sendOwnerInfo(owner, grave, true);
         saveAll();
+
+        if (insured) {
+            triggerAutoLoot(owner, grave, sanitized);
+        }
         return grave;
+    }
+
+    /** Returns true if the player has Legend or higher as primary or donor rank. */
+    private boolean isInsuredRank(Player player) {
+        if (player == null) return false;
+        com.darkniightz.core.players.PlayerProfile profile = plugin.getProfileStore().get(player.getUniqueId());
+        if (profile == null) return false;
+        com.darkniightz.core.ranks.RankManager ranks = plugin.getRankManager();
+        String primary = profile.getPrimaryRank();
+        String donor = profile.getDonorRank();
+        return (primary != null && ranks.isAtLeast(primary, "legend"))
+                || (donor != null && ranks.isAtLeast(donor, "legend"));
+    }
+
+    /** Returns the donor/effective rank string used for vault page limits. */
+    private String effectiveVaultRank(Player player) {
+        com.darkniightz.core.players.PlayerProfile profile = plugin.getProfileStore().get(player.getUniqueId());
+        if (profile == null) return null;
+        String donor = profile.getDonorRank();
+        if (donor != null) return donor;
+        // Fall back to primary rank if it is a donor-tier rank
+        String primary = profile.getPrimaryRank();
+        if (primary != null && (primary.equalsIgnoreCase("legend") || primary.equalsIgnoreCase("grandmaster"))) {
+            return primary;
+        }
+        return null;
+    }
+
+    /**
+     * Asynchronously moves the items from an insured grave into the owner's vault.
+     * Overflow items remain in the grave (still TTL_INSURED). Notifies the owner on completion.
+     */
+    private void triggerAutoLoot(Player owner, Grave grave, List<ItemStack> items) {
+        com.darkniightz.core.system.PrivateVaultManager pvManager = plugin.getPrivateVaultManager();
+        if (pvManager == null) return;
+
+        String vaultRank = effectiveVaultRank(owner);
+        if (vaultRank == null) return; // No vault access — leave items in grave
+
+        // Warn if vault fill is already known and ≥ 90%
+        int fillPercent = pvManager.getVaultFillPercent(owner.getUniqueId(), vaultRank);
+        if (fillPercent >= 90) {
+            owner.sendMessage(com.darkniightz.core.Messages.prefixed(
+                    "§6⚠ §eYour vault is §c" + fillPercent + "% full §e— §fitems will stay in your insured grave if it fills up."));
+        }
+
+        pvManager.autoLootToVault(owner.getUniqueId(), vaultRank, items, overflow -> {
+            // Called back on the main thread
+            if (overflow == null || overflow.isEmpty()) {
+                // All items safely in vault — remove grave
+                saveInventory(grave.id(), java.util.List.of());
+                if (owner.isOnline()) {
+                    owner.sendMessage(com.darkniightz.core.Messages.prefixed(
+                            "§d✦ Grave Insurance §8— §aAll items moved to your vault."));
+                }
+            } else {
+                // Partial overflow — update grave to overflow contents only
+                saveInventory(grave.id(), overflow);
+                if (owner.isOnline()) {
+                    Location l = grave.location();
+                    owner.sendMessage(com.darkniightz.core.Messages.prefixed(
+                            "§d✦ Grave Insurance §8— §e" + overflow.size() + " item stack(s) couldn't fit in your vault."));
+                    owner.sendMessage(com.darkniightz.core.Messages.prefixed(
+                            "§7They remain in your insured grave at §f"
+                            + l.getBlockX() + " " + l.getBlockY() + " " + l.getBlockZ()
+                            + " §7(never expires)."));
+                }
+            }
+        });
     }
 
     public Grave createCombatLogGrave(Player quitter, UUID killer) {
@@ -309,8 +392,12 @@ public class GraveManager {
     private void sendOwnerInfo(Player owner, Grave grave, boolean giveCompass) {
         Location l = grave.location();
         owner.sendMessage(com.darkniightz.core.Messages.prefixed("§aGrave created at §f" + l.getBlockX() + " " + l.getBlockY() + " " + l.getBlockZ() + "§a."));
-        long mins = Math.max(1L, (grave.expiresAt() - System.currentTimeMillis()) / 60_000L);
-        owner.sendMessage(com.darkniightz.core.Messages.prefixed("§7Expires in §f" + mins + "m§7. Anyone can loot this grave."));
+        if (grave.expiresAt() == TTL_INSURED) {
+            owner.sendMessage(com.darkniightz.core.Messages.prefixed("§d✦ Grave Insurance §8— §7moving items to your vault now..."));
+        } else {
+            long mins = Math.max(1L, (grave.expiresAt() - System.currentTimeMillis()) / 60_000L);
+            owner.sendMessage(com.darkniightz.core.Messages.prefixed("§7Expires in §f" + mins + "m§7. Anyone can loot this grave."));
+        }
         if (giveCompass) {
             giveCompass(owner, grave);
         }
@@ -336,17 +423,27 @@ public class GraveManager {
                 return;
             }
 
-            long remainMs = Math.max(0L, current.expiresAt() - System.currentTimeMillis());
-            long totalMs = Math.max(1L, current.expiresAt() - current.createdAt());
-            double progress = Math.max(0d, Math.min(1d, (double) remainMs / (double) totalMs));
-            int seconds = (int) Math.ceil(remainMs / 1000.0);
             BossBar activeBar = trackerBars.get(owner.getUniqueId());
-            if (activeBar != null) {
-                activeBar.setProgress(progress);
-                activeBar.setTitle("§dGrave: §f" + current.location().getBlockX() + " " + current.location().getBlockY() + " " + current.location().getBlockZ() + " §8(" + seconds + "s)");
+            String coords = current.location().getBlockX() + " " + current.location().getBlockY() + " " + current.location().getBlockZ();
+            if (current.expiresAt() == TTL_INSURED) {
+                if (activeBar != null) {
+                    activeBar.setProgress(1.0);
+                    activeBar.setTitle("§d✦ Insured Grave §8— §f" + coords);
+                }
+                owner.setCompassTarget(current.location());
+                owner.sendActionBar("§d✦ §7Insured grave: §f" + coords);
+            } else {
+                long remainMs = Math.max(0L, current.expiresAt() - System.currentTimeMillis());
+                long totalMs = Math.max(1L, current.expiresAt() - current.createdAt());
+                double progress = Math.max(0d, Math.min(1d, (double) remainMs / (double) totalMs));
+                int seconds = (int) Math.ceil(remainMs / 1000.0);
+                if (activeBar != null) {
+                    activeBar.setProgress(progress);
+                    activeBar.setTitle("§dGrave: §f" + coords + " §8(" + seconds + "s)");
+                }
+                owner.setCompassTarget(current.location());
+                owner.sendActionBar("§7Grave tracker: §f" + coords + " §8(" + seconds + "s)");
             }
-            owner.setCompassTarget(current.location());
-            owner.sendActionBar("§7Grave tracker: §f" + current.location().getBlockX() + " " + current.location().getBlockY() + " " + current.location().getBlockZ() + " §8(" + seconds + "s)");
         }, 10L, 20L);
         trackerTasks.put(owner.getUniqueId(), task);
     }

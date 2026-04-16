@@ -2,6 +2,7 @@ package com.darkniightz.core.commands;
 
 import com.darkniightz.core.Messages;
 import com.darkniightz.core.system.HomesManager;
+import com.darkniightz.core.system.TeleportWarmupManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -9,6 +10,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
 public class HomeCommand implements CommandExecutor {
@@ -46,11 +48,13 @@ public class HomeCommand implements CommandExecutor {
                     return;
                 }
                 player.sendMessage(Messages.prefixed("§7Teleporting to §e" + homeName.toLowerCase() + " §7in §f" + (delay / 20L) + "s§7..."));
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    TeleportWarmupManager.complete(player.getUniqueId());
                     if (!player.isOnline()) return;
                     player.teleport(home);
                     player.sendMessage(Messages.prefixed("§aTeleported to home §e" + homeName.toLowerCase() + "§a."));
                 }, delay);
+                TeleportWarmupManager.register(player.getUniqueId(), task);
             });
         });
         return true;

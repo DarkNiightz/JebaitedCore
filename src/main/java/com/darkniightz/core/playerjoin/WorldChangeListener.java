@@ -3,6 +3,7 @@ package com.darkniightz.core.playerjoin;
 import com.darkniightz.core.cosmetics.CosmeticsEngine;
 import com.darkniightz.core.cosmetics.ToyboxManager;
 import com.darkniightz.core.hub.HotbarNavigatorListener;
+import com.darkniightz.core.system.TeleportWarmupManager;
 import com.darkniightz.core.world.SmpReturnManager;
 import com.darkniightz.core.world.SpawnManager;
 import com.darkniightz.core.world.WorldManager;
@@ -12,13 +13,16 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Map;
@@ -100,33 +104,69 @@ public class WorldChangeListener implements Listener {
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
+        // Event participants are handled by EventModeCombatListener — skip auto-respawn for them
+        if (plugin instanceof com.darkniightz.main.JebaitedCore core
+                && core.getEventModeManager() != null
+                && core.getEventModeManager().isParticipant(player)) {
+            return;
+        }
         if (player.getWorld() != null) {
             lastDeathWorld.put(player.getUniqueId(), player.getWorld().getName());
         }
-        // Auto-respawn — skip the death screen entirely; respawn location set in onRespawn below
+        // Auto-respawn after 3 ticks — gives the client time to process the death screen transition
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline() && player.isDead()) {
                 player.spigot().respawn();
             }
-        }, 2L);
+        }, 3L);
+    }
+
+    /** Cancel any pending /home or /warp warmup timer if the player actually moves. */
+    @EventHandler(priority = EventPriority.LOW)
+    public void onMove(PlayerMoveEvent event) {
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (to == null) return;
+        if (from.getBlockX() == to.getBlockX()
+                && from.getBlockY() == to.getBlockY()
+                && from.getBlockZ() == to.getBlockZ()) {
+            return; // rotation-only, ignore
+        }
+        if (TeleportWarmupManager.cancel(event.getPlayer().getUniqueId())) {
+            event.getPlayer().sendMessage(
+                    com.darkniightz.core.Messages.prefixed("\u00a7cTeleport cancelled \u00a7\u00a77\u2014 you moved."));
+        }
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
+        // Event participants: EventModeCombatListener handles their respawn location
+        if (plugin instanceof com.darkniightz.main.JebaitedCore core
+                && core.getEventModeManager() != null
+                && core.getEventModeManager().isParticipant(player)) {
+            Bukkit.getScheduler().runTask(plugin, () -> applyGamemodeForWorld(player));
+            return;
+        }
         if (!event.isBedSpawn() && !event.isAnchorSpawn()) {
             String worldName = lastDeathWorld.remove(player.getUniqueId());
-            World preferred = worldName == null ? null : Bukkit.getWorld(worldName);
-            if (preferred == null && event.getRespawnLocation() != null) {
-                preferred = event.getRespawnLocation().getWorld();
+            World deathWorld = worldName == null ? null : Bukkit.getWorld(worldName);
+            if (deathWorld == null && event.getRespawnLocation() != null) {
+                deathWorld = event.getRespawnLocation().getWorld();
             }
-            if (preferred == null) {
-                preferred = player.getWorld();
+            if (deathWorld == null) {
+                deathWorld = player.getWorld();
             }
-            if (preferred != null) {
-                Location target = spawnManager == null ? null : spawnManager.getSpawnForWorld(preferred.getName());
+            // Deaths in nether/end should route back to SMP main world, not nether/end spawn
+            World respawnWorld = deathWorld;
+            if (worldManager != null && worldManager.isSmp(deathWorld) && !worldManager.getSmpWorldName().equalsIgnoreCase(deathWorld.getName())) {
+                World smp = worldManager.getSmpWorld();
+                if (smp != null) respawnWorld = smp;
+            }
+            if (respawnWorld != null) {
+                Location target = spawnManager == null ? null : spawnManager.getSpawnForWorld(respawnWorld.getName());
                 if (target == null) {
-                    target = preferred.getSpawnLocation();
+                    target = respawnWorld.getSpawnLocation();
                 }
                 if (target != null) {
                     event.setRespawnLocation(target);
@@ -206,10 +246,77 @@ public class WorldChangeListener implements Listener {
         if (player == null) {
             return;
         }
+        // Devmode players bypass gamemode enforcement — they manage their own gamemode
+        if (plugin instanceof com.darkniightz.main.JebaitedCore core
+                && core.getDevModeManager() != null
+                && core.getDevModeManager().isActive(player.getUniqueId())) {
+            return;
+        }
         if (worldManager.isHub(player)) {
             player.setGameMode(GameMode.ADVENTURE);
         } else if (worldManager.isSmp(player)) {
             player.setGameMode(GameMode.SURVIVAL);
+        }
+    }
+
+    /**
+     * Intercept portal travel to keep players within their SMP dimension set.
+     * <ul>
+     *   <li>smp_nether → nether portal → redirect to smp (not hub/overworld)</li>
+     *   <li>smp → nether portal → let Bukkit route to smp_nether normally</li>
+     *   <li>smp_the_end → end exit portal → redirect to smp (not hub/overworld)</li>
+     * </ul>
+     * Hub portals are not affected (hub players shouldn't have portals, but just in case we let it through).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPortal(PlayerPortalEvent event) {
+        Player player = event.getPlayer();
+        World from = player.getWorld();
+        PlayerTeleportEvent.TeleportCause cause = event.getCause();
+
+        // Nether portal from smp → route to world_nether
+        if (cause == PlayerTeleportEvent.TeleportCause.NETHER_PORTAL
+                && from.getName().equalsIgnoreCase(worldManager.getSmpWorldName())) {
+            World nether = Bukkit.getWorld(worldManager.getSmpNetherWorldName());
+            if (nether != null) {
+                Location fromLoc = event.getFrom();
+                event.setTo(new Location(nether, fromLoc.getX() / 8.0, fromLoc.getY(), fromLoc.getZ() / 8.0,
+                        fromLoc.getYaw(), fromLoc.getPitch()));
+            }
+            return;
+        }
+
+        // Nether portal from world_nether → route back to smp
+        if (cause == PlayerTeleportEvent.TeleportCause.NETHER_PORTAL
+                && from.getName().equalsIgnoreCase(worldManager.getSmpNetherWorldName())) {
+            World smp = worldManager.getSmpWorld();
+            if (smp != null) {
+                Location from3d = event.getFrom();
+                event.setTo(new Location(smp, from3d.getX() * 8.0, from3d.getY(), from3d.getZ() * 8.0,
+                        from3d.getYaw(), from3d.getPitch()));
+            }
+            return;
+        }
+
+        // End portal from smp → route to world_the_end
+        if (cause == PlayerTeleportEvent.TeleportCause.END_PORTAL
+                && from.getName().equalsIgnoreCase(worldManager.getSmpWorldName())) {
+            World end = Bukkit.getWorld(worldManager.getSmpEndWorldName());
+            if (end != null) {
+                event.setTo(end.getSpawnLocation());
+            }
+            return;
+        }
+
+        // End exit portal from world_the_end → redirect to smp spawn
+        if (cause == PlayerTeleportEvent.TeleportCause.END_PORTAL
+                && from.getName().equalsIgnoreCase(worldManager.getSmpEndWorldName())) {
+            World smp = worldManager.getSmpWorld();
+            if (smp != null) {
+                Location target = spawnManager != null ? spawnManager.getSpawnForWorld(smp.getName()) : null;
+                if (target == null) target = smp.getSpawnLocation();
+                event.setTo(target);
+            }
         }
     }
 

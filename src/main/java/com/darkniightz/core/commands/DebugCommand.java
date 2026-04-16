@@ -19,12 +19,16 @@ import com.darkniightz.main.JebaitedCore;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.util.StringUtil;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-public class DebugCommand implements CommandExecutor {
+public class DebugCommand implements CommandExecutor, TabCompleter {
     private final JebaitedCore plugin;
     private final DevModeManager devMode;
     private final DebugStateManager debugState;
@@ -84,11 +88,29 @@ public class DebugCommand implements CommandExecutor {
             case "actions", "tools" -> menu.openActions(player);
             case "events", "feed" -> menu.openEvents(player);
             case "health", "status" -> menu.openHealth(player);
+            case "database", "db" -> menu.openDatabase(player);
             default -> {
-                player.sendMessage(Messages.prefixed("§eUsage: §f/" + label + " [menu|system|commands|listeners|cosmetics|preview|actions|events|health]"));
+                player.sendMessage(Messages.prefixed("§eUsage: §f/" + label + " [menu|system|commands|cosmetics|events|health|database]"));
                 return true;
             }
         }
         return true;
+    }
+
+    private static final List<String> SUBS = List.of(
+        "menu", "system", "commands", "cosmetics", "events", "health", "status", "database", "db"
+    );
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
+        if (!(sender instanceof Player player)) return List.of();
+        if (!devMode.isAllowed(player.getUniqueId()) || !devMode.isActive(player.getUniqueId())) return List.of();
+        if (args.length == 1) {
+            List<String> result = new ArrayList<>();
+            StringUtil.copyPartialMatches(args[0], SUBS, result);
+            return result;
+        }
+        return List.of();
     }
 }

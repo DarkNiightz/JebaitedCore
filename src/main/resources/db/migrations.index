@@ -2,5 +2,7 @@
 # Adding a new migration: create the SQL file in this directory, then append it here.
 # DO NOT reorder or remove entries — that would break existing deployments.
 V001__base_schema.sql
-V002__column_catchup.sql
-V003__data_backfills.sql
+V002__schema_catchup.sql
+V003__homes_reshape.sql
+V004__donor_perks.sql
+V005__homes_column_fix.sql

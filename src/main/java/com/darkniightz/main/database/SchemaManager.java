@@ -46,28 +46,33 @@ public class SchemaManager {
      * Runs all pending migrations. Throws {@link RuntimeException} on failure so the
      * caller can abort startup — a partial schema is worse than not starting at all.
      */
-    public void runMigrations() {
-        if (!db.isEnabled()) return;
+    public record MigrationResult(int total, int applied, String latestMigration) {}
+
+    public MigrationResult runMigrations() {
+        if (!db.isEnabled()) return new MigrationResult(0, 0, "n/a");
 
         try (Connection conn = db.getConnection()) {
             ensureMigrationsTable(conn);
-            List<String> applied = loadApplied(conn);
+            List<String> alreadyApplied = loadApplied(conn);
             List<String> pending = discoverMigrations();
 
             int ran = 0;
             for (String name : pending) {
-                if (applied.contains(name)) continue;
+                if (alreadyApplied.contains(name)) continue;
                 logger.info("[Schema] Applying " + name + " ...");
                 String sql = readResource(MIGRATIONS_DIR + name);
                 applyMigration(conn, name, sql);
+                alreadyApplied.add(name);
                 ran++;
             }
 
+            String latest = alreadyApplied.isEmpty() ? "none" : alreadyApplied.get(alreadyApplied.size() - 1);
             if (ran == 0) {
-                logger.info("[Schema] Schema is up to date (" + applied.size() + " migration(s) already applied).");
+                logger.info("[Schema] Schema is up to date (" + alreadyApplied.size() + " migration(s) applied).");
             } else {
-                logger.info("[Schema] Applied " + ran + " migration(s) successfully.");
+                logger.info("[Schema] Applied " + ran + " new migration(s). Total: " + alreadyApplied.size() + ".");
             }
+            return new MigrationResult(alreadyApplied.size(), ran, latest);
 
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "[Schema] Migration failed", e);
@@ -164,19 +169,48 @@ public class SchemaManager {
     }
 
     /**
-     * Splits a SQL script on semicolons, skipping those inside single-quoted strings.
-     * Adequate for DDL/DML — does not handle PL/pgSQL dollar-quoting.
+     * Splits a SQL script on semicolons, skipping those inside single-quoted strings
+     * and PL/pgSQL {@code $$} dollar-quoted blocks (e.g. {@code DO $$ ... $$;}).
+     * Each {@code $$} token toggles dollar-quote mode — semicolons inside are ignored.
      */
     static List<String> splitStatements(String sql) {
         List<String> statements = new ArrayList<>();
         StringBuilder current = new StringBuilder();
-        boolean inString = false;
+        boolean inString      = false;
+        boolean inLineComment = false;
+        boolean inDollarQuote = false;
         for (int i = 0; i < sql.length(); i++) {
             char c = sql.charAt(i);
-            if (c == '\'' && (i == 0 || sql.charAt(i - 1) != '\\')) {
+
+            // End line comment on newline
+            if (inLineComment) {
+                current.append(c);
+                if (c == '\n') inLineComment = false;
+                continue;
+            }
+
+            // Detect start of -- line comment (only when not inside a string or dollar-quote)
+            if (!inString && !inDollarQuote && c == '-' && i + 1 < sql.length() && sql.charAt(i + 1) == '-') {
+                inLineComment = true;
+                current.append(c);
+                continue;
+            }
+
+            // Detect $$ dollar-quote toggle (only outside single-quoted strings)
+            if (!inString && c == '$' && i + 1 < sql.length() && sql.charAt(i + 1) == '$') {
+                inDollarQuote = !inDollarQuote;
+                current.append(c);
+                current.append(sql.charAt(i + 1));
+                i++; // consume both '$' chars
+                continue;
+            }
+
+            // Toggle single-quoted string state (only outside dollar-quotes)
+            if (!inDollarQuote && c == '\'' && (i == 0 || sql.charAt(i - 1) != '\\')) {
                 inString = !inString;
             }
-            if (c == ';' && !inString) {
+
+            if (c == ';' && !inString && !inDollarQuote) {
                 String stmt = current.toString().trim();
                 if (!stmt.isEmpty()) statements.add(stmt);
                 current.setLength(0);

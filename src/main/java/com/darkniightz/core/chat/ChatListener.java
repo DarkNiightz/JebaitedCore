@@ -55,6 +55,15 @@ public class ChatListener implements Listener {
         if (!plugin.getConfig().getBoolean("chat.enabled", true)) return;
 
         final var sender = event.getPlayer();
+
+        // One-shot chat input capture (e.g. "Add Friend" GUI prompt)
+        String rawInput = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(event.message());
+        if (ChatInputService.intercept(sender, rawInput)) {
+            event.setCancelled(true);
+            return;
+        }
+
         PlayerProfile profile = profileStore.get(sender.getUniqueId());
         final String rank = profile == null || profile.getPrimaryRank() == null
                 ? rankManager.getDefaultGroup()

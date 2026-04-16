@@ -48,6 +48,29 @@ public final class PermissionConstants {
     /** Bypasses the priority-queue kick check; granted implicitly to all staff ranks. */
     public static final String JOIN_PRIORITY_BYPASS = "jebaited.join.priority_bypass";
 
+    // ── Party ────────────────────────────────────────────
+    public static final String CMD_PARTY      = "jebaited.party.use";
+    public static final String CMD_PARTY_CHAT = "jebaited.party.chat";
+
+    // ── Achievements ─────────────────────────────────────
+    public static final String CMD_ACHIEVEMENTS = "jebaited.achievements.use";
+
+    // ── Donor Perks ──────────────────────────────────────
+    public static final String CMD_BACK         = "jebaited.back.use";
+    public static final String CMD_PV_INSPECT   = "jebaited.pv.inspect";
+    public static final String DONOR_FEED       = "jebaited.donor.feed";
+    public static final String DONOR_NEAR       = "jebaited.donor.near";
+    public static final String DONOR_ENDERCHEST = "jebaited.donor.enderchest";
+    public static final String DONOR_CRAFT      = "jebaited.donor.craft";
+    public static final String DONOR_ANVIL      = "jebaited.donor.anvil";
+    public static final String DONOR_REPAIR     = "jebaited.donor.repair";
+    public static final String DONOR_DEATHTP    = "jebaited.donor.deathtp";
+    public static final String DONOR_KIT        = "jebaited.donor.kit";
+    public static final String KIT_GOLD         = "jebaited.kit.gold";
+    public static final String KIT_DIAMOND      = "jebaited.kit.diamond";
+    public static final String KIT_LEGEND       = "jebaited.kit.legend";
+    public static final String KIT_GRANDMASTER  = "jebaited.kit.grandmaster";
+
     // ── Utility ─────────────────────────────────────────
 
     /**

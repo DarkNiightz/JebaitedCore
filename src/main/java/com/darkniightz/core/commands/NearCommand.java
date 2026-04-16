@@ -7,6 +7,7 @@ import com.darkniightz.main.JebaitedCore;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -15,7 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class NearCommand implements CommandExecutor {
+public class NearCommand implements CommandExecutor, TabCompleter {
 
     private final Plugin plugin;
 
@@ -31,6 +32,11 @@ public class NearCommand implements CommandExecutor {
         }
 
         if (plugin instanceof JebaitedCore core) {
+            // /near is SMP-only
+            if (core.getWorldManager() != null && core.getWorldManager().isHub(player)) {
+                player.sendMessage(Messages.prefixed("§cThis command is only available in SMP."));
+                return true;
+            }
             PlayerProfile profile = core.getProfileStore().getOrCreate(player, core.getRankManager().getDefaultGroup());
             String minRank = plugin.getConfig().getString("near.min_rank", "diamond");
             String actorRank = profile == null || profile.getPrimaryRank() == null ? core.getRankManager().getDefaultGroup() : profile.getPrimaryRank();
@@ -74,5 +80,10 @@ public class NearCommand implements CommandExecutor {
             player.sendMessage(Messages.prefixed("§7- §e" + target.getName() + " §8(" + Math.round(dist) + "m)"));
         }
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        return java.util.Collections.emptyList();
     }
 }

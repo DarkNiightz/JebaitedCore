@@ -84,6 +84,17 @@ near:
   min_rank: vip
   radius: 200
 
+# Donor kits — cooldown applies to each kit independently
+# Valid range: 0 to 604800000 (7 days). Default is 86400000 (24 hours).
+kits:
+  cooldown_ms: 86400000
+
+# Donor perk cooldowns
+donor:
+  perks:
+    repair_cooldown_ms: 300000
+    feed_cooldown_ms: 60000
+
 # Priority join queue — kicks the lowest-priority non-staff player when a higher-priority
 # player connects to a full server. Staff ranks are always immune.
 priority_queue:
@@ -597,6 +608,10 @@ hub:
 worlds:
   hub: "world"
   smp: "smp"
+  # Vanilla nether/end worlds shared by SMP portals.
+  # SMP nether portals route here; world_nether portals return to smp.
+  smp_nether: "world_nether"
+  smp_the_end: "world_the_end"
   route_join_to_hub: true
   smp_settings:
     create_if_missing: true
@@ -662,6 +677,120 @@ restart:
 
   # Notify the web panel on restart events (restart_scheduled / restart_executing / restart_cancelled)
   panel-notify: true
+
+# Achievement / Milestone System
+achievements:
+  categories:
+    kills:
+      display_name: "PvP Warrior"
+      description: "Eliminate other players in combat"
+      type: KILLS
+      tiers:
+        - label: "Rookie"
+          threshold: 10
+          reward_type: tag
+          reward_value: "[Rookie Slayer]"
+        - label: "Fighter"
+          threshold: 100
+          reward_type: coins
+          reward_value: "500"
+        - label: "Veteran"
+          threshold: 1000
+          reward_type: tag
+          reward_value: "[Veteran Slayer]"
+        - label: "Legend"
+          threshold: 10000
+          reward_type: coins
+          reward_value: "2500"
+    blocks_broken:
+      display_name: "Excavator"
+      description: "Break blocks across the world"
+      type: BLOCKS_BROKEN
+      tiers:
+        - label: "Miner"
+          threshold: 1000
+          reward_type: coins
+          reward_value: "100"
+        - label: "Digger"
+          threshold: 10000
+          reward_type: coins
+          reward_value: "500"
+        - label: "Excavator"
+          threshold: 100000
+          reward_type: tag
+          reward_value: "[Excavator]"
+        - label: "World Eater"
+          threshold: 1000000
+          reward_type: coins
+          reward_value: "2000"
+    fish_caught:
+      display_name: "Angler"
+      description: "Catch fish from the seas"
+      type: FISH_CAUGHT
+      tiers:
+        - label: "Rookie Angler"
+          threshold: 10
+          reward_type: coins
+          reward_value: "50"
+        - label: "Fisher"
+          threshold: 100
+          reward_type: coins
+          reward_value: "250"
+        - label: "Master Angler"
+          threshold: 1000
+          reward_type: tag
+          reward_value: "[Master Angler]"
+        - label: "Sea Lord"
+          threshold: 10000
+          reward_type: coins
+          reward_value: "1500"
+    distance_travelled:
+      display_name: "Wanderer"
+      description: "Explore the world on foot"
+      type: DISTANCE_TRAVELLED
+      tiers:
+        - label: "Traveller"
+          threshold: 1000
+          reward_type: coins
+          reward_value: "100"
+        - label: "Explorer"
+          threshold: 10000
+          reward_type: coins
+          reward_value: "500"
+        - label: "Wanderer"
+          threshold: 100000
+          reward_type: tag
+          reward_value: "[Wanderer]"
+        - label: "Pathfinder"
+          threshold: 1000000
+          reward_type: coins
+          reward_value: "2000"
+    playtime:
+      display_name: "Veteran"
+      description: "Time spent on the server"
+      type: PLAYTIME_MINUTES
+      tiers:
+        - label: "Newcomer"
+          threshold: 60
+          reward_type: coins
+          reward_value: "100"
+        - label: "Regular"
+          threshold: 1440
+          reward_type: coins
+          reward_value: "500"
+        - label: "Dedicated"
+          threshold: 10080
+          reward_type: tag
+          reward_value: "[Dedicated]"
+        - label: "Veteran"
+          threshold: 43200
+          reward_type: coins
+          reward_value: "2500"
+
+# Party system
+party:
+  max_size: 6
+  friends_required: false  # If true, only friends can be invited (stub — not enforced yet)
 
 # Web panel provisioning
 webpanel:

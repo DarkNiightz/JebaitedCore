@@ -228,37 +228,25 @@ public class HomesManager {
 
     private void initDatabase() {
         if (!(plugin instanceof JebaitedCore core)) return;
+        // Schema is managed by SchemaManager migrations (V003__homes_reshape.sql).
+        // This CREATE TABLE is a no-op on existing DBs; on fresh installs it creates the canonical schema.
         String sql = """
                 CREATE TABLE IF NOT EXISTS player_homes (
                     player_uuid UUID NOT NULL,
-                    home_name VARCHAR(16) NOT NULL,
-                    uuid UUID,
-                    name TEXT,
-                    world TEXT,
-                    world_name VARCHAR(64) NOT NULL,
-                    x DOUBLE PRECISION NOT NULL,
-                    y DOUBLE PRECISION NOT NULL,
-                    z DOUBLE PRECISION NOT NULL,
-                    yaw REAL NOT NULL,
-                    pitch REAL NOT NULL,
-                    created_at BIGINT NOT NULL DEFAULT 0,
+                    home_name   VARCHAR(64) NOT NULL,
+                    world_name  VARCHAR(64) NOT NULL,
+                    x           DOUBLE PRECISION NOT NULL,
+                    y           DOUBLE PRECISION NOT NULL,
+                    z           DOUBLE PRECISION NOT NULL,
+                    yaw         REAL NOT NULL DEFAULT 0,
+                    pitch       REAL NOT NULL DEFAULT 0,
+                    created_at  BIGINT NOT NULL DEFAULT 0,
                     PRIMARY KEY (player_uuid, home_name)
                 )
                 """;
         try (Connection conn = core.getDatabaseManager().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             PreparedStatement addUuid = conn.prepareStatement("ALTER TABLE IF EXISTS player_homes ADD COLUMN IF NOT EXISTS uuid UUID");
-             PreparedStatement addName = conn.prepareStatement("ALTER TABLE IF EXISTS player_homes ADD COLUMN IF NOT EXISTS name TEXT");
-             PreparedStatement addWorld = conn.prepareStatement("ALTER TABLE IF EXISTS player_homes ADD COLUMN IF NOT EXISTS world TEXT");
-             PreparedStatement addCreatedAt = conn.prepareStatement("ALTER TABLE IF EXISTS player_homes ADD COLUMN IF NOT EXISTS created_at BIGINT NOT NULL DEFAULT 0");
-             PreparedStatement backfill = conn.prepareStatement("UPDATE player_homes SET uuid = COALESCE(uuid, player_uuid), name = COALESCE(name, home_name), world = COALESCE(world, world_name), created_at = CASE WHEN COALESCE(created_at, 0) <= 0 THEN ? ELSE created_at END")) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.execute();
-            addUuid.execute();
-            addName.execute();
-            addWorld.execute();
-            addCreatedAt.execute();
-            backfill.setLong(1, System.currentTimeMillis());
-            backfill.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().warning("Failed to initialize player_homes table: " + e.getMessage());
         }
@@ -306,13 +294,10 @@ public class HomesManager {
     private void upsertHomeInDatabase(UUID uuid, String homeName, Location location) {
         if (!(plugin instanceof JebaitedCore core) || location.getWorld() == null) return;
         String sql = """
-                INSERT INTO player_homes (player_uuid, home_name, uuid, name, world, world_name, x, y, z, yaw, pitch, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO player_homes (player_uuid, home_name, world_name, x, y, z, yaw, pitch, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (player_uuid, home_name)
-                DO UPDATE SET uuid = EXCLUDED.uuid,
-                              name = EXCLUDED.name,
-                              world = EXCLUDED.world,
-                              world_name = EXCLUDED.world_name,
+                DO UPDATE SET world_name = EXCLUDED.world_name,
                               x = EXCLUDED.x,
                               y = EXCLUDED.y,
                               z = EXCLUDED.z,
@@ -323,16 +308,13 @@ public class HomesManager {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, uuid);
             ps.setString(2, homeName);
-            ps.setObject(3, uuid);
-            ps.setString(4, homeName);
-            ps.setString(5, location.getWorld().getName());
-            ps.setString(6, location.getWorld().getName());
-            ps.setDouble(7, location.getX());
-            ps.setDouble(8, location.getY());
-            ps.setDouble(9, location.getZ());
-            ps.setFloat(10, location.getYaw());
-            ps.setFloat(11, location.getPitch());
-            ps.setLong(12, System.currentTimeMillis());
+            ps.setString(3, location.getWorld().getName());
+            ps.setDouble(4, location.getX());
+            ps.setDouble(5, location.getY());
+            ps.setDouble(6, location.getZ());
+            ps.setFloat(7, location.getYaw());
+            ps.setFloat(8, location.getPitch());
+            ps.setLong(9, System.currentTimeMillis());
             ps.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().warning("Failed to upsert home in DB: " + e.getMessage());

@@ -23,6 +23,16 @@ public class WorldConfigManager {
         return plugin.getConfig().getString("worlds.smp", "smp");
     }
 
+    /** Vanilla nether world shared by SMP portals (default: world_nether). */
+    public String getSmpNetherWorldName() {
+        return plugin.getConfig().getString("worlds.smp_nether", "world_nether");
+    }
+
+    /** Vanilla end world shared by SMP portals (default: world_the_end). */
+    public String getSmpEndWorldName() {
+        return plugin.getConfig().getString("worlds.smp_the_end", "world_the_end");
+    }
+
     public boolean shouldRouteJoinToHub() {
         return plugin.getConfig().getBoolean("worlds.route_join_to_hub", true);
     }

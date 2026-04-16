@@ -3,6 +3,7 @@ package com.darkniightz.core.tracking;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
+import com.darkniightz.core.system.FriendManager;
 import com.darkniightz.core.system.OverallStatsManager;
 import com.darkniightz.main.JebaitedCore;
 import org.bukkit.Bukkit;
@@ -14,6 +15,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.player.PlayerExpChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -39,12 +41,16 @@ public class StatsTrackingListener implements Listener {
     private final ProfileStore profiles;
     private final RankManager ranks;
     private final OverallStatsManager overallStats;
+    private final FriendManager friendManager;
+    private final Plugin plugin;
     private final Map<UUID, Long> sessionStart = new ConcurrentHashMap<>();
     private final BukkitTask periodicFlushTask;
 
-    public StatsTrackingListener(Plugin plugin, ProfileStore profiles, RankManager ranks) {
+    public StatsTrackingListener(Plugin plugin, ProfileStore profiles, RankManager ranks, FriendManager friendManager) {
+        this.plugin = plugin;
         this.profiles = profiles;
         this.ranks = ranks;
+        this.friendManager = friendManager;
         this.overallStats = plugin instanceof JebaitedCore core ? core.getOverallStatsManager() : null;
         this.periodicFlushTask = Bukkit.getScheduler().runTaskTimer(plugin, this::flushOnlinePlaytime, 20L * 60L, 20L * 60L);
     }
@@ -96,6 +102,14 @@ public class StatsTrackingListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player victim = event.getEntity();
+
+        // Do not count event-mode deaths toward persistent stats
+        if (plugin instanceof JebaitedCore core
+                && core.getEventModeManager() != null
+                && core.getEventModeManager().isParticipant(victim)) {
+            return;
+        }
+
         PlayerProfile victimProfile = profiles.getOrCreate(victim, ranks.getDefaultGroup());
         if (victimProfile != null) {
             victimProfile.incDeaths();
@@ -178,5 +192,36 @@ public class StatsTrackingListener implements Listener {
                 || material == Material.CACTUS
                 || material == Material.PUMPKIN
                 || material == Material.MELON;
+    }
+
+    // ── Friends — shared stat tracking ───────────────────────────────────────
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onExpChange(PlayerExpChangeEvent event) {
+        if (friendManager == null || event.getAmount() <= 0) return;
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        long xp = event.getAmount();
+        // Track XP together with every online friend
+        Set<UUID> friends = friendManager.getFriends(uuid);
+        if (friends.isEmpty()) return;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            for (UUID friendUuid : friends) {
+                if (Bukkit.getPlayer(friendUuid) != null) {
+                    friendManager.addXpTogether(uuid, friendUuid, xp);
+                }
+            }
+        });
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onFriendPvpKill(PlayerDeathEvent event) {
+        if (friendManager == null) return;
+        Player victim = event.getEntity();
+        Player killer = victim.getKiller();
+        if (killer == null) return;
+        if (!friendManager.isFriend(killer.getUniqueId(), victim.getUniqueId())) return;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
+                friendManager.addKillTogether(killer.getUniqueId(), victim.getUniqueId()));
     }
 }

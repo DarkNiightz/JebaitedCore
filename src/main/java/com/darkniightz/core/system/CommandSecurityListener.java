@@ -162,9 +162,20 @@ public class CommandSecurityListener implements Listener {
                 yield ranks.isAtLeast(rank, minRank)
                         || (donorRank != null && ranks.isAtLeast(donorRank, minRank));
             }
-            case "kick", "warn", "staffchat", "history", "vanish", "notes", "whois" -> ranks.isAtLeast(rank, "helper");
-            case "mute", "tempmute", "unmute", "ban", "tempban", "unban", "freeze", "slowmode", "generatepassword" -> ranks.isAtLeast(rank, "moderator");
-            case "setrank", "event" -> ranks.isAtLeast(rank, "srmod");
+            case "back" -> ranks.isAtLeast(rank, "grandmaster")
+                    || (donorRank != null && ranks.isAtLeast(donorRank, "grandmaster"));
+            case "deathtp", "dtp" -> ranks.isAtLeast(rank, "legend")
+                    || (donorRank != null && ranks.isAtLeast(donorRank, "legend"));
+            case "repair" -> ranks.isAtLeast(rank, "grandmaster")
+                    || (donorRank != null && ranks.isAtLeast(donorRank, "grandmaster"));
+            case "feed" -> ranks.isAtLeast(rank, "diamond")
+                    || (donorRank != null && ranks.isAtLeast(donorRank, "diamond"));
+            case "enderchest", "ec", "craft", "anvil" -> ranks.isAtLeast(rank, "gold")
+                    || (donorRank != null && ranks.isAtLeast(donorRank, "gold"));
+            case "kit" -> donorRank != null;
+            case "kick", "warn", "staffchat", "history", "vanish", "notes", "whois", "generatepassword" -> ranks.isAtLeast(rank, "helper");
+            case "mute", "tempmute", "unmute", "ban", "tempban", "unban", "freeze", "slowmode" -> ranks.isAtLeast(rank, "moderator");
+            case "setrank" -> ranks.isAtLeast(rank, "srmod");
             case "setspawn", "eco", "setwarp", "delwarp", "setdonor", "worldstatus", "compat", "leaderboard", "previewpedestal", "maintenance" -> ranks.isAtLeast(rank, "admin");
             case "jreload", "debug", "devdebug", "devmode" -> ranks.isAtLeast(rank, "developer") || ranks.isAtLeast(rank, "admin");
             default -> true;
@@ -205,9 +216,9 @@ public class CommandSecurityListener implements Listener {
             return defaultMs;
         }
         return switch (label.toLowerCase(Locale.ROOT)) {
-            case "worldstatus", "compat", "history", "whois", "balancetop", "leaderboard", "event", "debug", "devdebug", "jreload" -> heavyMs;
+            case "worldstatus", "compat", "history", "whois", "balancetop", "leaderboard", "debug", "devdebug", "jreload" -> heavyMs;
             case "generatepassword" -> externalMs;
-            case "trade", "coins", "balance", "stats", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay" -> Math.max(defaultMs, 600L);
+            case "trade", "coins", "balance", "stats", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay", "party", "pa", "p", "event", "achievements", "ach", "achieve", "back", "feed", "repair", "deathtp", "dtp", "enderchest", "ec", "craft", "anvil", "kit" -> Math.max(defaultMs, 600L);
             default -> defaultMs;
         };
     }

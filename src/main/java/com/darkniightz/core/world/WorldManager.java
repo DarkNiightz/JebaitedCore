@@ -43,8 +43,17 @@ public class WorldManager {
     }
 
     public boolean isSmp(World world) {
-        return world != null && getSmpWorldName().equalsIgnoreCase(world.getName());
+        if (world == null) return false;
+        String name = world.getName();
+        return getSmpWorldName().equalsIgnoreCase(name)
+            || getSmpNetherWorldName().equalsIgnoreCase(name)
+            || getSmpEndWorldName().equalsIgnoreCase(name);
     }
+
+    /** The vanilla nether world used by SMP portals (world_nether). */
+    public String getSmpNetherWorldName() { return config.getSmpNetherWorldName(); }
+    /** The vanilla end world used by SMP portals (world_the_end). */
+    public String getSmpEndWorldName()    { return config.getSmpEndWorldName(); }
 
     public boolean isManaged(World world) {
         return isHub(world) || isSmp(world);
@@ -94,5 +103,33 @@ public class WorldManager {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns a friendly world label for the scoreboard/nametag.
+     * Labels are driven by config so new worlds can be added without code changes:
+     *   worlds.labels.<worldName>: Display Name
+     * Built-in defaults: hub → Hub, smp → Overworld, smp_nether → Nether,
+     *   smp_the_end → End, event_mode.event_world → Events.
+     * Any unrecognised world falls back to its raw Bukkit name.
+     */
+    public String getWorldLabel(Player player) {
+        if (player == null || player.getWorld() == null) return "Unknown";
+        String name = player.getWorld().getName();
+
+        // Config override takes highest priority: worlds.labels.<worldName>
+        String override = plugin.getConfig().getString("worlds.labels." + name, null);
+        if (override != null && !override.isBlank()) return override;
+
+        // Built-in mappings
+        if (name.equalsIgnoreCase(getHubWorldName()))         return "Hub";
+        if (name.equalsIgnoreCase(getSmpWorldName()))         return "Overworld";
+        if (name.equalsIgnoreCase(getSmpNetherWorldName()))   return "Nether";
+        if (name.equalsIgnoreCase(getSmpEndWorldName()))      return "End";
+        if (name.equalsIgnoreCase(plugin.getConfig().getString("event_mode.event_world", "event")))
+            return "Events";
+
+        // Fallback: raw world name
+        return name;
     }
 }

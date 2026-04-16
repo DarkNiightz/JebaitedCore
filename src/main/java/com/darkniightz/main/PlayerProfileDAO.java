@@ -165,6 +165,11 @@ public class PlayerProfileDAO {
                     } catch (SQLException ignore) {
                         profile.loadPreferences("");
                     }
+                    try {
+                        profile.setKitCooldownsLoaded(parseKitCooldowns(rs.getString("kit_cooldowns")));
+                    } catch (SQLException ignore) {
+                        // column not yet present on older DBs — V004 migration adds it
+                    }
                 }
             }
 
@@ -908,5 +913,96 @@ public class PlayerProfileDAO {
 
     private String decode(String raw) {
         return URLDecoder.decode(raw == null ? "" : raw, StandardCharsets.UTF_8);
+    }
+
+    // ── Private Vaults ────────────────────────────────────────────────────────
+
+    /** Loads raw vault data for a given player UUID + page (0-based). Sync — call from async context. */
+    public byte[] loadVaultPage(java.util.UUID uuid, int page) {
+        String sql = "SELECT items FROM player_vaults WHERE uuid = ? AND page = ?";
+        try (Connection c = dbManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            ps.setInt(2, page);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getBytes("items");
+            }
+        } catch (SQLException e) {
+            logger.warning("loadVaultPage failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /** Upserts vault page data. Call from an async context. */
+    public void saveVaultPageAsync(java.util.UUID uuid, int page, byte[] data) {
+        String sql = "INSERT INTO player_vaults (uuid, page, items, updated_at) VALUES (?,?,?,?) " +
+                     "ON CONFLICT (uuid, page) DO UPDATE SET items = EXCLUDED.items, updated_at = EXCLUDED.updated_at";
+        try (Connection c = dbManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            ps.setInt(2, page);
+            ps.setBytes(3, data);
+            ps.setLong(4, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.warning("saveVaultPageAsync failed: " + e.getMessage());
+        }
+    }
+
+    // --- Kit cooldown persistence ---
+
+    /**
+     * Asynchronously persists the entire kit_cooldowns map for the given player.
+     * Call from the main thread after updating profile.setKitLastUsed().
+     */
+    public void saveKitCooldownsAsync(UUID uuid, java.util.Map<String, Long> cooldowns) {
+        String json = serializeKitCooldowns(cooldowns);
+        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(
+            org.bukkit.Bukkit.getPluginManager().getPlugin("JebaitedCore"),
+            () -> {
+                try (java.sql.Connection conn = dbManager.getConnection();
+                     java.sql.PreparedStatement ps = conn.prepareStatement(
+                             "UPDATE players SET kit_cooldowns = ?::jsonb WHERE uuid = ?")) {
+                    ps.setString(1, json);
+                    ps.setString(2, uuid.toString());
+                    ps.executeUpdate();
+                } catch (java.sql.SQLException e) {
+                    logger.warning("saveKitCooldownsAsync failed: " + e.getMessage());
+                }
+            });
+    }
+
+    /** Serialises kit cooldowns as a JSON object string for JSONB storage. */
+    private String serializeKitCooldowns(java.util.Map<String, Long> cooldowns) {
+        if (cooldowns == null || cooldowns.isEmpty()) return "{}";
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (java.util.Map.Entry<String, Long> e : cooldowns.entrySet()) {
+            if (!first) sb.append(',');
+            sb.append('"').append(e.getKey().replace("\"", "")).append('"');
+            sb.append(':').append(e.getValue());
+            first = false;
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    /** Parses a JSONB JSON string (e.g. {"gold":1234567890}) into a Map. */
+    private java.util.Map<String, Long> parseKitCooldowns(String json) {
+        java.util.Map<String, Long> map = new java.util.LinkedHashMap<>();
+        if (json == null || json.isBlank() || "{}".equals(json.trim())) return map;
+        // Simple hand-rolled parser for flat {"key":longVal,...} — avoids JSON library dependency
+        String inner = json.trim();
+        if (inner.startsWith("{")) inner = inner.substring(1);
+        if (inner.endsWith("}")) inner = inner.substring(0, inner.length() - 1);
+        for (String token : inner.split(",")) {
+            token = token.trim();
+            int colon = token.indexOf(':');
+            if (colon <= 0) continue;
+            String key = token.substring(0, colon).trim().replace("\"", "");
+            String val = token.substring(colon + 1).trim();
+            try { map.put(key, Long.parseLong(val)); } catch (NumberFormatException ignored) {}
+        }
+        return map;
     }
 }

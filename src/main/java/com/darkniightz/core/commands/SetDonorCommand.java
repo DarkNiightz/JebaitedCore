@@ -82,6 +82,17 @@ public class SetDonorCommand implements CommandExecutor, TabCompleter {
         }
 
         PlayerProfile tp = profiles.getOrCreate(target, ranks.getDefaultGroup());
+
+        // Prevent overwriting an existing donor rank without explicitly clearing first.
+        // Upgrades are a purchase — use /setdonor <player> none first, then assign the new tier.
+        if (!clearing && tp.getDonorRank() != null) {
+            sender.sendMessage(Messages.prefixed(
+                    "§c" + (target.getName() != null ? target.getName() : tuid)
+                    + " already has donor rank §e" + tp.getDonorRank()
+                    + "§c. Clear it first: §f/" + label + " " + targetName + " none"));
+            return true;
+        }
+
         tp.setDonorRank(clearing ? null : newDonorRank);
         if (clearing) {
             // Clear donor display preference

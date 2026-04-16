@@ -41,9 +41,22 @@ public class GraveListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
+
+        // Never create graves for event participants — the event system handles their inventory.
+        if (plugin.getEventModeManager() != null
+                && plugin.getEventModeManager().isParticipant(player)) {
+            return;
+        }
+
         var cause = player.getLastDamageCause() == null ? null : player.getLastDamageCause().getCause();
         if (!graves.shouldCreateGraveForPlayerDeath(player, cause)) {
             return;
+        }
+
+        // Record death location for /back (Grandmaster perk)
+        com.darkniightz.core.system.BackManager backManager = plugin.getBackManager();
+        if (backManager != null) {
+            backManager.recordDeath(player.getUniqueId(), player.getLocation());
         }
 
         List<ItemStack> drops = new ArrayList<>(event.getDrops());

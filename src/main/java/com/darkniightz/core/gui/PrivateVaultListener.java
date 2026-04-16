@@ -1,0 +1,98 @@
+package com.darkniightz.core.gui;
+
+import com.darkniightz.core.system.PrivateVaultManager;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+
+import java.util.UUID;
+
+public class PrivateVaultListener implements Listener {
+
+    private final PrivateVaultManager vaultManager;
+
+    public PrivateVaultListener(PrivateVaultManager vaultManager) {
+        this.vaultManager = vaultManager;
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        if (!(event.getInventory().getHolder() instanceof PrivateVaultHolder holder)) return;
+        if (holder.isReadOnly()) return; // read-only inspection — discard changes
+        // Save to vault OWNER, not necessarily the player who had it open
+        UUID saveTarget = holder.getTargetUUID() != null ? holder.getTargetUUID() : player.getUniqueId();
+        vaultManager.saveVaultPage(saveTarget, holder.getPage(), event.getInventory());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getInventory().getHolder() instanceof PrivateVaultHolder holder)) return;
+
+        int slot = event.getRawSlot();
+
+        // Read-only: block all clicks
+        if (holder.isReadOnly()) {
+            event.setCancelled(true);
+            return;
+        }
+
+        // Bottom border row: slots 45-53. Always cancel — these are navigation/decoration.
+        if (slot >= 45 && slot <= 53) {
+            event.setCancelled(true);
+
+            switch (slot) {
+                case 45 -> { // ◄ Previous page
+                    if (holder.getPage() > 0) {
+                        player.closeInventory();
+                        if (holder.getTargetUUID() != null) {
+                            vaultManager.openVaultForStaff(player, holder.getTargetUUID(), holder.getPage() - 1, false);
+                        } else {
+                            vaultManager.openVault(player, holder.getPage() - 1);
+                        }
+                    }
+                }
+                case 49 -> player.closeInventory(); // Close button
+                case 53 -> { // ► Next page
+                    if (holder.getPage() < holder.getMaxPages() - 1) {
+                        player.closeInventory();
+                        if (holder.getTargetUUID() != null) {
+                            vaultManager.openVaultForStaff(player, holder.getTargetUUID(), holder.getPage() + 1, false);
+                        } else {
+                            vaultManager.openVault(player, holder.getPage() + 1);
+                        }
+                    }
+                }
+                default -> { /* glass pane — just cancelled */ }
+            }
+            return;
+        }
+
+        // Shift-clicks from player inventory that would land in bottom row — cancel them too.
+        if (event.isShiftClick() && slot >= 54) {
+            // Check if the shift-click would spill into the border row; easiest: just allow
+            // normal item movement into slots 0-44 and let Bukkit handle it.
+            // We only need to block clicks that hit border slots (already handled above).
+        }
+    }
+
+    /** Prevent drag operations that touch the border row. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        if (!(event.getInventory().getHolder() instanceof PrivateVaultHolder)) return;
+
+        for (int slot : event.getRawSlots()) {
+            if (slot >= 45 && slot <= 53) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+}
+

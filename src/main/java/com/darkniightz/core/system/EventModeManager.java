@@ -276,6 +276,19 @@ public class EventModeManager {
         return lines;
     }
 
+    /** Returns the first configured spawn for the given arena, or {@code null} if none are set. */
+    public synchronized @org.jetbrains.annotations.Nullable Location getFirstArenaSpawn(String arenaKeyRaw) {
+        String arenaKey = normalizeArenaKey(arenaKeyRaw);
+        List<Location> spawns = spawnCache.getOrDefault(arenaKey, List.of());
+        return spawns.isEmpty() ? null : spawns.get(0).clone();
+    }
+
+    /** Returns how many spawns are configured for the given arena. */
+    public synchronized int getArenaSpawnCount(String arenaKeyRaw) {
+        String arenaKey = normalizeArenaKey(arenaKeyRaw);
+        return spawnCache.getOrDefault(arenaKey, List.of()).size();
+    }
+
     public synchronized ActionResult viewArenaSpawns(Player player, String arenaKeyRaw, int seconds) {
         String arenaKey = normalizeArenaKey(arenaKeyRaw);
         List<Location> spawns = spawnCache.getOrDefault(arenaKey, List.of());
@@ -326,21 +339,34 @@ public class EventModeManager {
         if ((activeSpec.kind == EventKind.HARDCORE || activeSpec.kind == EventKind.HARDCORE_FFA
                 || activeSpec.kind == EventKind.HARDCORE_DUELS || activeSpec.kind == EventKind.HARDCORE_KOTH)
                 && !confirmedHardcore) {
-            player.sendMessage(Component.text("§4§lWARNING: §cThis hardcore event can make you lose your real items on death."));
-            player.sendMessage(Component.text("[CLICK TO PROCEED]", NamedTextColor.RED, TextDecoration.BOLD)
+            player.sendMessage(Component.text(""));
+            player.sendMessage(Component.text("  ☠ HARDCORE EVENT WARNING", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+            player.sendMessage(Component.text("  ─────────────────────────────────────", NamedTextColor.DARK_GRAY));
+            player.sendMessage(Component.text("  • Your entire inventory will be cleared on join.", NamedTextColor.RED));
+            player.sendMessage(Component.text("  • If you die, your items are gone — permanently.", NamedTextColor.RED));
+            player.sendMessage(Component.text("  • Items go to the winner. No grave. No vault transfer.", NamedTextColor.RED));
+            player.sendMessage(Component.text("  • Grave Insurance does NOT apply in hardcore events.", NamedTextColor.RED));
+            player.sendMessage(Component.text("  ─────────────────────────────────────", NamedTextColor.DARK_GRAY));
+            player.sendMessage(Component.text("  [CLICK TO CONFIRM AND JOIN]", NamedTextColor.RED, TextDecoration.BOLD)
                     .clickEvent(ClickEvent.runCommand("/event join confirm"))
-                    .hoverEvent(HoverEvent.showText(Component.text("Join the hardcore event anyway", NamedTextColor.RED))));
-            return new ActionResult(false, "§cHardcore warning sent. Click the button or run §f/event join confirm§c.");
+                    .hoverEvent(HoverEvent.showText(Component.text("I understand — join the hardcore event", NamedTextColor.RED))));
+            player.sendMessage(Component.text(""));
+            return new ActionResult(false, "§cHardcore warning sent. Click above or run §f/event join confirm§c.");
         }
 
         adminEditAccessUntil.remove(player.getUniqueId());
         queuedParticipants.add(player.getUniqueId());
-        broadcast("&f" + player.getName() + " joined " + activeSpec.displayName + " (&a" + queuedParticipants.size() + "&7/" + activeSpec.maxPlayers + ")");
+        broadcast("&f" + player.getName() + " &7joined &d" + activeSpec.displayName + " &8(&a" + queuedParticipants.size() + "&8/&7" + activeSpec.maxPlayers + "&8)");
 
         if (queuedParticipants.size() >= activeSpec.minPlayers) {
             launchSignupEvent();
         }
-        return new ActionResult(true, "§aJoined the event queue.");
+        int needed = activeSpec.minPlayers - queuedParticipants.size();
+        if (needed > 0) {
+            return new ActionResult(true, "§aYou joined §d" + activeSpec.displayName
+                    + "§a! Waiting for §f" + needed + "§a more player" + (needed == 1 ? "" : "s") + " §7(" + queuedParticipants.size() + "/" + activeSpec.maxPlayers + ")");
+        }
+        return new ActionResult(true, "§aYou joined §d" + activeSpec.displayName + "§a! Starting now...");
     }
 
     public synchronized ActionResult leaveQueue(Player player) {
@@ -386,6 +412,12 @@ public class EventModeManager {
             // HC_KOTH: not eliminated (KOTH is timer-based), but pendingReturn so they respawn at world spawn
             pendingReturnAfterDeath.add(player.getUniqueId());
         }
+    }
+
+    public synchronized boolean isParticipant(Player player) {
+        if (player == null) return false;
+        UUID uuid = player.getUniqueId();
+        return activeParticipants.contains(uuid) || queuedParticipants.contains(uuid);
     }
 
     public synchronized boolean isParticipantInHardcore(Player player) {
@@ -450,7 +482,7 @@ public class EventModeManager {
 
     private synchronized void autoTick() {
         if (activeSpec != null) return;
-        if (!plugin.getConfig().getBoolean("event_mode.automation.enabled", true)) return;
+        if (!plugin.getConfig().getBoolean("event_mode.automation.enabled", false)) return;
 
         List<String> keys = getConfiguredEventKeys();
         if (keys.isEmpty()) return;
@@ -755,7 +787,7 @@ public class EventModeManager {
 
         OfflinePlayer w = Bukkit.getOfflinePlayer(winner);
         String winnerName = w.getName() == null ? winner.toString().substring(0, 8) : w.getName();
-        broadcast("&dEvent complete: &f" + ended.displayName + "&7. Winner: &a" + winnerName + " &7(+" + reward + " coins)");
+        broadcast("&d\u2605 &fEvent Over: &d" + ended.displayName + " &7\u2014 Winner: &a" + winnerName + " &8(+&6" + reward + " coins&8)");
         if (reason != null && !reason.isBlank()) {
             broadcast("&7Reason: &f" + reason);
         }

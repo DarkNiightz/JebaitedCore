@@ -1,24 +1,143 @@
-# JebaitedCore — Feature Roadmap
+﻿# JebaitedCore — Feature Roadmap
 
-> Last updated: April 2026  
+> Last updated: April 2026 (P21 — DB schema audit: V003 idempotent, player_homes added to V001, SchemaManager dollar-quote support; version tagging + audit section added)  
 > Package root: `com.darkniightz`  
 > All DB changes go through SchemaManager migrations (`src/main/resources/db/`).
 
 ---
 
-## Feature Index
+## Feature Showcase — What the Plugin Has
+
+> Use this section for advertising copy. All features listed as ✅ are live and functional.  
+> Public = visible/usable by all players. Staff = restricted to helper+ or higher.
+
+### Player-Facing Features (Public)
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Rank System** | 13-tier rank ladder (pleb → owner). Separate donor track (gold, diamond, legend, grandmaster). Colored names, tab prefixes, rank-specific perks throughout. | ✅ Shipped |
+| **Friends System** | Persistent friends list with online notifications, request flow, GUI browser, and friend stats (XP together, kills together). Rank-based limits. | ✅ Shipped |
+| **Party System** | Temporary groups with shared XP bonuses (tier-scaled by donor rank), drop bonuses, party chat, open/locked parties, friendly fire toggle, warp-to-party, and a 54-slot GUI. | ✅ Shipped |
+| **Private Vaults** | Personal paginated item storage for donor ranks. Gold=1 page, Diamond=3, Legend=5, Grandmaster=10. Auto-loot from graves on death. | ✅ Shipped |
+| **Achievements** | 5-category milestone system (kills, blocks, fish, distance, playtime) with 5 tiers each. Rewards: coins, cosmetic tags, unlocks. Paginated GUI with progress bars. | ✅ Shipped |
+| **Grave System** | Items saved on death in a grave at death location. Normal players get a 10-minute timer; Legend/Grandmaster get insured permanent graves. | ✅ Shipped |
+| **Grave Insurance** | Legend/Grandmaster players: grave never expires, items auto-looted to vault on death. 90% full vault warning sent before overflow. | ✅ Shipped |
+| **Cosmetics Wardrobe** | Browse, preview on ArmorStand, and equip cosmetics (particles, hats, tags, effects). Per-player ownership tracked in DB. | ✅ Shipped |
+| **Cosmetic Coins** | Premium server currency earned through gameplay, events, and achievements. Used to buy cosmetics in the coin shop. | ✅ Shipped |
+| **Cosmetic Tags** | Customisable colored chat tags with `&` color code support. Unlocked via achievements or coins. Prefix/suffix position configurable. | ✅ Shipped |
+| **Cosmetic Loadouts** | Save and reapply up to 10 cosmetic outfit combinations by name. | ✅ Shipped |
+| **Settings Menu** | 6-category settings hub (Notifications, Social, Display, Gameplay, Privacy, Experimental). GUI-driven, DB-backed, rank display toggle for donors. | ✅ Shipped |
+| **Stats Tracking** | Tracks kills, deaths, mob kills, boss kills, blocks broken, fish caught, playtime, messages, commands, event wins. Persisted to DB. | ✅ Shipped |
+| **Stats Menu (/stats)** | 45-slot GUI showing all player stats, rank, balance, and achievements. Staff can view other players. | ✅ Shipped |
+| **Leaderboards** | Hologram leaderboards placeable anywhere in-world for any stat (kills, playtime, blocks, etc.). Top 10 with rank-colored names. Auto-refresh. | ✅ Shipped |
+| **Economy** | In-game balance with `/balance`, `/pay`, and staff eco commands. Displayed in stats menu. | ✅ Shipped |
+| **Homes** | Save and teleport to named home locations. Rank-based limits (pleb=1 up to grandmaster=unlimited). | ✅ Shipped |
+| **Warps** | Public server warps with optional entry fee. Listable via `/warps`. | ✅ Shipped |
+| **Random Teleport (RTP)** | Teleport to a safe random SMP location. Configurable radius. | ✅ Shipped |
+| **Events — KOTH** | King of the Hill: capture and hold a zone for 120 seconds to win. Coin reward. | ✅ Shipped |
+| **Events — FFA** | Free-for-All: last player standing wins. Coin reward. | ✅ Shipped |
+| **Events — Duels** | 1v1 combat events. Coin reward. | ✅ Shipped |
+| **Events — Hardcore** | HC_FFA, HC_DUELS, HC_KOTH: enter without inventory, permanent item loss on death, higher coin rewards. Exclusive win cosmetics (planned). | ✅ Shipped |
+| **Chat Games** | Scrabble (unscramble a word), Math (solve an equation), Quiz (trivia Q&A). Winners earn cosmetic coins. | ✅ Shipped |
+| **Private Messages** | `/msg` + `/reply` for player-to-player DMs. Optional color codes for gold+. | ✅ Shipped |
+| **Nicknames** | Set a custom display name in chat and tab. Staff can override any player's nick. | ✅ Shipped |
+| **Trading** | `/trade <player>` — request a nearby item trade. In-memory, one-time flow. | ✅ Shipped |
+| **Scoreboard** | Per-player sidebar scoreboard showing rank, playtime, active event, and achievements. Updates every 2 seconds. | ✅ Shipped |
+| **BossBar** | Persistent rotating bossbar with server branding and custom messages. Configurable from DB. | ✅ Shipped |
+| **Night Skip Voting** | Players vote to skip night by sneaking. Skips when 50%+ agree. | ✅ Shipped |
+| **Hub Navigation** | Hotbar items for cosmetics, toybox, and navigator menu. Cleared on SMP entry, restored on hub return. | ✅ Shipped |
+| **Toybox Gadgets** | Equippable hub gadgets via hotbar slot. | ✅ Shipped |
+| **Rules** | `/rules` displays server rules from config. | ✅ Shipped |
+| **Back (Grandmaster)** | One-use death location teleport for Grandmaster rank only. Requires SMP, no combat tag. | ✅ Shipped |
+| **Near (Diamond+)** | `/near` lists players within a configurable radius. | ✅ Shipped |
+| **Cosmetic Preview** | `/preview` to try any cosmetic on an ArmorStand before equipping. | ✅ Shipped |
+| **Combat Tag** | Prevents teleport commands while in recent PvP combat. Configurable duration. | ✅ Shipped |
+| **Priority Queue** | Donor/staff ranks get join priority when the server is full; lowest-priority non-staff player is removed to make room. | ✅ Shipped |
+
+### Staff/Mod Features
+
+| Feature | Min Rank | Description | Status |
+|---------|----------|-------------|--------|
+| **Kick** | Helper | Immediate removal from server with reason. | ✅ Shipped |
+| **Warn** | Helper | Issue and record a formal warning. | ✅ Shipped |
+| **Mute / Tempmute** | Moderator | Silence a player (permanent or timed). | ✅ Shipped |
+| **Ban / Tempban** | Moderator | Prevent a player joining (permanent or timed). | ✅ Shipped |
+| **Unban / Unmute** | Moderator | Reverse bans and mutes. | ✅ Shipped |
+| **Freeze** | Moderator | Immobilise a player while you investigate. | ✅ Shipped |
+| **Vanish** | Helper | Become invisible to non-staff players. | ✅ Shipped |
+| **Staff Chat** | Helper | Private channel for staff. `/sc` shorthand. | ✅ Shipped |
+| **Clear Chat** | Helper | Blank 150 lines of chat for non-staff. | ✅ Shipped |
+| **Slowmode** | Moderator | Apply a global chat cooldown timer. | ✅ Shipped |
+| **Moderation History** | Helper | View full ban/mute/warn record per player. | ✅ Shipped |
+| **Player Notes** | Helper | View staff notes attached to a player (write via panel). | ✅ Shipped |
+| **Watchlist** | Helper | Flag players for monitoring; visible in panel. | ✅ Shipped |
+| **Whois** | Helper | Full diagnostic: rank, balance, stats, IP, last seen. | ✅ Shipped |
+| **Set Rank** | Admin | Promote/demote any player to any rank. | ✅ Shipped |
+| **Set Donor** | Admin | Grant a donor rank track to a player. | ✅ Shipped |
+| **Economy Control** | Admin | Give/take/set balance or cosmetic coins for any player. | ✅ Shipped |
+| **Event Management** | Admin | Start, stop, configure, and complete all event types. | ✅ Shipped |
+| **Leaderboard Control** | Admin | Place, remove, refresh hologram leaderboards anywhere. | ✅ Shipped |
+| **Warp Management** | Helper | Create and delete public warps with optional cost. | ✅ Shipped |
+| **Set Spawn** | Admin | Set the hub spawn point (persisted to DB). | ✅ Shipped |
+| **Maintenance Mode** | Admin | Lock server to staff+whitelist only. Whitelist management included. | ✅ Shipped |
+| **Broadcast System** | Admin | Rotating server-wide message rotation with configurable interval. | ✅ Shipped |
+| **Restart Scheduling** | Admin | `/restart [time] [reason]` with countdown and cancel. | ✅ Shipped |
+| **Reload Plugin** | Developer | Hot-reload config and managers without a server reboot. | ✅ Shipped |
+| **Audit Logging** | System | All admin actions (rank changes, bans, eco, cosmetics) logged async to DB. | ✅ Shipped |
+| **Command Log** | System | Individual player command history stored in `player_command_log`. | ✅ Shipped |
+| **Compat Report** | Developer | DB status, migration state, world loading times. | ✅ Shipped |
+| **Debug Cockpit** | Developer | Full dev GUI — system health, cosmetics, events, DB controls, live feed. | ✅ Shipped |
+| **Web Panel Auth** | Player | `/generatepassword` creates a one-time panel login token. | ✅ Shipped |
+| **Version Monitor** | System | Alerts staff when a new Paper version is available. | ✅ Shipped |
+
+---
+
+## Upcoming Features
+
+| # | Feature | Who Benefits | Priority | Status |
+|---|---------|-------------|----------|--------|
+| A | Donor Perk Commands (`/repair`, `/feed`, `/kit`, `/deathtp`) | Donor players | Next | Planned |
+| B | MOTD / Login Summary | All players | Soon | Planned |
+| C | Server Boosters | All players | Soon | Planned |
+| D | Personal Boosters | Donor players | Soon | Planned |
+| E | Recruit-a-Friend | All players | Soon | Planned |
+| F | Player Profile Overhaul (`/stats` tabbed GUI) | All players | Soon | Planned |
+| G | Graves Overhaul (nametag ArmorStand, donor auto-equip) | All players | Soon | Planned |
+| H | Exclusive Event Skins + Blood Champion Banner | Hardcore event winners | Soon | Planned |
+| I | **Server Shop** (`/shop`) — 9-category GUI, buy/sell, DB-backed prices | All players | Soon | Planned |
+| I2 | Player Shops — player-to-player storefronts | All players | Later | Planned |
+| I3 | **Version Tagging** — label v0.1 through v1.0. Starts after Economy Store + Player Shops ship. Each milestone tag captures full feature state. | All | After I2 | Milestone |
+| J | Jebaited Wrapped (year-end stats showcase) | All players | Soon | Planned |
+| K | Quest Lines | All players | Later | Planned |
+| L | Custom Enchants / Special Items | All players | Later | Deferred |
+| M | Temp Rank System | Staff / Admin | Later | Deferred |
+| N | Rank Purchase Pipeline (Tebex) | Donor players | Later | Deferred |
+| O | Multi-Server Network (Velocity) | All players | Deferred | Deferred |
+| P | **Pre-Production Audit** — full codebase security pass (OWASP Top 10), messy code cleanup, dead code removal, SQL injection/XSS review, permission audit. Hard gate before v1.0 public release. | Dev | Before v1.0 | Planned |
+
+---
+
+## Feature Index (Detailed Design Docs)
 
 | # | Feature | Size | Status |
 |---|---------|------|--------|
-| 1 | [Friends System](#1-friends-system) | Large | Planned |
-| 2 | [Party System](#2-party-system) | Large | Planned |
+| 1 | [Friends System](#1-friends-system) | Large | ✅ Shipped (P9, P12, P13, P14) |
+| 2 | [Party System](#2-party-system) | Large | ✅ Shipped (P15, P17) |
 | 3 | [Recruit-a-Friend](#3-recruit-a-friend) | Medium | Planned |
 | 4 | [Server Boosters](#4-server-boosters) | Large | Planned |
 | 5 | [Personal Boosters](#5-personal-boosters) | Medium | Planned |
 | 6 | [Player Profile Overhaul (/stats)](#6-player-profile-overhaul-stats) | Large | Planned |
 | 7 | [Graves Overhaul](#7-graves-overhaul) | Medium | Planned |
 | 8 | [Quest Lines](#8-quest-lines) | Large | Planned |
-| 9 | [Donor Rank Perks](#9-donor-rank-perks) | Large | Planned |
+| 9 | [Donor Rank Perks](#9-donor-rank-perks) | Large | Planned — next up |
+| 10 | [Settings Overhaul](#10-settings-overhaul) | Large | ✅ Shipped (P16) |
+| 11 | [MOTD / Login Summary](#11-motd--login-summary) | Medium | Planned |
+| 12 | [Rank Purchase / Upgrade Pipeline (Tebex)](#12-rank-purchase--upgrade-pipeline-tebex) | Medium | Deferred |
+| 13 | [Temp Rank System](#13-temp-rank-system-future) | Medium | Deferred |
+| 14 | [Plugin Command Wrappers](#14-plugin-command-wrappers) | Ongoing | Planned |
+| 15 | [Achievement / Milestone System (The Grind Bible)](#15-achievement--milestone-system-the-grind-bible) | XL | ✅ Shipped (P18) |
+| 16 | [Jebaited Wrapped](#16-jebaited-wrapped) | Medium | Planned |
+| 17 | [Server Shop (`/shop`)](#17-server-shop-shop) | Large | Planned |
 
 ---
 
@@ -26,7 +145,6 @@
 
 ### Goal
 Persistent, cached friend relationships with real-time notifications, a dedicated GUI, and hooks for Party invites and the Recruit system.
-
 ### DB — `V004__friends.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS friendships (
@@ -101,6 +219,12 @@ CREATE TABLE IF NOT EXISTS friend_requests (
 ### Goal
 Players form a temporary in-game party for shared gameplay on SMP. Stats for party activities are tracked separately. Active on SMP only; parties disband if the leader disconnects with no transfer.
 
+**Standards for this feature:**
+- All limits configurable (`party.max_size`, XP share %, drop rate bonuses) — config validation must reject values outside sane bounds (e.g. max_size 1–16, XP share 0–100).
+- All messages use Adventure API + `Messages.prefix()`. No legacy `§` codes in Java. Rank-coloured player names via `RankManager` wherever a player name appears in chat.
+- `/party` and `/p` tab completions are ours. mcMMO's `/party` must be evicted on plugin load. Tab completions must not leak subcommands the player doesn't have access to (e.g. leader-only subcommands hidden for non-leaders).
+- **Panel surface:** Party stats per player (`player_party_stats`) should be exposed on the player profile page in the panel.
+
 ### Party Rules
 - Max 6 members (config: `party.max_size`).
 - Leader can invite, kick, disband, transfer leadership.
@@ -174,7 +298,13 @@ While in a party, each kill/mine/fish event checks `PartyManager.getParty(player
 ### Goal
 Incentivise new player acquisition. When player A refers new player B, both receive a reward on B's first qualifying session (e.g. 30 min playtime on SMP). Anti-abuse: IP/referral code uniqueness check.
 
-### DB — `V006__referrals.sql`
+**Standards for this feature:**
+- Qualifying playtime, reward coin amounts, code claim window, and referrer minimum playtime all configurable with validated bounds (e.g. qualifying playtime 1–120 mins, rewards 0–10000 coins — reject nonsense values on startup).
+- All messages use Adventure API + `Messages.prefix()`. Welcome message on first join is the only unsolicited message; all others are direct feedback to the player who ran the command.
+- `/refer` tab completion shows nothing useful to the player (code is user-supplied, not auto-completable). No tab leak from any plugin.
+- **Panel surface:** Referral history per player — who they referred, whether the reward was claimed, date. Staff page: total referral counts per player for competition tracking.
+
+### DB — `V006__referrals.sql` *(assign V-number at implementation; next available after V005__boosters)*
 ```sql
 CREATE TABLE IF NOT EXISTS referrals (
     id              SERIAL PRIMARY KEY,
@@ -232,6 +362,12 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS referral_code VARCHAR(16) UNIQUE;
 ### Goal
 Staff-activatable server-wide boosts that apply to all online players for a fixed duration. Different boost types affect different mechanics. Only one active booster per type at a time.
 
+**Standards for this feature:**
+- Each boost type has configurable default multiplier, max multiplier cap (e.g. 5×), and max duration (e.g. 24h). Staff cannot pass values beyond the cap — reject with a clear error message.
+- Activation/expiry broadcasts use Adventure API + `Messages.prefix()`. Boost active reminders (e.g. on join mid-boost) must be a single informational line, not spam. Format: `§e[Booster] §fActive: §a{type} §7(×{mult} — {time_remaining})`.
+- `/booster` tab completes boost types and subcommands only for the sender's rank. Players can run `/boosters` (status) — no admin subcommands shown to non-staff in tab.
+- **Panel surface:** Active booster dashboard (type, multiplier, activated_by, expires_at, time remaining). Staff can activate/stop boosters from the panel via RCON.
+
 ### Boost Types
 | Key | Effect | Mechanic |
 |-----|--------|---------|
@@ -244,7 +380,7 @@ Staff-activatable server-wide boosts that apply to all online players for a fixe
 
 Boost amounts and defaults configured under `boosters.server.*` in config.
 
-### DB — `V007__boosters.sql`
+### DB — `V005__boosters.sql` *(assign V-number at implementation; next after V004__donor_perks)*
 ```sql
 CREATE TABLE IF NOT EXISTS server_boosters (
     id              SERIAL PRIMARY KEY,
@@ -327,6 +463,12 @@ boosters:
 ### Goal
 Per-player passive boosts that are always active for that player on SMP. Certain tiers are granted automatically by donor rank. Others can be activated from inventory.
 
+**Standards for this feature:**
+- Boost multipliers and durations for each donor tier are configurable (`boosters.personal.*`). Sane caps enforced — no single player can exceed server booster cap values. Inventory-item boosters have a configurable max stack (e.g. 10 per type per player).
+- All feedback messages use Adventure API + `Messages.prefix()`. Passive boosts are silent (no spam on every XP gain). Show a one-time activation notice and a single line on login if a timed booster is active.
+- `/booster` tab completions already handled by Server Booster spec. No separate command needed unless there's a `/mybooster` — if added, tab must only show options relevant to that player.
+- **Panel surface:** Per-player booster inventory and active personal boost status on the player profile page. Staff can grant or remove booster items from the panel.
+
 ### Passive Boosts by Donor Rank
 | Donor Rank | Effect |
 |-----------|--------|
@@ -387,6 +529,12 @@ if (donorRank != null) {
 
 ### Goal
 Replace the current 45-slot static `StatsMenu` with a tabbed, full-featured **Player Profile** screen. `/stats`, `/profile`, and `/pp` all open it. Works for viewing others (with rank gate: helper+). Contains links to Settings, Friend invite, Party invite, and action buttons.
+
+**Standards for this feature:**
+- All display text customisable in config (`profile.labels.*`) with validation — empty strings rejected, max length enforced so item names don't overflow Minecraft's 50-char lore limit.
+- All item display names and lore use Adventure API only. Rank colour on player head title must use `RankManager.getRankColor(target)`. Stat numbers formatted with locale-aware commas (e.g. `1,452,310` not `1452310`).
+- `/stats`, `/profile`, `/pp` are all ours — evict any plugin that registers these. Tab completions for player-name argument complete only online players visible to the sender (respect vanish). Staff viewer sees all.
+- **Panel surface:** Player profile data already surfaced via DB. This overhaul adds the Achievements tab — panel should mirror the tab layout: hub stats, smp stats, event stats, achievements, friend/party counts.
 
 ### Layout — 54 slots
 
@@ -489,18 +637,261 @@ Replace the current 45-slot static `StatsMenu` with a tabbed, full-featured **Pl
 
 ## Implementation Order
 
-Recommended sequence to minimise rework:
+Recommended sequence to minimise rework (updated post-P20):
 
-1. **Player Profile Overhaul** first — it's the root UI that wires Friends, Party, Recruits, and Boosters buttons. Build the shell with empty/placeholder action slots and fill them in as each system ships.
-2. **Friends System** — prerequisite for Party invites, shows in profile.
-3. **Party System** — depends on Friends. XP share hooks depend on Booster data structure.
-4. **Personal Boosters** — donor rank XP share can ship standalone before full booster system.
-5. **Server Boosters** — build on top of personal booster infrastructure.
-6. **Recruit-a-Friend** — independent, can ship any time after Friends.
+> ✅ Shipped: Friends (P9/P12/P13/P14), Private Vaults (P10), Settings (P16), Party (P15/P17), Achievements (P18), Graves + Insurance + /back (P19), Bug-fix pass + nether/end (P20)
+
+1. **Donor perk commands** — `/feed`, `/near`, `/kit`, `/repair`, `/deathtp`. `/back` already shipped P19. `kit_cooldowns JSONB` column needed → **V004** migration.
+2. **MOTD / Login Summary** — Can ship any time; login listener hook + MotdService singleton. No DB.
+3. **Server/Personal Boosters** — Fully independent; **V005**__boosters.sql + BoosterManager.
+4. **Recruit-a-Friend** — Fully independent; **V006**__referrals.sql + ReferralManager.
+5. **Player Profile overhaul** (`/stats`) — Tabbed 54-slot GUI. Achievements, friends, and party tabs all have live systems now. No DB.
+6. **Graves overhaul** — Floating ArmorStand nametag, donor auto-equip on loot, GraveNametagTask. No DB.
+7. **Exclusive Event Skins + Blood Champion banner** — HC win wardrobe auto-unlock + NBT banner item. No DB.
+8. **Economy Store + Player Shops** — **V007**__shop.sql + ShopManager, listing table, PanelConnectorService push.
+9. **Version Tagging starts** — After Economy Store + Player Shops: tag v0.1. Every major feature after gets a version bump.
+10. **Jebaited Wrapped** — End of year; depends on a full year of stats data.
+11. **Quest Lines** — **V008**__quests.sql. Design phase only until store ships (rewards need to exist first).
+12. **Pre-Production Audit** — full OWASP + code quality pass. Hard gate before v1.0 public release.
 
 ---
 
-## Gotchas & Pre-flight Checklist
+## 10. Settings Overhaul
+
+### Goal
+A fully categorised, persistent per-player settings system. Players can customise their experience across sounds, chat formatting, notifications, social interactions, and more. Everything is DB-backed, GUI-driven, and togglable per-category. Designed to ship **after Party and Player Profile Overhaul** — so that friend/party/event settings all have real systems to toggle.
+
+### Design Principles
+- **Categories, not a flat list.** `SettingsMenu` becomes a category picker (27-slot); each category opens a 54-slot page.
+- **DB-backed.** Settings stored in a new table — no YAML per-player files.
+- **Sensible defaults.** All settings default to ON / the expected behaviour; the DB only stores non-default values (reduces row bloat).
+- **Settings gate features.** Friend invites, party invites, event broadcasts, chat visibility — all gated by the player's own preferences.
+- **Panel-visible.** The panel should surface per-player toggles for moderation context (e.g. "player has disabled PMs" is useful in moderation view).
+
+---
+
+### DB — `VNEXT__settings.sql` *(assign V-number at implementation; after all prior features' migrations)*
+
+```sql
+CREATE TABLE IF NOT EXISTS player_settings (
+    uuid            VARCHAR(36) PRIMARY KEY,
+    settings_json   JSONB        NOT NULL DEFAULT '{}',
+    updated_at      BIGINT       NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
+    FOREIGN KEY (uuid) REFERENCES players(uuid) ON DELETE CASCADE
+);
+```
+
+Using JSONB lets us add new settings keys without schema migrations — only the initial table creation needs a migration. Individual settings are read/written as JSON keys within the blob.
+
+---
+
+### Settings Categories
+
+#### 🔔 Notifications
+| Key | Default | Description |
+|-----|---------|-------------|
+| `notify.friend_request` | `true` | Show incoming friend request in chat |
+| `notify.friend_online` | `true` | Notify when a friend comes online |
+| `notify.friend_accept` | `true` | Notify when your friend request is accepted |
+| `notify.party_invite` | `true` | Show party invites in chat |
+| `notify.event_start` | `true` | Notify when an event starts |
+| `notify.event_end` | `true` | Notify when an event ends |
+| `notify.server_broadcast` | `true` | Receive scheduled server broadcasts |
+| `notify.booster_active` | `true` | Notify when a server booster activates |
+| `notify.levelup` | `true` | Show mcMMO level-up messages |
+
+#### 🔊 Sounds
+| Key | Default | Description |
+|-----|---------|-------------|
+| `sound.friend_request` | `true` | Play ding on friend request |
+| `sound.friend_online` | `true` | Play sound when a friend logs in |
+| `sound.party_invite` | `true` | Play ding on party invite |
+| `sound.event_start` | `true` | Play fanfare on event start |
+| `sound.gui_click` | `true` | GUI click sounds |
+| `sound.level_up` | `true` | mcMMO level-up sound |
+| `sound.coin_earn` | `true` | Cosmetic coin earn sound |
+
+#### 💬 Chat
+| Key | Default | Description |
+|-----|---------|-------------|
+| `chat.receive_global` | `true` | See global chat |
+| `chat.receive_private_messages` | `true` | Receive /msg and /r |
+| `chat.show_join_leave` | `true` | See player join/leave messages |
+| `chat.compact_friend_notifications` | `false` | Compact multi-friend-online into one line |
+| `chat.show_rank_prefix` | `true` | Show your rank prefix in chat |
+| `chat.show_donor_prefix` | `true` | Show donor rank tag (if applicable) |
+
+#### 👥 Social
+| Key | Default | Description |
+|-----|---------|-------------|
+| `social.receive_friend_requests` | `true` | Allow incoming friend requests |
+| `social.receive_party_invites` | `true` | Allow incoming party invites |
+| `social.show_on_friends_list` | `true` | Appear online to friends (ghost mode when false) |
+| `social.show_in_leaderboards` | `true` | Include your stats in leaderboards |
+
+#### ⚔️ Events
+| Key | Default | Description |
+|-----|---------|-------------|
+| `event.auto_join_notification` | `true` | Get pinged when an event you previously played starts |
+| `event.spectate_on_death` | `true` | Auto-spectate when eliminated in HC events |
+
+#### 🎮 Gameplay
+| Key | Default | Description |
+|-----|---------|-------------|
+| `gameplay.show_scoreboard` | `true` | Show the sidebar scoreboard |
+| `gameplay.show_bossbar` | `true` | Show boss bars (event timers etc.) |
+| `gameplay.show_hotbar_tips` | `true` | Show hub hotbar action-bar hints |
+| `gameplay.combat_tag_warning` | `true` | Show warning when entering/leaving combat tag |
+
+---
+
+### Settings Menu Layout
+
+**Category picker — 27 slots (`SettingsMenu.java` rewrite)**
+
+```
+[ ][ ][ ][ ][ ][ ][ ][ ][ ]   row 0 — border
+[ ][ 🔔 Notify ][ 🔊 Sound ][ 💬 Chat ][ 👥 Social ][ ⚔️ Events ][ 🎮 Gameplay ][ ]
+[ ][ ][ ][ ][ ][ ][ ][ ][ ]   row 2 — border + close
+```
+
+| Slot | Item | Category |
+|------|------|---------|
+| 10 | BELL | Notifications |
+| 12 | NOTE_BLOCK | Sounds |
+| 14 | BOOK | Chat |
+| 16 | PLAYER_HEAD (Steve) | Social |
+| 19 | DIAMOND_SWORD | Events |
+| 21 | COMPARATOR | Gameplay |
+| 22 | BARRIER | Close |
+
+**Category page — 54 slots**
+
+Rows 2–5 display toggle items. Each item:
+- Name: `§f<Setting Name>`
+- Lore line 1: `§7<description>`
+- Lore line 2: `§a✔ Enabled` (GREEN_DYE icon) or `§c✘ Disabled` (RED_DYE icon)
+- Click → toggle + async DB write + re-render
+
+Slot 49: `§7← Back to Settings` (ARROW, runs `SettingsMenu.open(player)`)
+
+---
+
+### Java — Files to create/modify
+
+| File | Action |
+|------|--------|
+| `core/system/PlayerSettingsManager.java` | **New** — loads/caches settings per player. `get(uuid, key, default)`, `set(uuid, key, value)` async. Cache populated on join, cleared on quit |
+| `core/system/PlayerSettingsDAO.java` | **New** — `loadSettings(uuid)`, `upsertSettings(uuid, Map<String,Object>)` — reads/writes JSONB blob |
+| `core/gui/SettingsMenu.java` | **Overhaul** — becomes category picker. Existing cosmetic/rank toggles migrate to relevant category pages |
+| `core/gui/settings/NotificationSettingsPage.java` | **New** — 54-slot toggle page for Notifications category |
+| `core/gui/settings/SoundSettingsPage.java` | **New** — Sounds |
+| `core/gui/settings/ChatSettingsPage.java` | **New** — Chat |
+| `core/gui/settings/SocialSettingsPage.java` | **New** — Social (friend/party toggles) |
+| `core/gui/settings/EventSettingsPage.java` | **New** — Events |
+| `core/gui/settings/GameplaySettingsPage.java` | **New** — Gameplay (scoreboard, bossbar, hotbar) |
+| `core/system/FriendManager.java` | Check `settings.receive_friend_requests` before delivering invite |
+| `core/moderation/MessageManager.java` | Check `settings.chat.receive_private_messages` before delivering PM |
+| `core/tracking/StatsTrackingListener.java` | Check `settings.sound.*` + `settings.notify.*` before playing sounds/sending notifications |
+
+### Wiring checklist
+- [ ] DB migration `VNEXT__settings.sql` (assign V-number at implementation time)
+- [ ] `PlayerSettingsManager.java` + `PlayerSettingsDAO.java`
+- [ ] `PlayerSettingsManager` registered as singleton in `JebaitedCore`
+- [ ] Cache load in `FriendListener.onJoin` (or a dedicated `SettingsListener`)
+- [ ] Cache eviction on quit
+- [ ] `SettingsMenu.java` overhauled to category picker
+- [ ] 6 category page classes
+- [ ] Existing rank-display and donor toggles in old `SettingsMenu` migrated to `SocialSettingsPage`
+- [ ] `FriendManager` checks `receive_friend_requests`
+- [ ] `MessageManager` checks `receive_private_messages`
+- [ ] Notification sends gated by `notify.*` keys
+- [ ] Sound plays gated by `sound.*` keys
+- [ ] Panel endpoint: `GET /api/players/:uuid/settings` — returns full settings map for moderation context
+
+### Panel Surface
+```
+[PANEL SURFACE]
+Feature: Settings Overhaul
+DB tables/columns added: player_settings (uuid, settings_json, updated_at)
+Suggested panel page/endpoint: GET /api/players/:uuid/settings
+Data shape: { "notify.friend_request": true, "chat.receive_global": false, ... }
+```
+
+---
+
+## 11. MOTD / Login Summary
+
+### Goal
+When a player logs in, show a clean personalised summary in chat — friends online, pending requests, unread mail, recent shop sales, and more. Every line is configurable per-player via Settings (after that system ships). Deferred until Settings Overhaul is complete so the toggle infrastructure exists.
+
+**Standards for this feature:**
+- Every MOTD line individually toggleable via a `motd.*` settings key (already designed into the settings system). Global MOTD header format configurable in `config.yml` — but must always use `Messages.prefix()` as the anchor, never freeform. Max configurable MOTD line count (e.g. 12 lines to avoid scroll flooding).
+- Entire MOTD output uses Adventure API. No legacy codes. Rank-coloured player name in the greeting line. Clickable components (e.g. friend name → runs `/friend info <name>`) where applicable.
+- No command registered by this feature. MOTD fires on `PlayerJoinEvent` only. No tab completion concerns, but ensure `PanelConnectorService` is not called synchronously during login.
+- **Panel surface:** Staff can preview any player's expected MOTD from the panel (what they'd see on login). Useful for debugging wrong state. Panel can also push a one-time server-wide MOTD override (e.g. maintenance window notice) via RCON.
+
+### Login summary lines (all toggleable in Settings under `motd.*`)
+
+| Key | Default | Example output |
+|-----|---------|---------------|
+| `motd.friends_online` | `true` | `§b✦ Friends online: §fDarkNiightz, xXSniper99 §7(+3 more)` |
+| `motd.pending_requests` | `true` | `§e⚡ You have §f2 §epending friend requests. §7[Click to view]` |
+| `motd.unread_mail` | `true` | `§d✉ §f3 §dunread mail messages. §7[/mail read]` |
+| `motd.shop_sales` | `true` | `§6⬡ §fDiamond Sword §6sold for §f2,500 coins §7(last 24h)` |
+| `motd.event_active` | `true` | `§c⚔ An event is live: §fHARDCORE_FFA §7[/join]` |
+| `motd.booster_active` | `true` | `§a⬆ §fServer 2× XP Booster §aactive for §f14m 32s` |
+| `motd.playtime_milestone` | `true` | `§a✔ New playtime milestone: §f50 hours!` |
+
+### Design
+- Displayed async after join — data is all read-through from cache. If cache is cold, skip gracefully; don't block join event.
+- Fully skipped for staff joining in dev mode (no noise during debugging).
+- Section header + footer match the existing `Messages` theme (aqua bar line, prefix).
+- Each toggle lives in `motd.*` namespace inside `player_settings` JSONB — zero new DB columns needed once Settings Overhaul ships.
+- Short-term (before Settings Overhaul): the MOTD fires with all items, no per-player toggle yet. Toggles wired in once `PlayerSettingsManager` exists.
+
+### Implementation sketch
+```java
+// MotdService.java — sendLoginSummary(Player, plugin, managers...)
+// Called from PlayerJoinListener after profile is warm in cache (100ms delay)
+// Each section: check cache → build Component → append to list → player.sendMessage(list)
+```
+
+### Settings keys added to Settings Overhaul
+Add to the `🔔 Notifications` category in Settings Overhaul:
+```
+notify.motd_friends_online    — true
+notify.motd_pending_requests  — true
+notify.motd_unread_mail       — true
+notify.motd_shop_sales        — true
+notify.motd_event_active      — true
+notify.motd_booster_active    — true
+notify.motd_playtime_milestone — true
+```
+
+### Java files
+| File | Action |
+|------|--------|
+| `core/system/MotdService.java` | **New** — `sendLoginSummary(Player)`, async, gated by settings |
+| `core/playerjoin/PlayerJoinListener.java` | **Modify** — schedule `MotdService.sendLoginSummary` after 3-tick delay |
+
+### Wiring
+- `MotdService` registered as singleton in `JebaitedCore`
+- Depends on: `FriendManager`, `ProfileStore`, `EconomyManager` (shop sales), `EventModeManager`, `BossBarManager` (boosters)
+- Mail integration: once a mail system ships, add to `MotdService.sendLoginSummary`
+- Shop sales: once Economy Store ships, query `shop_sales` DB view for player sales in last 24h
+
+### Panel Surface
+```
+[PANEL SURFACE]
+Feature: MOTD / Login Summary
+No new DB tables — reads from existing data sources
+Suggested panel page: player profile page sidebar widget showing "what greeted this player on login"
+```
+
+---
+
+
 
 Before any session, confirm:
 
@@ -520,6 +911,12 @@ Before any session, confirm:
 
 ### Goal
 Replace the basic item-dropping death behaviour with persistent graves that display a floating nametag (ArmorStand) above the grave block showing the player's name, death time, and item count. Donor players auto-equip their best cosmetic preset on grave loot pickup.
+
+**Standards for this feature:**
+- TTL, display format, and auto-equip behaviour all configurable per donor tier (`graves.*`). Death message format configurable but must keep rank colour on player name. Configurable TTL floor: no TTL below 60 seconds for regular players (prevent instant despawn abuse).
+- Floating ArmorStand nametag uses Adventure API display name. Death message in chat uses `Messages.prefix()` and rank-coloured player name. Auto-equip notification is a single silent message, not a broadcast.
+- `/graves` is ours — evict any grave plugin that registers this. Tab completes to nothing (no useful completable args for regular players). Staff `/graves <player>` completes online player names only.
+- **Panel surface:** Active graves table — player, location, death time, item count, TTL remaining. Staff can view and force-clear graves from the panel. Grave Insurance status visible on player profile.
 
 ### Current State
 Graves system exists (`GraveManager`, `/graves` command, `graves:` config block). It likely creates a chest or drops items — the overhaul extends it with visual and donor-specific features.
@@ -585,6 +982,12 @@ graves:
 ### Goal
 Multi-step quest engine with progress tracking, branching completion, and configurable rewards (cosmetic coins, cosmetic unlocks, donor perks). Quests are defined in config and progress is persisted per-player.
 
+**Standards for this feature:**
+- Entire quest tree defined in config — quest ID, steps, completion conditions, rewards. Rewards validated on startup: coin amounts capped (e.g. max 5000 per quest step), cosmetic IDs verified to exist, donor perk strings validated against known perk keys. Bad config = startup warning + quest disabled, never a crash.
+- All quest messages use Adventure API + `Messages.prefix()`. Step completion uses a distinctive but non-spammy format. Quest objectives shown in chat only on progress, not every tick. No raw `§` in Java.
+- `/quest` is ours. Tab completes to the player's currently active quest IDs only — they never see quests they haven't unlocked. No plugin should be registering `/quest`; evict if found.
+- **Panel surface:** Per-player quest progress on the player profile page — active quests, completed quests, completion dates. Staff page shows quest completion rates across the server.
+
 ### Quest Types
 | Type | Example |
 |------|---------|
@@ -600,7 +1003,7 @@ Multi-step quest engine with progress tracking, branching completion, and config
 
 Quests can have prerequisites (`requires: [quest_id]`) and belong to a `series` for questline ordering.
 
-### DB — `V008__quests.sql` (or `V009` if graves needed V008)
+### DB — `V008__quests.sql` *(assign V-number at implementation; exact number depends on features before it)*
 ```sql
 CREATE TABLE IF NOT EXISTS player_quests (
     uuid            VARCHAR(36) NOT NULL,
@@ -686,6 +1089,15 @@ quests:
 ---
 
 ## 9. Donor Rank Perks
+
+### Goal
+Implement and gate all donor rank perks so they are fully functional, permission-checked, and individually configurable. Donor ranks (`gold`, `diamond`, `legend`, `grandmaster`) layer perks on top of the normal rank system via `rankDisplayMode="donor"`. The Donor Perks Tracker in Section 15 is the single source of truth.
+
+**Standards for this feature:**
+- Every perk has a configurable value (`donor.perks.*`) with enforced limits. Home counts: 1–50. Vault pages: 1–20. XP share %: 0–100. Coin grants: 0–50000. Reject out-of-range values at startup — never silently clamp without warning.
+- All perk messages use Adventure API + `Messages.prefix()`. Rank colour always comes from `RankManager`. "You don't have this perk" messages must reference the donor rank name clearly so the player knows what to upgrade to.
+- Every perk command (e.g. `/feed`, `/near`, `/repair`, `/back`, `/kit`) is registered and tab-completed by JebaitedCore. Zero tab completions visible to non-donor players for donor-only commands — `CommandSecurityListener` must hide these subcommands in tab. `/kit` tab should only show kits the player can actually use.
+- **Panel surface:** Donor rank breakdown chart (active counts per tier). Per-player donor rank, display mode, and all active perks visible on player profile. Staff can grant/revoke donor rank from the panel and preview the exact perk set the player will receive.
 
 > Donor ranks sit on top of the normal rank ladder. Players keep their staff/pleb rank but get donor
 > perks layered on top via `rankDisplayMode="donor"`. Ranks in ascending order of price/power:
@@ -839,14 +1251,843 @@ Cleared on: server restart.
 - [ ] `KitManager.java` — kit definitions from config, cooldown read/write
 - [ ] `PrivateVaultManager.java` — open vault by page, persist to DB
 - [ ] `BackManager.java` — last-death/last-tp tracking
-- [ ] DB migration for `player_vaults` table + `kit_cooldowns` column
+- [ ] DB migration `V004__donor_perks.sql` — adds `kit_cooldowns JSONB` column to `players`
 - [ ] `migrations.index` append
-
-**Panel surface:**
-```
-[PANEL SURFACE]
-Feature: Donor Rank Perks
 DB tables/columns added: player_vaults, players.kit_cooldowns (JSONB)
 Suggested panel page/endpoint: /admin/donors - active donor list, rank, expiry (if timed)
 Data shape: { uuid, username, donorRank, pvPages, kitCooldowns: { gold: 1234567890 } }
 ```
+
+---
+
+## 12. Rank Purchase / Upgrade Pipeline (Tebex)
+
+### Goal
+Donor rank upgrades are a purchase, not an admin command. The flow:
+
+**Standards for this feature:**
+- Webhook secret validated on every inbound request (HMAC or header token). Rank names in the webhook payload validated against the known donor ladder before any DB write. Reject unknown rank strings — never pass unsanitised webhook data to `/setdonor`.
+- Confirmation messages to the player use Adventure API + `Messages.prefix()`. Welcome message on rank grant is rank-coloured. `/store` command output is a single Adventure component with a clickable link — no paste-into-chat URL.
+- `/store` is ours. Tab completes nothing. No other plugin should be registering store/shop commands — evict if found.
+- **Panel surface:** Rank purchase log — player, previous rank, new rank, purchase date, Tebex transaction ID. Staff can view pending/failed webhooks and manually retry. Active donor rank breakdown chart.
+1. Player visits the store (Tebex webstore link via `/store` command or hub NPC).
+2. Tebex webhook fires on purchase → hits a secured endpoint on the web-admin panel.
+3. Web-admin panel calls RCON or DB to run `/setdonor <player> <rank>`.
+4. If the player already has a donor rank, the webhook/admin must explicitly clear the old one first (`/setdonor <player> none`) before setting the new tier.
+
+### Rules
+- A player can only hold **one donor rank at a time**. Overwriting without clearing is blocked at the command level.
+- Donor rank upgrades replace the old tier — the purchase price reflects the delta (handled Tebex-side).
+- Admins still use `/setdonor <player> none` → `/setdonor <player> <rank>` for manual corrections.
+
+### Deferred items
+- [ ] Tebex webhook listener on web-admin panel (`POST /tebex/webhook`)
+- [ ] RCON bridge from panel to server for automatic grant
+- [ ] `/store` command with clickable chat link
+- [ ] Hub store NPC (Citizens or ArmorStand-based)
+
+### Notes
+- This does **not** change any in-plugin command logic — the guard is already in `SetDonorCommand`.
+- The Tebex package must set the correct tier only; the webhook handler clears any existing donor rank before granting the new one.
+
+---
+
+## 13. Temp Rank System (Future)
+
+### Goal
+Temporary ranks awarded as event prizes (e.g. 7-day Legend for winning a server-wide tournament). They coexist with the donor rank system but follow different rules.
+
+**Standards for this feature:**
+- Duration configurable per award (`tempranks.default_duration_days`, override per command). Max duration cap enforced (e.g. 90 days — staff can't accidentally grant a permanent-looking temp rank). Rank name must be from the known ladder; reject anything else.
+- Expiry notification uses Adventure API + `Messages.prefix()`. Player gets a warning 24h before expiry and a message on expiry. No spam — once per event per player.
+- `/temprank` is staff-only. Tab completion hides subcommands and rank names from non-staff. Rank names tab complete from the known ladder only.
+- **Panel surface:** Active temp ranks table — player, rank, granted_by, expires_at, time remaining. Expired temp ranks in history. Staff can extend or revoke from the panel.
+
+### Rules
+- Temp ranks are **time-limited** and stored with an expiry timestamp.
+- A player with a temp rank **cannot** have it upgraded via `/setdonor` — upgrades are purchases of permanent donor tiers. Temp ranks expire naturally.
+- Temp rank display overrides the primary rank display while active.
+- On expiry, the player reverts to their previous primary/donor rank display.
+- Rank display selector in Settings **does not** expose temp ranks — they are auto-applied and non-configurable.
+
+### Planned DB columns (future migration)
+```sql
+ALTER TABLE players ADD COLUMN IF NOT EXISTS temp_rank        VARCHAR(32);
+ALTER TABLE players ADD COLUMN IF NOT EXISTS temp_rank_expiry BIGINT;
+```
+
+### Deferred items
+- [ ] `TempRankManager` — expiry check on join + scheduled task
+- [ ] `getDisplayRank()` chain: temp rank > donor/selector > primary
+- [ ] `SetTempRankCommand` — admin only, requires duration argument
+- [ ] `CommandSecurityListener` guard (admin+)
+- [ ] DB migration + `SchemaManager` hook
+- [ ] Panel surface: active temp ranks list with expiry countdown
+
+---
+
+## 14. Plugin Command Wrappers
+
+### Goal
+Players never see the underlying plugin branding. Every command that another plugin exposes (mcMMO, etc.) should be wrapped or overridden so it feels native to JebaitedCore. This is an **ongoing, every-session obligation** — not a one-off task. Whenever a command is added, modified, or a new plugin is introduced, the wrapper table below must be checked and updated.
+
+**Standards for this feature (apply every session):**
+- **Tab completion hygiene:** After evicting a plugin command, its tab completions must be gone too. Register our own `TabCompleter` on every wrapped command — even if it returns an empty list. A player should never see a `<player>` tab completion from mcMMO's `/party` because our `/party` doesn't expose member lists to non-members.
+- **Zero foreign branding:** Wrapped commands must produce output via Adventure API + `Messages.prefix()`. Any error message, help text, or feedback that leaks the original plugin name (e.g. `[mcMMO]`, `[Essentials]`) is a bug. Fix it.
+- **Rank-gating on wrappers:** Every wrapped command must go through `CommandSecurityListener` or inline rank check. No wrapper silently allows any player to run a command without at least a rank gate.
+- **Config-driven eviction list:** Maintain the eviction table below. If a new plugin is added to the server, check its command list against ours before it goes live. Conflicts must be resolved before deploy.
+- **Panel surface:** Wrapper coverage table should be surfaced as a panel health check — which commands are wrapped, which are pending, which plugins are on the server.
+
+### Strategy
+- Use `evictBuiltInCommand(name)` (already in `JebaitedCore.java`) to remove the foreign plugin's command from the `CommandMap`.
+- Register a thin wrapper `CommandExecutor` that delegates to the original plugin's API **or** reimplements the functionality cleanly.
+- Register a matching `TabCompleter` on every wrapped command — never leave tab completion to the evicted plugin.
+- All wrapper commands follow the standard wiring checklist (class + plugin.yml + bind + PermissionConstants + SecurityListener).
+
+### mcMMO wrappers (planned)
+| Original command | Wrapper class | Notes |
+|---|---|---|
+| `/mcstats` | `McStatsCommand` | Delegates to `McMMOIntegration`, formats output consistently |
+| `/mctop` | `McTopCommand` | Leaderboard-style output matching our `/leaderboard` format |
+| `/mcability` | Disable or no-op | Abilities toggled via Settings menu instead | - Jamie they can still use ./mcability but it would just show our prefix and message format rather than theres. Copy it word for word if needed just change the colours to match our theme.
+| `/party` | Reserved | Will conflict with our Party system — must evict mcMMO's `/party` | - Jamie our party 
+| `/ptp` | Reserved | Party teleport — will be part of our Party system |
+| `/inspect` | `InspectCommand` | Wrap mcMMO skill inspect, apply rank-color formatting |
+
+### Other plugins
+- Any plugin that registers `/home`, `/warp`, `/spawn`, `/tp` etc. must be evicted on enable — we already own those.
+- Track all active third-party plugins in the table below and confirm each has been evicted/wrapped before shipping.
+
+| Plugin | Commands owned | Status |
+|---|---|---|
+| mcMMO | `/mcstats`, `/mctop`, `/party`, `/ptp`, `/mcability`, `/inspect`, `/mcc`, `/mcrank` | Pending wrap |
+| EssentialsX (if added) | All `/tpa`, `/home`, `/spawn`, `/warp`, `/bal`, `/pay` etc. | Must evict — we own these |
+| Vault (if added) | No player-facing commands | OK |
+
+---
+
+## 15. Achievement / Milestone System (The Grind Bible)
+
+**Status:** Next — planning phase  
+**Size:** XL  
+**Dependencies:** V012 migration (new stat columns), existing `StatsTrackingListener`, `CosmeticsManager`, `PrivateVaultManager`, `GraveManager`
+
+### Goal
+Pure stat-based progression for dedicated players. No items, no coins, no kits handed out — only unpurchasable cosmetic tags that prove real grind. Progress is tracked silently on every existing stat action. Milestones unlock special tags visible in `/tag` (Achievements tab) and Player Profile. Players can choose which 0–6 to display.
+
+Hardcore winners receive exclusive limited-time wardrobe + placeable "Blood Champion" banner. Legend and above get permanent graves with smart auto-vault looting.
+
+**Standards for this feature:**
+- All thresholds, tier names, tag text, reward types, and secret flags configurable in `config.yml` under `achievements.categories.*`. Validation on startup: threshold must be > 0, tag text max 48 chars, reward type must be a known value (`coins_N`, `voucher_type`, `none`) — bad entries log a warning and the tier is skipped, never a crash.
+- All unlock messages use Adventure API + `Messages.prefix()`. Secret tier unlocks get a special announcement format (configurable: server broadcast or private-only). Achievement hover text in `/tag` and Player Profile uses `Component.text()` — no legacy codes.
+- `/achievements` (or whatever command opens the GUI) is ours. Tab completes player name for staff viewing others. No other plugin registers this command; evict if found. `/tag` tab completions must already be filtered by rank — achievement tags must not appear as completable options for players who haven't unlocked them.
+- **Panel surface:** Per-player achievements endpoint (`/api/players/:uuid/achievements`) with progress bars, unlock dates, voucher redemption status. Staff view: near-miss tracking (players within 10% of a secret threshold). Server-wide achievement completion chart for engagement monitoring.
+
+### Core Philosophy
+- Achievements are **purely stat-based** (no quests, no one-time tasks).
+- Progress uses **existing listeners** (`StatsTrackingListener`, `McMMOIntegration`, playtime ticks, etc.).
+- Unlocking a milestone automatically grants a special **cosmetic tag** (unpurchasable, greyed out for others in `/tag`).
+- Hover on tag (in `/tag` or Player Profile) shows exact count and name (e.g. `"Tree Feller — 1,347,892 logs chopped"`).
+- Players toggle displayed achievements in Settings → Social → Achievement Display.
+- Panel gets full visibility: `/api/players/:uuid/achievements`.
+
+---
+
+### DB — `V014__achievements.sql`
+
+> ⚠️ V012 must ship first (adds `blocks_placed` + `distance_travelled` columns to `player_stats`).  
+> V013 is reserved for any intermediate changes between now and this feature.
+
+```sql
+CREATE TABLE IF NOT EXISTS player_achievements (
+    uuid            VARCHAR(36)  NOT NULL,
+    achievement_id  VARCHAR(64)  NOT NULL,
+    progress        BIGINT       NOT NULL DEFAULT 0,
+    unlocked_at     BIGINT,                          -- NULL = in progress, set on unlock
+    claimed_tag     BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (uuid, achievement_id),
+    FOREIGN KEY (uuid) REFERENCES players(uuid) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_achievements_uuid ON player_achievements(uuid);
+
+CREATE TABLE IF NOT EXISTS achievement_vouchers (
+    id              SERIAL PRIMARY KEY,
+    uuid            VARCHAR(36)  NOT NULL,
+    voucher_type    VARCHAR(64)  NOT NULL,           -- e.g. "coins_1000", "secret_cosmetic_tag"
+    granted_at      BIGINT       NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
+    redeemed        BOOLEAN      NOT NULL DEFAULT FALSE,
+    redeemed_at     BIGINT,
+    FOREIGN KEY (uuid) REFERENCES players(uuid) ON DELETE CASCADE
+);
+```
+
+Append both filenames to `migrations.index`.
+
+---
+
+### New / Modified Classes
+
+| File | Purpose |
+|---|---|
+| `core/achievements/AchievementManager.java` | Singleton; cache per-player; `incrementProgress(uuid, id, amount)` with auto-unlock + tag grant |
+| `core/achievements/AchievementDefinition.java` | Data class loaded from config — `id`, `category`, `threshold`, `tag`, `secret`, `reward` |
+| `core/achievements/AchievementListener.java` | Hooks into existing tracking listeners for blocks placed, distance, etc. |
+| `core/gui/AchievementsMenu.java` | 54-slot GUI; category tabs across top row; progress bars per tier |
+| `core/gui/PlayerProfileMenu.java` | Add `ACHIEVEMENTS` tab; show unlocked tags with progress rings |
+| `core/gui/settings/AchievementDisplaySettingsPage.java` | Toggle which achievements to display (0–6 slots) |
+| `core/system/TagCustomizationManager.java` | Add `"Achievements"` category; hover text shows exact stat + unlock date |
+| `core/world/GraveManager.java` | Legend+ insurance (ttl=-1), auto-loot to vault on death |
+| `core/system/PrivateVaultManager.java` | 90% full warning, multi-page fallback logic for auto-vault |
+| `core/cosmetics/CosmeticsManager.java` | Generalized auto-equip for any wardrobe set (HC wins, future events) |
+
+---
+
+### Config Additions (`config.yml`)
+
+```yaml
+achievements:
+  display_in_profile: true
+  max_displayed: 6     # max achievement tags shown on a player
+  categories:
+    woodcutter:
+      icon: OAK_LOG
+      tiers:
+        - id: woodcutter_1k
+          name: "Sapling Slayer"
+          threshold: 1000
+          tag: "§2🌱 Sapling"
+        - id: woodcutter_10k
+          name: "Lumberjack"
+          threshold: 10000
+          tag: "§2🪓 Lumberjack"
+        - id: woodcutter_100k
+          name: "Forest Lord"
+          threshold: 100000
+          tag: "§2🌲 Forest Lord"
+        - id: woodcutter_1m
+          name: "Tree Feller"
+          threshold: 1000000
+          tag: "§2🌳 Tree Feller"
+        - id: woodcutter_10m
+          name: "Deforester"
+          threshold: 10000000
+          tag: "§2🌴 Deforester"
+        - id: woodcutter_100m
+          name: "World Eater"
+          threshold: 100000000
+          tag: "§c☠ World Eater"
+          secret: true
+          reward: "voucher_1000_coins"
+    # ... (all categories follow the same pattern)
+
+graves:
+  insurance:
+    legend_ttl: -1          # never expire
+    grandmaster_ttl: -1
+    auto_loot_to_vault: true
+    default_vault_page: 1   # configurable per player in Settings → Gameplay
+    warning_at_percent: 90
+```
+
+---
+
+### Full Stat Categories & Tiers
+
+All tiers use the same config pattern as woodcutter above. Secret tiers are hidden in the GUI (shown as `???`) until unlocked.
+
+| Category | Stat Source | Tiers | Secret Name |
+|---|---|---|---|
+| **Woodcutter** | `logs_chopped` | 1k / 10k / 100k / 1M / 10M / **100M** | `"World Eater"` |
+| **Miner** | `blocks_broken` | 5k / 50k / 500k / 5M / 50M / **500M** | `"Bedrock Bane"` |
+| **Fisher** | `fish_caught` | 500 / 5k / 50k / 500k / 5M / **50M** | `"Ocean Emperor"` |
+| **Farmer** | `crops_broken` + `crops_planted` | 2k / 20k / 200k / 2M / 20M / **200M** | `"Harvest God"` |
+| **Warrior (PvP)** | `player_kills` | 100 / 1k / 10k / **100k** | `"Blood Champion"` |
+| **Warrior (PvE)** | `mob_kills` + `boss_kills` | 1k / 10k / 100k / 1M / **10M** | `"Warlord"` |
+| **Playtime** | ticks online | 24h / 7d / 30d / 90d / 180d / **365d** | `"Veteran"` + 2000 coin voucher |
+| **McMMO Power** | power level | 50 / 100 / 250 / 500 / 1000 / **2000** | `"Ascendant"` |
+| **Event Wins** | `event_wins` | 10 / 50 / 100 / 500 / **1000** | `"Unbreakable"` |
+| **HC Wins** | `hardcore_wins` | 1 / 5 / 10 / 25 / **50** | `"Immortal"` |
+| **Explorer** | `distance_travelled` (new col) | 100km / 1,000km / 10,000km / **100,000km** | `"Wanderer"` |
+| **Builder** | `blocks_placed` (new col) | 5k / 50k / 500k / 5M / **50M** | `"Architect"` |
+| **Social** | `messages_sent` | 5k / 25k / 100k / 500k / **2M** | `"Chat God"` |
+
+**Special cross-stat secret — `"Jebaited Legend"`:**
+- Awarded for: 100M of any **single** stat OR 50M wood + 50M stone combo (configurable in yml).
+- Unique visual: glowing dark-red tag + unique chat name glow that stacks on top of whatever tag they have equipped.
+
+---
+
+### Tier Rewards — ⚠️ PLANNING PHASE (suggestions, not finalized)
+
+These are ideas only. Jamie to decide on exact values before implementation.
+
+| Tier Level | Suggested Reward |
+|---|---|
+| Tier 1–2 (low) | Nothing — just the tag. Keep early tiers pure cosmetic. |
+| Tier 3–4 (mid) | Small cosmetic coin bonus (50–100 coins) |
+| Tier 5 (high) | Larger coin bonus (250–500 coins) |
+| Secret tier (100M+) | **Voucher item** (1000–2000 coins) + achievement-only cosmetic tag |
+| `"Jebaited Legend"` cross-stat | Unique chat glow effect (not purchasable anywhere, ever) |
+| `"Veteran"` playtime | 2000 coin voucher (already referenced in config example) |
+
+**Ideas for achievement-exclusive cosmetics (can't buy, only earn):**
+- A dedicated `"Grind"` category in `/tag` with particle trails and name styles only unlockable via achievement milestones
+- Profile badge frame visible in `/stats` — shows a glowing border on the player head icon
+- Custom death message variants for high-tier Warriors
+
+---
+
+### Blood Champion Banner + Exclusive HC Wardrobe
+
+Winner of any Hardcore event (`HARDCORE_FFA`, `HARDCORE_DUELS`, `HARDCORE_KOTH`) receives:
+1. A **limited-time wardrobe set** auto-unlocked via `CosmeticsManager.autoEquipSet(uuid, "hc_win_YYYY_MM_DD")`.
+2. A **"Blood Champion" banner item** with custom NBT (pattern + lore + event date). Only the owner or staff can pick it up after placing.
+3. Right-click placed banner → `ArmorStand` + floating hologram (reuse `BossBarManager` / `DebugFeedManager`):
+   ```
+   §cBlood Champion §f— {winner}
+   §7Hardcore FFA • {event_date} • {kills} kills
+   ```
+4. Banner data persists in item NBT on pickup — same pattern as `PrivateVaultManager` serialization.
+
+`CosmeticsManager.autoEquipSet()` should be **generalized** (not HC-specific) — so future event types just pass a set name and it handles equip logic + grace period handling.
+
+---
+
+### Grave Insurance (Legend / Grandmaster)
+
+| Feature | Legend | Grandmaster |
+|---|---|---|
+| Grave TTL | Never expire (`ttl=-1`) | Never expire (`ttl=-1`) |
+| Auto-loot to Private Vault on death | ✅ | ✅ |
+| Preferred vault page (Settings) | ✅ | ✅ |
+| Fallback to next available vault pages | ✅ | ✅ |
+| 90% vault full warning on death | ✅ | ✅ |
+| `/back` after death (out of combat, once) | ❌ | ✅ |
+
+When vault is full and no fallback: items remain in grave (standard behaviour). Player gets a chat warning: `§cVault full — your grave has been created. Use /grave to retrieve items.`
+
+`GraveManager` changes:
+- Check `RankManager.isAtLeast(player, "legend")` before setting TTL
+- On death: `PrivateVaultManager.autoLootToVault(uuid, grave)` — fill pages in order, return overflow list back to grave
+- `PrivateVaultManager` emits a 90% warning event if usage ≥ threshold after auto-loot
+
+---
+
+### Donor Perks Tracker (Single Source of Truth)
+
+Keep this table updated whenever perks are added or changed. Used for pricing, web panel selling, and permission checks.
+
+| Rank | Perks | Permissions (`jebaited.donor.*`) |
+|---|---|---|
+| **Gold** | 3 homes, chat delay exempt, `/nick`, `/enderchest`, `/pv 1`, `/craft`, `/anvil`, `/kit gold` | `.homes.3`, `.chat.no_delay`, `.nick`, `.pv.1`, `.craft`, `.anvil`, `.kit.gold` |
+| **Diamond** | All Gold + 5 homes, `/near`, `/feed`, `/pv 3`, `/kit diamond`, 50% faster RTP | `.homes.5`, `.near`, `.feed`, `.pv.3`, `.kit.diamond`, `.rtp.50` |
+| **Legend** | All Diamond + 10 homes, `/pv 5`, instant RTP, `/kit legend`, Grave Insurance (ttl=-1 + auto-vault), Blood Champion auto-equip | `.homes.10`, `.pv.5`, `.rtp.instant`, `.kit.legend`, `.grave.insurance`, `.grave.auto_equip` |
+| **Grandmaster** | All Legend + unlimited homes, `/pv 10`, `/back`, `/repair`, smarter vault fallback, instant TP warmups | `.homes.unlimited`, `.pv.10`, `.back`, `.repair`, `.grave.insurance`, `.grave.auto_equip`, `.tp.instant` |
+
+---
+
+### Wiring Checklist
+
+- [ ] `VNEXT__stat_columns.sql` — `blocks_placed INT DEFAULT 0` + `distance_travelled BIGINT DEFAULT 0` on `player_stats`; append to `migrations.index`
+- [ ] `V014__achievements.sql` — tables above; append to `migrations.index`
+- [ ] `AchievementDefinition`, `AchievementManager`, `AchievementListener` classes + JebaitedCore wiring
+- [ ] `AchievementsMenu` (54-slot GUI) + `PlayerProfileMenu` achievements tab
+- [ ] `AchievementDisplaySettingsPage` in Settings → Social
+- [ ] `TagCustomizationManager` — add Achievements category with hover stats
+- [ ] `StatsTrackingListener` — increment `blocks_placed` (BlockPlaceEvent) + `distance_travelled` (PlayerMoveEvent or PlayerStatisticIncrementEvent)
+- [ ] `GraveManager` — Legend/Grandmaster TTL override + `autoLootToVault` call
+- [ ] `PrivateVaultManager` — 90% full warning + multi-page fallback
+- [ ] `CosmeticsManager` — generalized `autoEquipSet()` method
+- [ ] `EventModeManager` — HC win handler → call `autoEquipSet` + give Blood Champion banner item
+- [ ] `ProfileStore.invalidate(uuid)` after achievement unlocks
+- [ ] Panel endpoint `/api/players/:uuid/achievements`
+
+---
+
+```
+[PANEL SURFACE]
+Feature: Achievement / Milestone System
+DB tables added: player_achievements, achievement_vouchers
+Suggested panel page/endpoint: GET /api/players/:uuid/achievements
+Data shape: {
+  achievements: [
+    { id: "woodcutter_1m", category: "woodcutter", progress: 1452310, unlocked_at: 1712345678000, claimed_tag: true },
+    ...
+  ],
+  vouchers: [
+    { voucher_type: "coins_1000", granted_at: 1712345678000, redeemed: false }
+  ]
+}
+Panel use: Per-player achievements tab showing progress bars, unlock dates, secret tier tracking. Staff can monitor near-miss 100M grind candidates.
+```
+
+---
+
+## 16. Jebaited Wrapped
+
+### Goal
+Annual year-end stats showcase. Every player gets a personal "Wrapped" — top moments, biggest stats, highlights from the year. Server-wide records too. Inspired by Spotify Wrapped.
+
+### Concept
+- Triggered via `/wrapped [year]` (staff or self).  
+- Pulls data from `player_stats`, `player_event_stats`, `player_achievements`, `player_party_stats`, and `chat_logs` scoped to `EXTRACT(YEAR FROM ...)`.  
+- Presents a guided 54-slot "slideshow" GUI: one slide per stat category, animated with fireworks/particles.  
+- Panel surface: `GET /api/wrapped?year=YYYY&uuid=...` returns the JSON summary.
+
+### Per-player highlights
+| Category | Shown |
+|---|---|
+| Combat | Total kills, K/D ratio, most kills in a single event |
+| Builder | Total blocks broken, most broken block type |
+| Social | Messages sent, commands used, friends made |
+| Events | Events entered/won by type, best winning streak |
+| Achievements | Tiers unlocked this year, rarest unlock |
+| Economy | Total cosmetic coins earned, peak balance |
+| Playtime | Total hours online, most active day-of-week |
+
+### Server-wide records
+- Most kills overall
+- Most blocks broken
+- Most events won
+- Longest play session
+- Most messages sent
+- Top cosmetic coin earner
+
+### Technical notes
+- `WrappedManager` — queries all wrapped data async per UUID.
+- `WrappedCommand` — `/wrapped [year] [player]`, helper+ can view others.
+- `WrappedMenu` — 54-slot slideshow GUI, NEXT button advances through category slides.
+- No new migration needed — all data comes from existing tables scoped by year.
+- Epoch ms timestamps can be year-filtered with: `WHERE timestamp >= epoch_start AND timestamp < epoch_end`.
+
+### Panel surface
+```
+[PANEL SURFACE]
+Feature: Jebaited Wrapped
+DB tables/columns used: player_stats, player_event_stats, player_achievements, player_party_stats (all scoped to year via epoch ms)
+Suggested panel endpoint: GET /api/wrapped?year=YYYY&uuid=...
+Data shape:
+{
+  year: 2025,
+  uuid: "...",
+  username: "...",
+  stats: {
+    kills: 1234, deaths: 456, kd_ratio: 2.71,
+    blocks_broken: 99000, fish_caught: 350,
+    playtime_hours: 142, messages_sent: 4200, commands_sent: 1800,
+    cosmetic_coins_earned: 5500, events_entered: 28, events_won: 7
+  },
+  top_achievement_tier: "GOLD",
+  friends_made: 3
+}
+```
+
+---
+
+## 17. Server Shop (`/shop`)
+
+### Goal
+A convenient server-run bulk buy/sell GUI covering 9 item categories. Priced deliberately worse than what a smart player shop can offer — the shop is a floor, not the ceiling. Drives player trade by design. DB-backed prices mean live tweaks from the web panel with zero restarts.
+
+### Economy Philosophy
+- **Buy price** = 1.5–2.5× the natural effort/value of obtaining the item.
+- **Sell price** = 40–60% of buy price. Creates an economy sink, prevents infinite farming loops.
+- **Stack math** is calculated on-the-fly — all prices stored per single unit in DB. GUI multiplies by 64 for shift-click display.
+- **No inflation loop:** selling to the server is never more profitable than farming events or using player shops.
+- **Adjustable:** prices stored in `server_shop_prices` table — admin can edit via panel page without a server restart.
+
+### GUI Layout (54 slots)
+
+```
+Row 0 (slots 0–8):   [Player Head] [spacer] [Category tabs ×9]
+Row 1 (slots 9–17):  [Category tabs continued / search bar]
+Rows 2–4 (18–44):    Item grid — 21 slots per page (7×3)
+Row 5 (45–53):       [Prev Page] [spacer×3] [Search] [spacer×3] [Next Page]
+```
+
+- **Player Head** (slot 0): async-loaded skull with player's own skin. Lore shows display name + balance only (e.g. `$12,345.67`). Nothing else. - Jamie (make sure it's updated if something is sold / bought)
+- **9 category tabs** across rows 0–1: Blocks, Farming, Mobs, Ores, Dyes, Music, Food, Decoration, Redstone. Clicking a tab reloads the item grid instantly for that category. Active tab has glowing border (enchant effect).
+- **Item grid**: 21 items per page. Clicking an item buys/sells. Hover lore shows buy price, sell price, and shift-click stack price in yellow.
+- **Search**: opens a chat input (via existing `ChatInputService`) — filters items by name within the current category. No Anvil GUI.
+- **Pagination**: prev/next arrows only shown when needed.
+
+### Interaction Model
+| Action | Result |
+|--------|--------|
+| Left-click item | Buy 1 |
+| Shift + Left-click | Buy 64 (stack) |
+| Right-click item | Sell 1 (scans inventory for exact material) |
+| Shift + Right-click | Sell all of that material from inventory |
+
+All actions are instant with sound feedback via `SoundCompat`. Insufficient balance → `Messages.prefix()` error in chat, no GUI close.
+
+### Categories & Curated Item Lists
+
+**Blocks** — building staples, not exhaustive
+All 8 log types, Bamboo Block, Stone, Cobblestone, Deepslate, Andesite, Diorite, Granite, Sand, Gravel, Dirt, Grass Block, Mycelium, Podzol, Clay, Terracotta (all 16 colors), Concrete (all 16 colors), Wool (all 16 colors), Glass (plain + 16 stained).
+
+**Farming**
+Wheat Seeds, Wheat, Carrots, Potatoes, Beetroot Seeds, Beetroot, Pumpkin Seeds, Pumpkin, Melon Seeds, Melon, Sugarcane, Cactus, Bamboo, Cocoa Beans, Sweet Berries, Glow Berries, Nether Wart, Bonemeal, Hay Bale, Dried Kelp Block.
+
+**Mobs** (drops + limited common eggs only)
+Rotten Flesh, Bone, String, Spider Eye, Gunpowder, Ender Pearl, Blaze Rod, Ghast Tear, Phantom Membrane, Magma Cream, Shulker Shell, Totem of Undying, Spawn Eggs (Cow/Pig/Chicken/Sheep/Zombie/Skeleton only — no wither/ender dragon).
+
+**Ores / Resources**
+Coal, Raw Iron, Iron Ingot, Raw Gold, Gold Ingot, Raw Copper, Copper Ingot, Lapis Lazuli, Redstone Dust, Diamond, Emerald, Nether Quartz, Netherite Scrap, Ancient Debris, Netherite Ingot. Ore blocks (Iron/Gold/Diamond/Emerald Block) at hardcoded 9× ingot price.
+
+**Dyes** — all 16 colors, uniform price.
+
+**Music**
+All 16 music discs + all 8 Goat Horn variants.
+
+**Food**
+Bread, Cookie, Pumpkin Pie, Cake, Apple, Golden Apple, Enchanted Golden Apple (very expensive), Baked Potato, Cooked Chicken, Cooked Beef, Cooked Porkchop, Cooked Mutton, Cooked Salmon, Rabbit Stew, Suspicious Stew, Honey Bottle, Sweet Berries, Glow Berries.
+
+**Decoration**
+All standard flowers, Lantern, Soul Lantern, Campfire, Soul Campfire, Item Frame, Glow Item Frame, Painting, Armor Stand, Bookshelf, Lectern, Flower Pot, Scaffolding, Chain, Bell, Carpet (all 16 colors), Banner (base).
+
+**Redstone**
+Redstone Dust, Redstone Torch, Repeater, Comparator, Piston, Sticky Piston, Observer, Hopper, Dropper, Dispenser, Rail, Powered Rail, Detector Rail, Activator Rail, Lever, Stone/Wood Button, Pressure Plates (all), Target Block, Sculk Sensor, Calibrated Sculk Sensor, Daylight Sensor.
+
+### Pricing Reference Table
+
+| Category | Item | Buy | Sell |
+|----------|------|-----|------|
+| Blocks | Any log (all 8 types) | $8 | $3.50 |
+| Blocks | Bamboo Block | $7 | $3 |
+| Blocks | Stone | $4 | $1.80 |
+| Blocks | Cobblestone | $3 | $1.40 |
+| Blocks | Deepslate | $6 | $2.70 |
+| Blocks | Andesite / Diorite / Granite | $5 | $2.20 |
+| Blocks | Sand / Gravel | $4 | $1.80 |
+| Blocks | Dirt / Grass Block | $3 | $1.40 |
+| Blocks | Mycelium / Podzol | $12 | $5.50 |
+| Blocks | Clay | $6 | $2.70 |
+| Blocks | Terracotta (any color) | $9 | $4 |
+| Blocks | Concrete (any color) | $14 | $6.50 |
+| Blocks | Wool (any color) | $8 | $3.50 |
+| Blocks | Glass (plain) | $7 | $3 |
+| Blocks | Stained Glass (any color) | $11 | $5 |
+| Farming | Wheat Seeds | $2 | $0.90 |
+| Farming | Wheat | $4 | $1.80 |
+| Farming | Carrots / Potatoes | $5 | $2.20 |
+| Farming | Beetroot Seeds / Beetroot | $4 | $1.80 |
+| Farming | Pumpkin / Melon Seeds | $6 | $2.70 |
+| Farming | Pumpkin / Melon | $8 | $3.50 |
+| Farming | Sugarcane | $5 | $2.20 |
+| Farming | Cactus | $7 | $3 |
+| Farming | Bamboo | $4 | $1.80 |
+| Farming | Cocoa Beans | $9 | $4 |
+| Farming | Sweet Berries / Glow Berries | $8 | $3.50 |
+| Farming | Nether Wart | $12 | $5.50 |
+| Farming | Bonemeal | $10 | $4.50 |
+| Farming | Hay Bale | $18 | $8 |
+| Farming | Dried Kelp Block | $15 | $7 |
+| Mobs | Rotten Flesh | $3 | $1.40 |
+| Mobs | Bone | $5 | $2.20 |
+| Mobs | String | $6 | $2.70 |
+| Mobs | Spider Eye / Gunpowder | $8 | $3.50 |
+| Mobs | Ender Pearl | $35 | $16 |
+| Mobs | Blaze Rod | $25 | $11 |
+| Mobs | Ghast Tear / Phantom Membrane | $60 | $27 |
+| Mobs | Magma Cream | $18 | $8 |
+| Mobs | Shulker Shell | $120 | $55 |
+| Mobs | Totem of Undying | $450 | $95 |
+| Mobs | Spawn Egg (Cow/Pig/Chicken/Sheep) | $40 | $18 |
+| Mobs | Spawn Egg (Zombie/Skeleton) | $55 | $25 |
+| Ores | Coal | $6 | $2.70 |
+| Ores | Raw Iron | $9 | $4 |
+| Ores | Iron Ingot | $12 | $5.50 |
+| Ores | Raw Gold | $18 | $8 |
+| Ores | Gold Ingot | $25 | $11 |
+| Ores | Raw Copper | $7 | $3 |
+| Ores | Copper Ingot | $10 | $4.50 |
+| Ores | Lapis Lazuli | $15 | $7 |
+| Ores | Redstone Dust | $14 | $6.50 |
+| Ores | Diamond | $120 | $55 |
+| Ores | Emerald | $90 | $40 |
+| Ores | Nether Quartz | $22 | $10 |
+| Ores | Netherite Scrap | $80 | $36 |
+| Ores | Ancient Debris | $95 | $43 |
+| Ores | Netherite Ingot | $450 | $210 |
+| Ores | Iron Block | $108 | $49.50 |
+| Ores | Gold Block | $225 | $99 |
+| Ores | Diamond Block | $1,080 | $495 |
+| Ores | Emerald Block | $810 | $360 |
+| Dyes | Any dye (all 16) | $5 | $2.20 |
+| Music | Any music disc | $85 | $18 |
+| Music | Any goat horn | $45 | $20 |
+| Food | Bread / Cookie | $6 | $2.70 |
+| Food | Pumpkin Pie | $18 | $8 |
+| Food | Cake | $45 | $20 |
+| Food | Apple | $4 | $1.80 |
+| Food | Baked Potato | $5 | $2.20 |
+| Food | Cooked meats (all) | $12 | $5.50 |
+| Food | Golden Apple | $85 | $38 |
+| Food | Enchanted Golden Apple | $2,500 | $1,100 |
+| Food | Rabbit Stew / Suspicious Stew | $22 | $10 |
+| Food | Honey Bottle | $15 | $7 |
+| Decoration | Flowers (all) | $4 | $1.80 |
+| Decoration | Lantern / Soul Lantern | $18 | $8 |
+| Decoration | Campfire / Soul Campfire | $15 | $7 |
+| Decoration | Item Frame / Glow Item Frame | $10 | $4.50 |
+| Decoration | Painting | $25 | $11 |
+| Decoration | Armor Stand | $35 | $16 |
+| Decoration | Bookshelf / Lectern | $22 | $10 |
+| Decoration | Flower Pot / Scaffolding | $8 / $12 | $3.50 / $5.50 |
+| Decoration | Chain / Bell | $14 | $6.50 |
+| Decoration | Carpet (any color) | $7 | $3 |
+| Decoration | Banner (base) | $20 | $9 |
+| Redstone | Redstone Dust | $14 | $6.50 |
+| Redstone | Redstone Torch / Repeater | $16 | $7 |
+| Redstone | Comparator | $22 | $10 |
+| Redstone | Piston / Sticky Piston | $28 | $12.50 |
+| Redstone | Observer / Hopper | $35 | $16 |
+| Redstone | Dispenser / Dropper | $32 | $14.50 |
+| Redstone | Rails (normal/powered/detector/activator) | $12–$18 | $5.50–$8 |
+| Redstone | Lever / Button / Pressure Plate | $10–$14 | $4.50–$6.50 |
+| Redstone | Target Block | $40 | $18 |
+| Redstone | Sculk Sensor | $85 | $38 |
+| Redstone | Calibrated Sculk Sensor | $120 | $55 |
+| Redstone | Daylight Sensor | $28 | $12.50 |
+
+> ⚠️ Music disc sell price is intentionally capped at $18 (not 40–60% of buy) to prevent disc-farming loops via cat/jukebox. Totem sell capped at $95 for the same reason.
+
+### DB Schema — `V007__server_shop.sql` *(assign exact V-number at implementation; currently V007 per implementation order)*
+```sql
+CREATE TABLE IF NOT EXISTS server_shop_prices (
+    item_key      VARCHAR(64)    PRIMARY KEY,   -- e.g. "minecraft:oak_log"
+    category      VARCHAR(32)    NOT NULL,       -- "blocks", "farming", etc.
+    display_name  VARCHAR(64)    NOT NULL,
+    buy_price     NUMERIC(18,2)  NOT NULL,
+    sell_price    NUMERIC(18,2)  NOT NULL,
+    max_stack     INT            NOT NULL DEFAULT 64,
+    sort_order    INT            NOT NULL DEFAULT 0,
+    enabled       BOOLEAN        NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS shop_transactions (
+    id            BIGSERIAL      PRIMARY KEY,
+    player_uuid   VARCHAR(36)    NOT NULL REFERENCES players(uuid) ON DELETE CASCADE,
+    item_key      VARCHAR(64)    NOT NULL,
+    quantity      INT            NOT NULL,
+    unit_price    NUMERIC(18,2)  NOT NULL,
+    total         NUMERIC(18,2)  NOT NULL,
+    action        VARCHAR(4)     NOT NULL CHECK (action IN ('BUY','SELL')),
+    transacted_at TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_shop_tx_player ON shop_transactions(player_uuid);
+CREATE INDEX IF NOT EXISTS idx_shop_tx_time   ON shop_transactions(transacted_at);
+```
+
+### Java — Files to create
+
+| File | Purpose |
+|------|---------|
+| `core/system/ShopManager.java` | Singleton. Loads all `server_shop_prices` rows into memory on startup. Provides `buyItem`, `sellItem`, `getPrice`, `getCategory` methods. Seeds prices from config on first run if table is empty. |
+| `core/commands/ShopCommand.java` | `/shop` — opens `ShopMenu`. No subcommands. Implements `CommandExecutor + TabCompleter` (empty). |
+| `core/gui/ShopMenu.java` | Main 54-slot GUI. Player head slot 0, category tabs, item grid, pagination, search trigger. Extends `BaseMenu`. |
+| `core/gui/ShopCategoryMenu.java` | Renders a single category page. Called by `ShopMenu` on tab click or page change. Handles left/right/shift-left/shift-right click logic. |
+
+### Wiring checklist (all 5 required)
+- [ ] `ShopCommand.java` — executor + tab completer
+- [ ] `plugin.yml` — command entry for `shop` with alias `market`
+- [ ] `JebaitedCore.java` — `bindCommand("shop", new ShopCommand(...))` + `ShopManager` init in `onEnable`
+- [ ] `PermissionConstants.java` — `CMD_SHOP = "jebaited.shop.use"` (default true, no rank gate)
+- [ ] `CommandSecurityListener.java` — add `"shop"` to switch with 600ms cooldown bucket (no rank gate)
+
+### Security & Dupe Protection
+1. **Atomic transactions:** check balance → deduct/add money via `EconomyManager` → modify inventory → `ProfileStore.saveDeferred`. If inventory give fails (full), refund balance before returning.
+2. **Sell validation:** scan player inventory for exact `Material` match before accepting sell. Quantity capped at what player actually holds.
+3. **Rate limit:** 2 transactions per second per player (tracked in `ShopManager` via `ConcurrentHashMap<UUID, Long> lastTx`).
+4. **Survival/Adventure only:** block shop use in creative mode.
+5. **Audit log:** every buy/sell written to `shop_transactions` and `AuditLogService` (wrapped in try/catch — failure never crashes).
+6. **Hub block:** shop unavailable in hub world — SMP only.
+
+### Panel Surface
+```
+[PANEL SURFACE]
+Feature: Server Shop
+DB tables added: server_shop_prices, shop_transactions
+Suggested panel pages:
+  - /admin/shop/prices  — live price editor (edit buy/sell/enabled per item)
+  - /admin/shop/log     — transaction log with player/item/qty/total/timestamp
+Data shape (transaction row):
+{
+  "id": 1042,
+  "player_uuid": "...",
+  "player_name": "darkniightz",
+  "item_key": "minecraft:diamond",
+  "quantity": 5,
+  "unit_price": 120.00,
+  "total": 600.00,
+  "action": "BUY",
+  "transacted_at": "2026-04-16T20:00:00Z"
+}
+```
+
+### Notes
+- Player shops (P2P storefronts) are a separate feature (I2 in the roadmap) — deferred until the server economy has been live long enough to understand real supply/demand.
+- Prices in `server_shop_prices` are seeded on first run from config, but the config is source-of-truth only for fresh installs. Subsequent changes go via the panel to avoid config/DB drift.
+- No A–Z letter filter — search bar (via `ChatInputService`) covers all filtering needs within a category.
+- No Anvil GUI for search — `ChatInputService` is already in the codebase and is more consistent.
+
+---
+
+## 18. Version Labelling
+
+### When it starts
+After Economy Store + Player Shops (§17 + I2) ship and are stable, the plugin gets its first public version tag. Before that, it's internal/beta — no external release promise.
+
+### Scheme
+```
+v0.x-beta  — pre-economy-store releases (current state: in-progress)
+v0.1       — Economy Store + Player Shops shipped, server actively running
+v0.x       — incremental feature milestones post-v0.1
+v1.0       — after Pre-Production Audit passes (§19), full public release
+```
+
+### Rules
+- Tags are git tags. Each tag is cut on a clean `BUILD SUCCESS` with no known P1/P2 bugs in the changelog.
+- Version is displayed in the startup log block and in `/version` (add to `PluginCommand` or a small `VersionCommand`).
+- Each minor version bump (v0.1 → v0.2 etc.) requires at least one shipped item from the Upcoming Features table.
+- No version tag is cut from a branch — only from main.
+
+### Checklist before v0.1
+- [ ] Economy Store (`/shop`) — buy/sell GUI fully functional
+- [ ] Player Shops — P2P storefronts working
+- [ ] All V-numbered migrations from V001–V007 verified idempotent + clean on fresh install
+- [ ] No P1 bugs in the live changelog
+
+### Checklist before v1.0
+- [ ] Pre-Production Audit (§19) complete with all critical findings resolved
+- [ ] Web admin panel surfacing economy, moderation, stats, and achievements
+- [ ] Full server test run with a real player session — no ghost players, no boot loops
+
+---
+
+## 20. Broadcaster Overhaul
+
+### Current state
+`BroadcasterManager` round-robins a flat list of plain-text config messages on a fixed interval. No formatting variety, no per-message cooldowns, no context awareness, no interactivity.
+
+### Goals
+Make broadcasts feel like part of the server — not a spam bot. Messages should be contextual, rich, and occasional. Players should read them, not ignore them.
+
+### Features
+
+#### Message types
+Each message entry in config gets a `type:` field:
+
+| Type | Behaviour |
+|------|-----------|
+| `text` | Plain broadcast — existing behaviour, full Adventure API formatting |
+| `tip` | `💡 Tip:` prefix in gold, italic. Rotates through tips list independently |
+| `vote` | Links to vote site — clickable hover + URL ClickEvent |
+| `event_hint` | Only fires when an event is active; shows current event name + `/event join` button |
+| `rule_reminder` | Random pick from a `rules:` list; `📜 Rule:` prefix in red |
+| `stat_spotlight` | Pulls a random online player's top stat and shows it — `§e{name} §7has §a{value} kills!` |
+
+#### Per-message config shape
+```yaml
+broadcaster:
+  enabled: true
+  shuffle: false          # if true, randomise order instead of round-robin
+  interval_seconds: 300
+  messages:
+    - type: text
+      text: "&6Welcome to &lJebaited&6! Type &e/help &6to get started."
+    - type: tip
+      text: "&eUse &f/kit &eto claim your daily gear kit!"
+    - type: event_hint
+      text: "&d{event_name} &7is live — &f/event join &7to enter!"
+    - type: vote
+      text: "&bSupport the server! &fVote at &n{url}"
+      url: "https://your-vote-url.com"
+    - type: stat_spotlight
+      stat: kills            # pulls from player_stats
+```
+
+#### Formatting rules
+- All messages prefix with `Messages.prefix()` unless `raw: true` is set.
+- `event_hint` messages are **skipped** if no event is active — don't count toward the rotation index when skipped.
+- `stat_spotlight` is skipped if no players are online.
+- All text fields support `&` colour codes translated at send-time (not load-time — allows config hot-reload).
+- `vote` type renders a hoverable clickable link: `[Click to Vote]` with `HoverEvent.showText` + `ClickEvent.openUrl`.
+
+#### Sending channel options
+```yaml
+broadcaster:
+  channel: all         # all = all online, smp = SMP world only, hub = hub only
+```
+
+#### `/broadcast` command overhaul (admin)
+- `/broadcast <message>` — immediate one-off broadcast (existing)
+- `/broadcast reload` — hot-reloads `broadcaster.messages` list without restart
+- `/broadcast skip` — skips to next queued message
+- `/broadcast pause` / `/broadcast resume` — halts/resumes the timer
+- Tab completes: `reload`, `skip`, `pause`, `resume` (helper+ only; inline message for everyone helper+)
+
+#### Panel surface
+```
+[PANEL SURFACE]
+Feature: Broadcaster Overhaul
+DB tables/columns added: none (config-driven)
+Suggested panel page/endpoint: /api/broadcaster/status, /api/broadcaster/send
+Data shape: { "index": 2, "total": 8, "paused": false, "lastFiredAt": 1713300000000, "lastMessage": "..." }
+```
+Panel can show current queue position, last fired message, pause/resume toggle, and a "fire now" button.
+
+### Implementation checklist
+- [ ] `BroadcastMessage` record (type, text, url, stat, channel, raw)
+- [ ] `BroadcasterManager` refactor: load typed entries, context-skip logic, shuffle mode, pause/resume state
+- [ ] `BroadcastCommand` overhaul: reload/skip/pause/resume subcommands, PermissionConstants.CMD_BROADCAST_ADMIN
+- [ ] `stat_spotlight` — async DB pull of a random online player's top stat column
+- [ ] `vote` type — Adventure API ClickEvent.openUrl + HoverEvent.showText
+- [ ] `event_hint` type — `EventModeManager.isEventActive()` guard
+- [ ] Panel connector push on each fire: `PanelConnectorService.push("broadcaster", payload)`
+- [ ] Config validation at startup: unknown `type` → warn + skip, not crash
+- [ ] plugin.yml `/broadcast` usage string updated
+
+### Notes
+- Jamie: Keep it dead simple to add new types — the switch/dispatch on `type` should be one method, new type = new case + handler, nothing else. — Jamie
+
+---
+
+## 19. Pre-Production Audit (Gate to v1.0)
+
+### Purpose
+Before any "v1.0" public release tag, the entire codebase goes through a security and quality pass. Nothing ships with a v1.0 tag until this is done.
+
+### Security scope (OWASP-guided)
+| Check | Applies here |
+|-------|-------------|
+| SQL injection | All `PreparedStatement` usage — confirm zero string-concatenated SQL in production paths |
+| Broken Access Control | Every command checks rank/permission before acting; TabCompleters filter by rank |
+| Sensitive data exposure | No plaintext passwords, tokens, or UUIDs in logs/chat (check AuditLog, OpsAlert, startup block) |
+| Security misconfiguration | config.yml defaults validated in `onEnable`; no debug flags enabled in prod |
+| Insecure deserialization | `ItemStack.deserializeItemsFromBytes` paths — confirm schema/version guard |
+| Injection (command) | `AsyncChatEvent` → `PlainTextComponentSerializer` used everywhere; no `getMessage()` |
+| Logging & monitoring | AuditLog + ModerationManager cover all privileged actions |
+| Rate limiting | All commands behind `CommandSecurityListener` cooldown buckets |
+
+### Code quality scope
+- Dead code removal — classes/methods that were superseded but never deleted
+- Messy/duplicated logic — any copy-pasted blocks that should be helpers
+- TODO/FIXME comments — resolve or close each one with a decision
+- Unused imports / fields — clean build with zero warnings after `-Xlint:all`
+- Inconsistent naming — any field/method that doesn't match the project's naming conventions
+- Config keys that are documented but never read (or read but never documented)
+
+### Process
+1. Run `mvn compile -Xlint:all` — log every warning, fix or suppress with justification.
+2. Grep for `// TODO`, `// FIXME`, `//noinspection` — review each.
+3. Manual command-by-command permission audit: every command executor → confirmed permission check → confirmed TabCompleter rank filter.
+4. Database query audit: every raw query string reviewed for injection risk.
+5. Write a one-page "Security & Quality Sign-off" doc in `docs/` before cutting v1.0 tag.
+
+### Gate condition
+The v1.0 tag is only cut after:
+- [ ] All OWASP checks above have a "pass" or "N/A" verdict
+- [ ] Zero compiler warnings on `-Xlint:all`
+- [ ] Sign-off doc committed to `docs/SECURITY_SIGNOFF.md`
