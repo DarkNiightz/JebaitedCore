@@ -124,6 +124,7 @@ public class WorldChangeListener implements Listener {
     /** Cancel any pending /home or /warp warmup timer if the player actually moves. */
     @EventHandler(priority = EventPriority.LOW)
     public void onMove(PlayerMoveEvent event) {
+        if (event instanceof PlayerTeleportEvent) return; // server-initiated teleports must not cancel warmup
         Location from = event.getFrom();
         Location to = event.getTo();
         if (to == null) return;
@@ -196,7 +197,9 @@ public class WorldChangeListener implements Listener {
             if (smpVital != null) {
                 applyVitals(player, smpVital);
             }
-            player.setGameMode(GameMode.SURVIVAL);
+            if (!isDevModeActive(player)) {
+                player.setGameMode(GameMode.SURVIVAL);
+            }
             if (cosmeticsEngine != null) {
                 cosmeticsEngine.clearActiveEffects(player);
             }
@@ -257,6 +260,14 @@ public class WorldChangeListener implements Listener {
         } else if (worldManager.isSmp(player)) {
             player.setGameMode(GameMode.SURVIVAL);
         }
+    }
+
+    /** Returns true if the player has active developer mode — bypasses gamemode enforcement. */
+    private boolean isDevModeActive(Player player) {
+        return player != null
+                && plugin instanceof com.darkniightz.main.JebaitedCore core
+                && core.getDevModeManager() != null
+                && core.getDevModeManager().isActive(player.getUniqueId());
     }
 
     /**
@@ -338,7 +349,9 @@ public class WorldChangeListener implements Listener {
             applyVitals(player, VitalSnapshot.defaultHub());
         }
 
-        player.setGameMode(GameMode.ADVENTURE);
+        if (!isDevModeActive(player)) {
+            player.setGameMode(GameMode.ADVENTURE);
+        }
         if (hotbarNavigator != null) {
             hotbarNavigator.ensureHubHotbar(player);
         }

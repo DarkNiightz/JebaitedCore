@@ -1,6 +1,6 @@
 ﻿# JebaitedCore — Feature Roadmap
 
-> Last updated: April 2026 (P21 — DB schema audit: V003 idempotent, player_homes added to V001, SchemaManager dollar-quote support; version tagging + audit section added)  
+> Last updated: April 2026 (P22 — Events System Overhaul roadmap added §21; death screen 1L respawn fix; vault guard in createNormalGrave; helper+ PV access)  
 > Package root: `com.darkniightz`  
 > All DB changes go through SchemaManager migrations (`src/main/resources/db/`).
 
@@ -103,7 +103,8 @@
 | E | Recruit-a-Friend | All players | Soon | Planned |
 | F | Player Profile Overhaul (`/stats` tabbed GUI) | All players | Soon | Planned |
 | G | Graves Overhaul (nametag ArmorStand, donor auto-equip) | All players | Soon | Planned |
-| H | Exclusive Event Skins + Blood Champion Banner | Hardcore event winners | Soon | Planned |
+| H | **Events System Overhaul** — full rewrite: per-event-type arenas, auto-countdown lobby, team auto-balance (party-aware), CTF, live sidebar + boss bar, coins+XP+item rewards, spectator mode polish | All players | **Next** | Planned |
+| H2 | Exclusive Event Skins + Blood Champion Banner | Hardcore event winners | Soon | Planned |
 | I | **Server Shop** (`/shop`) — 9-category GUI, buy/sell, DB-backed prices | All players | Soon | Planned |
 | I2 | Player Shops — player-to-player storefronts | All players | Later | Planned |
 | I3 | **Version Tagging** — label v0.1 through v1.0. Starts after Economy Store + Player Shops ship. Each milestone tag captures full feature state. | All | After I2 | Milestone |
@@ -138,6 +139,7 @@
 | 15 | [Achievement / Milestone System (The Grind Bible)](#15-achievement--milestone-system-the-grind-bible) | XL | ✅ Shipped (P18) |
 | 16 | [Jebaited Wrapped](#16-jebaited-wrapped) | Medium | Planned |
 | 17 | [Server Shop (`/shop`)](#17-server-shop-shop) | Large | Planned |
+| 21 | [Events System Overhaul](#21-events-system-overhaul) | XL | Planned — next up |
 
 ---
 
@@ -2091,3 +2093,280 @@ The v1.0 tag is only cut after:
 - [ ] All OWASP checks above have a "pass" or "N/A" verdict
 - [ ] Zero compiler warnings on `-Xlint:all`
 - [ ] Sign-off doc committed to `docs/SECURITY_SIGNOFF.md`
+
+---
+
+## 21. Events System Overhaul
+
+### Goal
+Full clean-room rewrite of the events system. The current `EventModeManager` is a single 600-line god-class that conflates arena config, participant tracking, inventory snapshots, HC loot, spectator state, KOTH scoring, and elimination logic into one synchronized blob. Every new event type makes it worse.
+
+The rewrite introduces a proper layered architecture: a thin `EventEngine` coordinator, per-kind `EventHandler` strategy classes, a clean arena registry, a team engine, and a lobby countdown system — while keeping all external surfaces stable so stats, commands, the scoreboard, and the web panel require zero changes.
+
+### External surfaces that must NOT break
+| Surface | What it reads | Contract to preserve |
+|---------|--------------|---------------------|
+| `StatsTrackingListener` | `PlayerDeathEvent`, kills/deaths — no event-specific coupling | No change needed |
+| `ServerScoreboardManager` | `EventModeManager.getStatusLine()` | Keep this method, update its impl |
+| `/event` command | `EventModeManager` public API | Keep same command interface |
+| `GraveListener` | `EventModeManager.isParticipant(player)` | Keep this method |
+| `EventModeCombatListener` | `isParticipant`, `handleParticipantDeath`, `shouldKeepInventoryOnDeath`, `isParticipantInHardcore`, `collectHardcoreLoot`, `handleParticipantRespawn` | Preserve all, delegate to new engine internally |
+| Web panel | No direct event DB table — reads `player_stats.event_wins` | No schema change needed |
+| `AuditLogService` | Logs event start/stop/winner | Preserve audit calls |
+
+---
+
+### Architecture
+
+```
+eventmode/
+  EventEngine.java            ← replaces EventModeManager as the brain
+  EventState.java             ← enum: IDLE | OPEN | LOBBY_COUNTDOWN | RUNNING | ENDING
+  EventKind.java              ← enum: FFA, KOTH, DUELS, HARDCORE_FFA, HC_DUELS, HC_KOTH, CTF (new)
+  EventSpec.java              ← record: kind, arenaKey, displayName, minPlayers, maxPlayers, coinReward, xpReward, itemReward?
+  EventSession.java           ← live session state: participants, teams, snapshots, spectators, score
+  EventArenaRegistry.java     ← loads arena configs from config.yml; maps EventKind → ArenaConfig
+  ArenaConfig.java            ← record: spawnPoints[], teamSpawns[][], flagLocations[], hillRegion, etc.
+  team/
+    TeamEngine.java           ← auto-balance + party-cohesion algorithm; assigns participants → Team
+    Team.java                 ← record: id, color, members, score
+  handler/
+    EventHandler.java         ← interface: onStart, onDeath, onRespawn, onTick, onEnd, getScoreboardLines
+    FfaHandler.java           ← FFA and HC_FFA logic
+    KothHandler.java          ← KOTH timer, hill capture logic, HC_KOTH variant
+    DuelsHandler.java         ← 1v1 bracket, HC_DUELS variant
+    CtfHandler.java           ← Capture the Flag: flag pickup, carry, score, drop-on-death
+  EventCommand.java           ← /event — unchanged interface
+  EventCommandTabCompleter.java
+```
+
+`EventModeManager.java` becomes a thin façade that delegates every call to `EventEngine` — this preserves all existing references across the codebase without a mass refactor.
+
+---
+
+### Event lifecycle (new)
+
+```
+IDLE
+  └─ /event open <kind> [arena]   → OPEN      (staff only)
+       │  Queue is visible. /event join works.
+       │  If minPlayers already met when opened → immediately enter LOBBY_COUNTDOWN.
+       └─ player joins → broadcast count
+            └─ minPlayers met → LOBBY_COUNTDOWN (30s default, configurable)
+                  │  Boss bar countdown visible to all event participants.
+                  │  /event join still accepted up to maxPlayers.
+                  │  Staff can /event forcestart to skip countdown.
+                  └─ countdown expires → RUNNING
+                        │  EventHandler.onStart() called.
+                        │  Teams assigned (if team event).
+                        │  Players teleported to arena spawn points.
+                        │  Inventory snapshots taken.
+                        └─ win condition met → ENDING
+                              │  EventHandler.onEnd() called.
+                              │  Rewards distributed.
+                              │  Snapshots restored, players teleported home.
+                              └─ IDLE
+```
+
+Staff can still force-stop at any time with `/event stop` (graceful cleanup — restores inventories).
+
+---
+
+### Arena config (`config.yml`)
+
+Each event kind maps to one arena config. Multiple arenas per kind are supported (staff picks, or the engine rotates).
+
+```yaml
+events:
+  lobby_countdown_seconds: 30
+  arenas:
+    ffa:
+      - key: ffa_main
+        display: "§cBloody Plains"
+        spawns:
+          - world: event world: 100,64,100
+          - world: event_world: -100,64,-100
+          # ... up to maxPlayers spawn points
+    koth:
+      - key: koth_arena
+        display: "§6The Fortress"
+        spawns: [...]
+        hill:
+          world: event_world
+          min: 10,63,10
+          max: 20,67,20
+        capture_seconds: 120
+    ctf:
+      - key: ctf_arena
+        display: "§bFlag Wars"
+        red_spawn: [...]
+        blue_spawn: [...]
+        red_flag: world: event_world: 50,65,50
+        blue_flag: world: event_world: -50,65,-50
+        flag_return_seconds: 30
+    duels:
+      - key: duels_arena
+        spawns_1v1:
+          - [100,64,0, -100,64,0]  # pair of spawn points per duel
+    hardcore_ffa:
+      # reuses ffa_main by default unless overridden
+      inherit: ffa_main
+    hardcore_koth:
+      inherit: koth_arena
+    hardcore_duels:
+      inherit: duels_arena
+```
+
+---
+
+### Teams (auto-balance + party-aware)
+
+Applies to CTF and future TDM-style events. Algorithm:
+
+1. Collect all queued participants.
+2. Group by party — parties stay together.
+3. Sort parties descending by size. Assign each party to the smallest team so far (greedy pack).
+4. Remaining solo players fill the smaller team first.
+5. Resulting teams are named by colour (Red / Blue) and stored in `EventSession.teams`.
+
+Team members get coloured nametags (NameTagVisibility per team) and cannot damage teammates unless friendly fire is toggled on by staff.
+
+---
+
+### Capture the Flag — design
+
+| Element | Detail |
+|---------|--------|
+| Flags | 2 wool blocks (Red = RED_WOOL, Blue = BLUE_WOOL) placed at config positions on arena load |
+| Pickup | `PlayerInteractEvent` on flag block → pick up if enemy team, carry as item in hotbar slot 0 |
+| Carry | Carrier gets a Slowness I debuff + their name highlighted in scoreboard |
+| Capture | Walk into own flag base region while holding enemy flag item → score point, return flags |
+| Drop on death | `handleParticipantDeath` → drop flag item at death location, re-place if not picked up within 30s (`flag_return_seconds`) |
+| Win condition | First team to `ctf.win_score` captures (default 3); or most captures when time limit expires |
+| Time limit | Configurable (default 10 minutes) — `KothHandler`-style boss bar countdown |
+
+---
+
+### Live scoreboard + boss bar
+
+**Sidebar (all event types):**
+```
+§d§lEVENT §8» §fBloody Plains
+§8————————————
+§fYou:  §c3 kills  §70 deaths
+§8————————————
+§7Top:
+§e1. PlayerA §8— §c7
+§e2. PlayerB §8— §c5
+§e3. You     §8— §c3
+§8————————————
+§7Status: §aRunning
+```
+
+**KOTH / CTF boss bar:**
+- KOTH: `§6PlayerA §7is holding §8| §f87s §7remaining`
+- CTF: `§cRed §72  §8vs  §92  §bBlue §8| §f8:34 §7remaining`
+- HC: `§c§lHARDCORE — §f5 §7players remain`
+
+Boss bar is updated every second via a `BukkitRunnable`. Clears when event ends.
+
+---
+
+### Rewards
+
+| Place | Coins | XP | Item reward |
+|-------|-------|-----|-------------|
+| 1st (winner / winning team) | `coinReward` from spec | `xpReward` from spec | Optional — staff sets `itemReward` item when opening the event. Stored as Base64 NBT string in `EventSpec`. |
+| 2nd (if FFA / CTF) | 50% of coinReward | 50% of xpReward | None |
+| 3rd | 25% of coinReward | 25% of xpReward | None |
+| Participation (joined but didn't win) | 20 coins | 200 XP | None |
+
+Rewards are distributed in `finalizeEvent()` which already fires `AuditLogService.log()`. XP is raw Bukkit XP (`player.giveExp(xpReward)`).
+
+For HC events the winner also gets auto-unlocked cosmetics (Blood Champion banner — deferred to §H2 Exclusive Event Skins feature).
+
+---
+
+### Spectator mode (polish)
+
+Eliminated players in non-HC events:
+- Set to `GameMode.SPECTATOR` immediately on respawn (already implemented).
+- `player.spectatorTarget` not forced — player can fly around the arena freely.
+- Cannot interact with any blocks or entities (SPECTATOR enforces this).
+- On event end → restored to pre-event inventory + teleported to their return location.
+- No spectator chat channel (silent spectate only, as decided).
+
+Non-participant spectators (players not in the event who want to watch):
+- `/event spectate` — teleports to arena as SPECTATOR. Added to a `spectatorVisitors` set in `EventSession`.
+- Restored to their original location + gamemode on `/event leave` or event end.
+- Gated at `helper+` (any staff can spectate; players cannot).
+
+---
+
+### Commands (unchanged interface, extended)
+
+| Command | Rank | Change |
+|---------|------|--------|
+| `/event open <kind> [arena]` | Admin | Extended: optional arena key; if omitted uses first configured arena for that kind |
+| `/event join` | All | No change in UX — countdown starts automatically when minPlayers met |
+| `/event join confirm` | All | HC warning confirmation — bypass rate-limiter already done |
+| `/event leave` | All | New: works during LOBBY_COUNTDOWN phase too; removes from queue |
+| `/event start` | Admin | Now renamed `/event forcestart` internally (alias kept); skips countdown if in LOBBY_COUNTDOWN |
+| `/event stop` | Admin | No change |
+| `/event spectate` | Helper | New: teleport to arena as spectator without joining |
+| `/event info` | All | New: shows current event kind, arena, participant count, current score/status |
+| `/event setreward <coins> <xp> [item]` | Admin | New: override reward for the current open event spec. Item = item in hand |
+| `/event arenas` | Admin | New: lists all configured arenas for all event kinds |
+
+Tab completion shows arena keys to admins, hides staff-only subcommands from players.
+
+---
+
+### Migration requirements
+
+No new DB migrations required. The rewrite is purely in-memory during an event session. Stats (`event_wins`, `kills`, `deaths`) are written via existing `PlayerProfileDAO` paths — no schema changes.
+
+If future per-event-type leaderboards are added, a new `V0XX__event_stats.sql` will be required. That is explicitly **deferred** from this overhaul — keeping the stats surface unchanged was a design decision.
+
+---
+
+### Wiring plan (new files)
+
+| File | Action |
+|------|--------|
+| `core/eventmode/EventEngine.java` | New — central coordinator, replaces god-class logic |
+| `core/eventmode/EventState.java` | New — state enum |
+| `core/eventmode/EventSession.java` | New — live session snapshot |
+| `core/eventmode/EventArenaRegistry.java` | New — reads config.yml arenas block |
+| `core/eventmode/ArenaConfig.java` | New — record |
+| `core/eventmode/team/TeamEngine.java` | New — auto-balance algorithm |
+| `core/eventmode/team/Team.java` | New — record |
+| `core/eventmode/handler/EventHandler.java` | New — interface |
+| `core/eventmode/handler/FfaHandler.java` | New |
+| `core/eventmode/handler/KothHandler.java` | New |
+| `core/eventmode/handler/DuelsHandler.java` | New |
+| `core/eventmode/handler/CtfHandler.java` | New (CTF) |
+| `core/system/EventModeManager.java` | Gutted to thin façade; all public methods delegate to `EventEngine` |
+| `core/system/EventModeCombatListener.java` | No external change — calls same `EventModeManager` API |
+| `config.yml` | Add `events.arenas.*` block |
+
+**EventModeManager stays as the public façade** — this is non-negotiable. Every other system in the plugin calls into it and we are not doing a mass refactor.
+
+---
+
+### Session plan (implementation order)
+
+| Step | What | Risk |
+|------|------|------|
+| 1 | `EventEngine`, `EventState`, `EventSession`, `EventSpec` — skeleton with no logic | Zero — nothing wired yet |
+| 2 | `EventArenaRegistry` + `ArenaConfig` — loads from config.yml, logs missing arenas as WARNINGs | Zero |
+| 3 | `EventModeManager` converted to façade — all existing method bodies moved into `EventEngine` | Medium — must pass all existing tests manually |
+| 4 | `EventHandler` interface + `FfaHandler`, `KothHandler`, `DuelsHandler` implementing current logic | Medium — HC variants included here |
+| 5 | Lobby countdown system — `EventState.LOBBY_COUNTDOWN`, boss bar countdown, forcestart | Low |
+| 6 | `TeamEngine` + `Team` — auto-balance with party cohesion | Low (used by CTF only initially) |
+| 7 | `CtfHandler` — flag placement, pickup, carry, capture, return-on-death | High (new logic) |
+| 8 | Live scoreboard lines — `EventHandler.getScoreboardLines()` fed into `ServerScoreboardManager` | Low |
+| 9 | `/event spectate`, `/event info`, `/event setreward`, `/event arenas` commands | Low |
+| 10 | Reward: XP + optional item via `setreward` | Low |
+| 11 | Arena spawn teleport on event start (replace current hardcoded warp) | Medium |
+| 12 | Full manual test cycle on all existing event kinds before CTF | Critical |

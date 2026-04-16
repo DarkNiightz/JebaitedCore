@@ -35,12 +35,12 @@ public class EventModeCombatListener implements Listener {
             event.setDeathMessage(null);
         }
 
-        // Force auto-respawn after 3 ticks — gives the client time to process the death; prevents ghost entity / stuck death screen
+        // Force auto-respawn after 1 tick — enough for the death packet to process without a visible death screen.
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline() && player.isDead()) {
                 player.spigot().respawn();
             }
-        }, 3L);
+        }, 1L);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

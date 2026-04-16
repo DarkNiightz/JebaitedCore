@@ -91,7 +91,11 @@ public class CommandSecurityListener implements Listener {
             return;
         }
 
-        if (!bypass && shouldThrottle(player, resolved)) {
+        // HC event confirmation bypass: player already saw the warning, allow the confirm click
+        // even if it arrives within the normal 600 ms anti-spam window.
+        boolean isHcConfirm = "event".equals(resolved)
+                && raw.toLowerCase(Locale.ROOT).matches("(?i)^/event\\s+join\\s+confirm\\b.*");
+        if (!bypass && !isHcConfirm && shouldThrottle(player, resolved)) {
             event.setCancelled(true);
             sendThrottle(player);
         }

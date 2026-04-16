@@ -51,7 +51,7 @@ public class PvCommand implements CommandExecutor, TabCompleter {
             if (!isPageNumber) {
                 // Staff inspection: /pv <player> [page]
                 PlayerProfile staffProfile = plugin.getProfileStore().get(player.getUniqueId());
-                if (staffProfile == null || !plugin.getRankManager().isAtLeast(staffProfile.getPrimaryRank(), "moderator")) {
+                if (staffProfile == null || !plugin.getRankManager().isAtLeast(staffProfile.getPrimaryRank(), "helper")) {
                     player.sendMessage(Messages.prefixed("§cYou don't have permission to inspect other players' vaults."));
                     return true;
                 }
@@ -103,8 +103,8 @@ public class PvCommand implements CommandExecutor, TabCompleter {
             List<String> completions = new ArrayList<>();
             // Page numbers for own vault
             StringUtil.copyPartialMatches(args[0], List.of("1", "2", "3"), completions);
-            // Player names for staff inspection (moderator+)
-            if (profile != null && plugin.getRankManager().isAtLeast(profile.getPrimaryRank(), "moderator")) {
+            // Player names for staff inspection (helper+)
+            if (profile != null && plugin.getRankManager().isAtLeast(profile.getPrimaryRank(), "helper")) {
                 for (Player online : Bukkit.getOnlinePlayers()) {
                     if (!online.getUniqueId().equals(player.getUniqueId())) {
                         StringUtil.copyPartialMatches(args[0], List.of(online.getName()), completions);

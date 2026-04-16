@@ -85,6 +85,8 @@ public class GraveManager {
 
     public Grave createNormalGrave(Player owner, Location deathLoc, List<ItemStack> contents) {
         if (owner == null || deathLoc == null || contents == null || contents.isEmpty()) return null;
+        // Never create graves for event participants — their inventory is managed by EventModeManager.
+        if (plugin.getEventModeManager() != null && plugin.getEventModeManager().isParticipant(owner)) return null;
         Location placed = findPlacement(deathLoc);
         if (placed == null || placed.getWorld() == null) return null;
 

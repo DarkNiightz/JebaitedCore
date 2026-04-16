@@ -72,24 +72,46 @@ public class PrivateVaultManager {
 
     private CompletableFuture<Inventory> getOrCreateVaultForStaff(UUID targetUUID, int page, int maxPages, boolean readOnly) {
         return CompletableFuture.supplyAsync(() -> {
-            // Load from database (bypasses the owner's live cache to avoid clobber)
-            byte[] data = dao.loadVaultPage(targetUUID, page);
             String label = readOnly ? "§6Vault §8[§7View-Only§8] §7Page " + (page + 1)
                                     : "§6Vault §8[§cEditable§8] §7Page " + (page + 1);
             Inventory inv = Bukkit.createInventory(
                     new com.darkniightz.core.gui.PrivateVaultHolder(page, maxPages, targetUUID, readOnly),
                     54, label);
 
-            if (data != null && data.length > 0) {
-                try {
-                    ItemStack[] items = ItemStack.deserializeItemsFromBytes(data);
-                    inv.setContents(items);
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Failed to deserialize vault page " + page + " for " + targetUUID);
+            // Prefer live owner cache so staff always sees the most current in-memory state
+            Map<Integer, Inventory> ownerCache = vaultCache.get(targetUUID);
+            Inventory liveInv = ownerCache != null ? ownerCache.get(page) : null;
+            if (liveInv != null) {
+                for (int i = 0; i < 45; i++) {
+                    inv.setItem(i, liveInv.getItem(i));
+                }
+            } else {
+                byte[] data = dao.loadVaultPage(targetUUID, page);
+                if (data != null && data.length > 0) {
+                    try {
+                        ItemStack[] items = ItemStack.deserializeItemsFromBytes(data);
+                        for (int i = 0; i < Math.min(45, items.length); i++) {
+                            inv.setItem(i, items[i]);
+                        }
+                    } catch (Exception e) {
+                        plugin.getLogger().warning("Failed to deserialize vault page " + page + " for " + targetUUID);
+                    }
                 }
             }
 
             addVaultBorder(inv, page, maxPages);
+
+            // Red border for read-only (helper inspection — clear signal, no interaction)
+            if (readOnly) {
+                ItemStack red = new ItemBuilder(Material.RED_STAINED_GLASS_PANE)
+                        .name("§c§lRead-Only View")
+                        .lore(java.util.List.of("§7You cannot modify this vault."))
+                        .build();
+                for (int i = 45; i < 54; i++) {
+                    inv.setItem(i, red);
+                }
+            }
+
             return inv;
         });
     }
@@ -102,12 +124,15 @@ public class PrivateVaultManager {
         }
 
         String donorRank = profile.getDonorRank();
-        if (donorRank == null) {
+        // Helper+ staff get access regardless of donor rank (1 page)
+        boolean isStaff = plugin.getRankManager() != null
+                && plugin.getRankManager().isAtLeast(profile.getPrimaryRank(), "helper");
+        if (donorRank == null && !isStaff) {
             player.sendMessage("§cPrivate Vaults are a donor feature only.");
             return;
         }
 
-        int maxPages = getMaxPages(donorRank);
+        int maxPages = donorRank != null ? getMaxPages(donorRank) : 1;
         int page = Math.max(0, Math.min(requestedPage, maxPages - 1));
 
         getOrCreateVault(player.getUniqueId(), page, maxPages).thenAccept(inventory -> {
@@ -176,6 +201,14 @@ public class PrivateVaultManager {
     public void saveVaultPage(UUID uuid, int page, Inventory inventory) {
         byte[] data = serializeInventory(inventory);
         dao.saveVaultPageAsync(uuid, page, data);
+        // Keep live cache in sync so the owner (if they re-open) sees the latest state
+        Map<Integer, Inventory> ownerCache = vaultCache.get(uuid);
+        if (ownerCache != null && ownerCache.containsKey(page)) {
+            Inventory cached = ownerCache.get(page);
+            for (int i = 0; i < 45; i++) {
+                cached.setItem(i, inventory.getItem(i));
+            }
+        }
     }
 
     /**
