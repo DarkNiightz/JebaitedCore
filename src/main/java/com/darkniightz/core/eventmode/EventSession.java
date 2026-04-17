@@ -63,8 +63,10 @@ public final class EventSession {
     public final Map<UUID, InventorySnapshot> spectatorSnapshots = new ConcurrentHashMap<>();
 
     // ── KOTH state ───────────────────────────────────────────────────────────
-    /** Seconds each player has held the KOTH hill this session. */
+    /** Cumulative seconds a player was the sole occupant of the hill (uncontested). */
     public final Map<UUID, Integer> kothSeconds = new ConcurrentHashMap<>();
+    /** Round-robin cursor for {@code /event setup koth addspawn} / YAML arena spawns. */
+    public final AtomicInteger kothSpawnCursor = new AtomicInteger(0);
 
     // ── HC loot pool ─────────────────────────────────────────────────────────
     public final List<ItemStack> hardcoreLootPool = new ArrayList<>();

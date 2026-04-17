@@ -39,6 +39,13 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
     }
     private static final List<String> KOTH_ACTIONS  = List.of("pos1", "pos2");
     private static final List<String> SPAWN_ACTIONS = List.of("addspawn", "clearspawns", "listspawns", "view");
+    /** Tab completions for {@code /event setup koth|hardcore_koth …}. */
+    private static final List<String> KOTH_SETUP_ACTIONS;
+    static {
+        List<String> k = new ArrayList<>(KOTH_ACTIONS);
+        k.addAll(SPAWN_ACTIONS);
+        KOTH_SETUP_ACTIONS = List.copyOf(k);
+    }
 
     private final EventModeManager eventModeManager;
     private final ProfileStore profiles;
@@ -300,15 +307,23 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
                 if ("hardcore".equals(type)) type = "hardcore_ffa";
 
                 if (KOTH_TYPES.contains(type)) {
-                    if (args.length < 3
-                            || (!"pos1".equals(args[2].toLowerCase(Locale.ROOT))
-                             && !"pos2".equals(args[2].toLowerCase(Locale.ROOT)))) {
+                    if (args.length < 3) {
                         sender.sendMessage(Messages.prefixed(
-                            "§eUsage: §f/" + label + " setup " + type + " <pos1|pos2>"));
+                                "§eUsage: §f/" + label + " setup " + type
+                                        + " <pos1|pos2|addspawn|clearspawns|listspawns|view [s]>"));
                         return true;
                     }
-                    var result = eventModeManager.setupKothPosition(p, "pos1".equals(args[2].toLowerCase(Locale.ROOT)));
-                    sender.sendMessage(Messages.prefixed(result.message()));
+                    String action = args[2].toLowerCase(Locale.ROOT);
+                    if ("pos1".equals(action) || "pos2".equals(action)) {
+                        var result = eventModeManager.setupKothPosition(p, "pos1".equals(action));
+                        sender.sendMessage(Messages.prefixed(result.message()));
+                        return true;
+                    }
+                    if (SPAWN_ACTIONS.contains(action)) {
+                        return handleArenaSetup(p, sender, label, type, action, args);
+                    }
+                    sender.sendMessage(Messages.prefixed(
+                            "§cUnknown action. Use §fpos1§c/§fpos2§c for the hill box, or §faddspawn§c/§fclearspawns§c/§flistspawns§c/§fview§c for player spawns."));
                     return true;
                 }
 
@@ -404,9 +419,9 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
 
     private void sendSetupHelp(CommandSender sender, String label) {
         sender.sendMessage(helpHeader("Event Setup  /" + label + " setup"));
-        sender.sendMessage(helpSection("KOTH  define the hill cuboid with two corners"));
-        sender.sendMessage(helpEntry(label, "setup koth",           "<pos1|pos2>",    "Standard KOTH hill corners"));
-        sender.sendMessage(helpEntry(label, "setup hardcore_koth",  "<pos1|pos2>",    "Hardcore KOTH hill corners"));
+        sender.sendMessage(helpSection("KOTH  hill cuboid (pos1/pos2) + ring spawns (addspawn…)"));
+        sender.sendMessage(helpEntry(label, "setup koth",           "<pos1|pos2|spawns…>", "Hill corners and/or player spawn ring"));
+        sender.sendMessage(helpEntry(label, "setup hardcore_koth",  "<pos1|pos2|spawns…>", "HC KOTH hill + spawns"));
         sender.sendMessage(helpSection("Arena  add/manage individual spawn points"));
         sender.sendMessage(helpEntry(label, "setup ffa",            "<addspawn|clearspawns|listspawns|view>", "FFA spawn points"));
         sender.sendMessage(helpEntry(label, "setup duels",          "<addspawn|clearspawns|listspawns|view>", "Duels spawn points"));
@@ -504,13 +519,13 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && "setup".equals(sub)) {
             String type = "hardcore".equals(arg1) ? "hardcore_ffa" : arg1;
             if (KOTH_TYPES.contains(type))
-                return StringUtil.copyPartialMatches(typing, KOTH_ACTIONS, new ArrayList<>());
+                return StringUtil.copyPartialMatches(typing, KOTH_SETUP_ACTIONS, new ArrayList<>());
             if (ARENA_TYPES.contains(type))
                 return StringUtil.copyPartialMatches(typing, SPAWN_ACTIONS, new ArrayList<>());
         }
 
         if (args.length == 4 && "setup".equals(sub)
-                && ARENA_TYPES.contains(arg1) && "view".equals(arg2)) {
+                && (ARENA_TYPES.contains(arg1) || KOTH_TYPES.contains(arg1)) && "view".equals(arg2)) {
             return StringUtil.copyPartialMatches(typing,
                 List.of("30", "60", "120"), new ArrayList<>());
         }

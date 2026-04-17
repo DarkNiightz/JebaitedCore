@@ -46,6 +46,10 @@ public final class EventEngine {
     public record ActionResult(boolean ok, String message) {}
 
     /** Immutable snapshot for V006 async DB writes after an event ends or is stopped. */
+    /**
+     * @param coWinners empty for a single winner ({@code winnerOrNull} only); non-empty means
+     *                  cosmetic coin reward is split evenly across this set (KOTH ties).
+     */
     private record EventPersistenceSnap(
             int sessionId,
             String eventType,
@@ -54,6 +58,7 @@ public final class EventEngine {
             Set<UUID> eliminated,
             Set<UUID> spectating,
             UUID winnerOrNull,
+            Set<UUID> coWinners,
             int rewardCoins,
             Map<UUID, Integer> kills,
             Map<UUID, Integer> deaths
@@ -271,7 +276,7 @@ public final class EventEngine {
      * Called when a participant receives damage that would be fatal.
      * The damage event has already been cancelled — the player is alive.
      * For FFA/Duels: mark eliminated, switch to SPECTATOR, schedule 5s end if last alive.
-     * For KOTH: strip HC loot if applicable, teleport to world spawn, player stays active.
+     * For KOTH: strip HC loot if applicable, teleport to arena spawns or SMP world spawn, stays active.
      */
     public synchronized void handleParticipantFatalDamage(Player player, Player killerOrNull) {
         if (player == null || session == null || session.state != EventState.RUNNING) return;
@@ -312,14 +317,16 @@ public final class EventEngine {
         }
 
         if (isKoth) {
-            // KOTH: not elimination — player respawns at world spawn and can still hold the hill
+            boolean haveSpawns = !getArenaSpawnsForSession(session).isEmpty();
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) return;
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
-                Location spawn = getWorldSpawn();
+                Location spawn = pickKothRespawnLocation(session);
                 if (spawn != null) player.teleport(spawn);
-                player.sendMessage(Component.text("☠ Eliminated from the hill! Respawning at world spawn.",
+                String dest = haveSpawns ? "a ring spawn." : "world spawn.";
+                player.sendMessage(Component.text(
+                        "☠ Knocked down! Respawning at " + dest,
                         NamedTextColor.RED));
             });
         } else {
@@ -443,7 +450,7 @@ public final class EventEngine {
         if (player == null) return new ActionResult(false, "§cOnly players can set arena spawns.");
         String arenaKey = normalizeArenaKey(arenaKeyRaw);
         if (!isValidArenaKey(arenaKey)) {
-            return new ActionResult(false, "§cArena setup only supports ffa/hardcore_ffa and duels/hardcore_duels.");
+            return new ActionResult(false, "§cArena setup only supports ffa, duels, and koth (hardcore variants map to ffa/duels/koth).");
         }
         Location loc = player.getLocation();
         List<Location> cached = spawnCache.computeIfAbsent(arenaKey, k -> new ArrayList<>());
@@ -474,7 +481,7 @@ public final class EventEngine {
     public synchronized ActionResult clearArenaSpawns(String arenaKeyRaw) {
         String arenaKey = normalizeArenaKey(arenaKeyRaw);
         if (!isValidArenaKey(arenaKey)) {
-            return new ActionResult(false, "§cArena setup only supports ffa/hardcore_ffa and duels/hardcore_duels.");
+            return new ActionResult(false, "§cArena setup only supports ffa, duels, and koth (hardcore variants map to ffa/duels/koth).");
         }
         spawnCache.put(arenaKey, new ArrayList<>());
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -743,7 +750,7 @@ public final class EventEngine {
         duelsHandler = new DuelsHandler(sharedFfa);
         kothHandler  = new KothHandler(plugin,
                 this::getKothCuboidForSession,
-                this::getWorldSpawn,
+                this::pickKothRespawnLocation,
                 this::onKothExpired);
         ctfHandler   = new CtfHandler(plugin);
     }
@@ -782,22 +789,32 @@ public final class EventEngine {
     // Called by KothHandler when its timer expires
     private synchronized void onKothExpired(EventSession s) {
         if (s != session || session.state != EventState.RUNNING) return;
-        UUID winner = session.kothSeconds.entrySet().stream()
-                .max(Comparator.comparingInt(Map.Entry::getValue))
+        int maxSec = session.kothSeconds.values().stream().max(Integer::compareTo).orElse(0);
+        List<UUID> tops = session.kothSeconds.entrySet().stream()
+                .filter(e -> e.getValue() == maxSec && maxSec > 0)
                 .map(Map.Entry::getKey)
-                .orElse(null);
-        if (winner == null && !session.active.isEmpty()) winner = session.active.iterator().next();
-        if (winner == null) {
-            broadcast("§7" + session.spec.displayName + " ended with no winner.");
-            EventPersistenceSnap snap = null;
-            if (session.persistenceSessionId > 0) {
-                snap = takePersistenceSnapshot(session, null, 0);
+                .sorted()
+                .toList();
+        if (tops.isEmpty()) {
+            UUID winner = session.active.isEmpty() ? null : session.active.iterator().next();
+            if (winner == null) {
+                broadcast("§7" + session.spec.displayName + " ended with no winner.");
+                EventPersistenceSnap snap = null;
+                if (session.persistenceSessionId > 0) {
+                    snap = takePersistenceSnapshot(session, null, 0);
+                }
+                clearState();
+                persistFinalizeFromSnapshotAsync(snap);
+                return;
             }
-            clearState();
-            persistFinalizeFromSnapshotAsync(snap);
+            finalizeEvent(winner, session.runtimeCoinReward, "won " + session.spec.displayName);
             return;
         }
-        finalizeEvent(winner, session.runtimeCoinReward, "won " + session.spec.displayName);
+        if (tops.size() == 1) {
+            finalizeEvent(tops.get(0), session.runtimeCoinReward, "won " + session.spec.displayName);
+            return;
+        }
+        finalizeKothTiedWinners(new ArrayList<>(tops), session.runtimeCoinReward);
     }
 
     private synchronized void beginEvent(EventSpec spec, boolean automated, String arenaKeyOrNull) {
@@ -915,6 +932,33 @@ public final class EventEngine {
                 durationSeconds = Math.max(30, session.resolvedArenaConfig.kothDurationSeconds());
             }
             session.endsAtMs = System.currentTimeMillis() + durationSeconds * 1000L;
+
+            boolean isHC = kind.isHardcore();
+            List<Location> ring = getArenaSpawnsForSession(session);
+            int si = 0;
+            for (UUID id : session.active) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                if (isHC) {
+                    if (!session.snapshots.containsKey(id)) {
+                        session.snapshots.put(id, InventorySnapshot.capture(p));
+                    }
+                    p.getInventory().clear();
+                    p.getInventory().setArmorContents(new ItemStack[4]);
+                    p.getInventory().setItemInOffHand(null);
+                    p.updateInventory();
+                } else {
+                    if (!session.snapshots.containsKey(id)) {
+                        session.snapshots.put(id, InventorySnapshot.capture(p));
+                    }
+                }
+                if (!ring.isEmpty()) {
+                    Location dest = ring.get(si % ring.size());
+                    if (dest != null) p.teleport(dest.clone());
+                    si++;
+                }
+            }
+
             getHandler(kind).onStart(session);
             startTickTask();
             // KOTH players stay in SMP — set DO_IMMEDIATE_RESPAWN there so the death screen is suppressed.
@@ -1048,6 +1092,45 @@ public final class EventEngine {
         persistFinalizeFromSnapshotAsync(pSnap);
     }
 
+    /** KOTH timer expiry with multiple leaders on uncontested time (coins + HC loot split). */
+    private synchronized void finalizeKothTiedWinners(List<UUID> winners, int rewardTotal) {
+        if (session == null || winners == null || winners.isEmpty()) return;
+        Collections.sort(winners);
+        EventSpec ended = session.spec;
+        session.state = EventState.ENDING;
+
+        LinkedHashSet<UUID> co = new LinkedHashSet<>(winners);
+        EventPersistenceSnap pSnap = takePersistenceSnapshot(session, winners.get(0), rewardTotal, co);
+
+        int n = winners.size();
+        int base = rewardTotal / n;
+        int rem = rewardTotal % n;
+        for (int i = 0; i < n; i++) {
+            int coins = base + (i < rem ? 1 : 0);
+            rewardWinner(winners.get(i), coins, ended.displayName + " tie");
+        }
+        writeEventStatsCoWinners(ended.key, winners);
+        restoreSnapshots();
+        restoreStaffSpectators();
+        if (ended.kind.isHardcore()) {
+            giveLootSplitToWinners(winners);
+        }
+        getHandler(ended.kind).onEnd(session);
+
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < winners.size(); i++) {
+            if (i > 0) names.append("§7, §a");
+            OfflinePlayer ow = Bukkit.getOfflinePlayer(winners.get(i));
+            String nm = ow.getName() != null ? ow.getName() : winners.get(i).toString().substring(0, 8);
+            names.append(nm);
+        }
+        broadcast("§d★ §fEvent Over: §d" + ended.displayName + " §7— §eTie §7— §a" + names
+                + " §8(+§6" + rewardTotal + " coins split§8)");
+
+        clearState();
+        persistFinalizeFromSnapshotAsync(pSnap);
+    }
+
     private synchronized void doStopEvent(String reason) {
         EventPersistenceSnap snap = null;
         if (session != null) {
@@ -1141,6 +1224,43 @@ public final class EventEngine {
         }
     }
 
+    /** Round-robin hardcore loot pool across tied KOTH winners (§21). */
+    private void giveLootSplitToWinners(List<UUID> winnerIds) {
+        if (session == null || session.hardcoreLootPool.isEmpty() || winnerIds == null || winnerIds.isEmpty()) {
+            return;
+        }
+        List<Player> online = new ArrayList<>();
+        for (UUID id : winnerIds) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline()) {
+                online.add(p);
+            }
+        }
+        if (online.isEmpty()) {
+            session.hardcoreLootPool.clear();
+            return;
+        }
+        List<ItemStack> pool = new ArrayList<>(session.hardcoreLootPool);
+        session.hardcoreLootPool.clear();
+        int wi = 0;
+        for (ItemStack item : pool) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            Player target = online.get(wi % online.size());
+            wi++;
+            Map<Integer, ItemStack> overflow = target.getInventory().addItem(item);
+            for (ItemStack leftover : overflow.values()) {
+                target.getWorld().dropItemNaturally(target.getLocation(), leftover);
+            }
+            target.updateInventory();
+        }
+        for (Player p : online) {
+            p.sendMessage(Component.text("⚔ ", NamedTextColor.GOLD)
+                    .append(Component.text("Tie win — you received a share of the hardcore loot pool.",
+                            NamedTextColor.YELLOW)));
+            p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 0.8f);
+        }
+    }
+
     private void rewardWinner(UUID winner, int reward, String eventDisplay) {
         if (!(plugin instanceof JebaitedCore core)) return;
         ProfileStore store = core.getProfileStore();
@@ -1176,7 +1296,32 @@ public final class EventEngine {
         }
     }
 
+    private void writeEventStatsCoWinners(String eventKey, Collection<UUID> winners) {
+        if (!(plugin instanceof JebaitedCore core)) return;
+        ProfileStore store = core.getProfileStore();
+        if (store == null || session == null) return;
+        Set<UUID> win = new HashSet<>(winners);
+        for (UUID id : session.active) {
+            boolean won = win.contains(id);
+            store.updateEventStats(id, eventKey, 1, won ? 1 : 0, won ? 0 : 1);
+            if (won) {
+                OfflinePlayer op = Bukkit.getOfflinePlayer(id);
+                PlayerProfile profile = store.getOrCreate(op, core.getRankManager().getDefaultGroup());
+                if (profile != null) {
+                    if (session.spec.kind.isHardcore()) profile.incEventWinsHardcore();
+                    else profile.incEventWinsCombat();
+                    store.saveDeferred(id);
+                }
+            }
+        }
+    }
+
     private EventPersistenceSnap takePersistenceSnapshot(EventSession s, UUID winnerOrNull, int rewardCoins) {
+        return takePersistenceSnapshot(s, winnerOrNull, rewardCoins, Set.of());
+    }
+
+    private EventPersistenceSnap takePersistenceSnapshot(EventSession s, UUID winnerOrNull, int rewardCoins,
+                                                       Set<UUID> coWinners) {
         int sid = s.persistenceSessionId;
         Map<UUID, Integer> kills = new HashMap<>();
         for (Map.Entry<UUID, AtomicInteger> e : s.eventKills.entrySet()) {
@@ -1190,6 +1335,7 @@ public final class EventEngine {
         if (arenaKey != null && arenaKey.isBlank()) {
             arenaKey = null;
         }
+        Set<UUID> tie = coWinners == null ? Set.of() : Set.copyOf(coWinners);
         return new EventPersistenceSnap(
                 sid,
                 s.spec.kind.name(),
@@ -1198,6 +1344,7 @@ public final class EventEngine {
                 new HashSet<>(s.eliminated),
                 new HashSet<>(s.spectating),
                 winnerOrNull,
+                tie,
                 rewardCoins,
                 kills,
                 deaths);
@@ -1226,18 +1373,36 @@ public final class EventEngine {
 
     private List<EventParticipantDAO.ParticipantRow> buildParticipantRows(EventPersistenceSnap snap) {
         List<EventParticipantDAO.ParticipantRow> rows = new ArrayList<>();
+        Set<UUID> tie = snap.coWinners();
+        boolean split = tie != null && !tie.isEmpty();
+        List<UUID> tieSorted = split ? tie.stream().sorted().toList() : List.of();
+        int nWin = tieSorted.size();
+        int totalReward = snap.rewardCoins();
+        int baseEach = split && nWin > 0 ? totalReward / nWin : totalReward;
+        int remExtra = split && nWin > 0 ? totalReward % nWin : 0;
+
         for (UUID pid : snap.active()) {
             int k = snap.kills().getOrDefault(pid, 0);
             int d = snap.deaths().getOrDefault(pid, 0);
             String result;
-            if (snap.winnerOrNull() != null && pid.equals(snap.winnerOrNull())) {
+            boolean won = split ? tie.contains(pid)
+                    : snap.winnerOrNull() != null && pid.equals(snap.winnerOrNull());
+            if (won) {
                 result = "WIN";
             } else if (snap.spectating().contains(pid) || snap.eliminated().contains(pid)) {
                 result = "SPECTATE";
             } else {
                 result = "LOSS";
             }
-            int coins = (snap.winnerOrNull() != null && pid.equals(snap.winnerOrNull())) ? snap.rewardCoins() : 0;
+            int coins = 0;
+            if (won) {
+                if (split) {
+                    int idx = tieSorted.indexOf(pid);
+                    coins = baseEach + (idx >= 0 && idx < remExtra ? 1 : 0);
+                } else {
+                    coins = totalReward;
+                }
+            }
             rows.add(new EventParticipantDAO.ParticipantRow(pid, k, d, result, coins, 0));
         }
         return rows;
@@ -1368,12 +1533,12 @@ public final class EventEngine {
 
     private String getEventDescription(EventSpec spec) {
         return switch (spec.kind) {
-            case KOTH          -> "Hold the hill the longest to win.";
+            case KOTH          -> "Earn the most uncontested hill time (sole player in zone) to win.";
             case FFA           -> "Free-for-all. Last player standing wins. Gear is restored on death.";
             case DUELS         -> "1v1 duel. Best of one. Gear is restored after the match.";
             case HARDCORE, HARDCORE_FFA  -> "Hardcore FFA — die and lose your items, last survivor claims the pool.";
             case HARDCORE_DUELS          -> "Hardcore duel — the loser drops everything to the winner.";
-            case HARDCORE_KOTH           -> "Hardcore KOTH — die and lose your items. Most hill time wins the loot pool.";
+            case HARDCORE_KOTH           -> "Hardcore KOTH — die and lose your items. Most uncontested hill time wins; ties split the loot pool.";
             case CTF           -> "Capture the Flag — steal the enemy flag and bring it to your base.";
             default            -> plugin.getConfig().getString("event_mode.events." + spec.key + ".description",
                                        "Compete to win " + spec.coinReward + " coins.");
@@ -1485,15 +1650,26 @@ public final class EventEngine {
         return List.of();
     }
 
+    /** Next KOTH respawn: DB/YAML arena spawns round-robin, else SMP {@link #getWorldSpawn()}. */
+    private Location pickKothRespawnLocation(EventSession s) {
+        if (s == null) return getWorldSpawn();
+        List<Location> spawns = getArenaSpawnsForSession(s);
+        if (spawns.isEmpty()) return getWorldSpawn();
+        int idx = Math.floorMod(s.kothSpawnCursor.getAndIncrement(), spawns.size());
+        Location loc = spawns.get(idx);
+        return loc != null ? loc.clone() : getWorldSpawn();
+    }
+
     private static String normalizeArenaKey(String arenaKeyRaw) {
         String key = normalizeEventKey(arenaKeyRaw);
         if ("duels".equals(key) || "hardcore_duels".equals(key)) return "duels";
         if ("ffa".equals(key) || "hardcore_ffa".equals(key) || "hardcore".equals(key)) return "ffa";
+        if ("hardcore_koth".equals(key)) return "koth";
         return key;
     }
 
     private static boolean isValidArenaKey(String normalised) {
-        return "ffa".equals(normalised) || "duels".equals(normalised);
+        return "ffa".equals(normalised) || "duels".equals(normalised) || "koth".equals(normalised);
     }
 
     // ── World helpers ─────────────────────────────────────────────────────────

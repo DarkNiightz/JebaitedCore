@@ -320,6 +320,9 @@ event_mode:
   koth:
     duration_seconds: 120
     world: "smp"
+    # Hill: /event setup koth pos1|pos2 (or arena_registry.<koth|hardcore_koth>.hill)
+    # Player spawns (ring around the hill): /event setup koth addspawn|listspawns|…
+    #   and/or event_mode.arena_registry.koth / hardcore_koth spawns: in YAML
     # Configure with /event setup koth pos1 and /event setup koth pos2
     # pos1:
     #   x: 0

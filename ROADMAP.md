@@ -34,7 +34,7 @@
 | **Homes** | Save and teleport to named home locations. Rank-based limits (pleb=1 up to grandmaster=unlimited). | ✅ Shipped |
 | **Warps** | Public server warps with optional entry fee. Listable via `/warps`. | ✅ Shipped |
 | **Random Teleport (RTP)** | Teleport to a safe random SMP location. Configurable radius. | ✅ Shipped |
-| **Events — KOTH** | King of the Hill: capture and hold a zone for 120 seconds to win. Coin reward. | ✅ Shipped |
+| **Events — KOTH** | King of the Hill: timed hill control in a configured zone; winner by hill rule (see §21 — evolving toward **uncontested** time). Coin reward. | ✅ Shipped |
 | **Events — FFA** | Free-for-All: last player standing wins. Coin reward. | ✅ Shipped |
 | **Events — Duels** | 1v1 combat events. Coin reward. | ✅ Shipped |
 | **Events — Hardcore** | HC_FFA, HC_DUELS, HC_KOTH: enter without inventory, permanent item loss on death, higher coin rewards. Exclusive win cosmetics (planned). | ✅ Shipped |
@@ -162,7 +162,7 @@ Replace inline-only staff commands with optional GUI: action picker, duration pr
 
 **3. Events overhaul + chat games separation (large — 3–4 sessions)**  
 **Shipped:** [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + [`ChatGameEngine`](src/main/java/com/darkniightz/core/eventmode/ChatGameEngine.java) — chat rounds run **in parallel** with combat [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java) (`/chatgame` / `cg`; config `chat_games.games` + `chat_games.automation`; word/quiz lists remain `event_mode.chat`). DB: `event_sessions.event_type` uses config keys `chat_math` / `chat_scrabble` / `chat_quiz`; [`ChatGamePanelNotifier`](src/main/java/com/darkniightz/core/eventmode/ChatGamePanelNotifier.java) → `{webpanel}/api/server/chat-game-event` (JSON: `type`, `serverId`, `configKey`, `displayName`, `sessionId`, `winnerUuid`, `rewardCoins`, `startedAt`, `endedAt`; header `X-Provision-Secret`).  
-**Still open:** **KOTH → parkour hill** redesign, hardcore loot pool GUI, `/loot`, `LootPoolManager`, `KothParkourHandler` — see existing `eventmode` package and ROADMAP §21 for migration hooks.
+**Still open:** **KOTH v2** — uncontested hill time + HC tie → split loot ([§21](#21-events-system-overhaul)); **Parkour race** — separate `EventKind`/handler (not hill reuse); plugin disable persist ([`EventParticipantDAO`](src/main/java/com/darkniightz/core/eventmode/EventParticipantDAO.java)); hardcore loot pool GUI, `/loot`, `LootPoolManager` — see `eventmode` package and §21.
 
 ---
 
@@ -2196,7 +2196,7 @@ These are **different event products**, not one mode replacing the other. Implem
 **KOTH (hill control)**
 
 - Setup: staff configure **player spawns** around the hill; **`pos1` / `pos2`** bound a hill region/volume (current registry patterns apply).
-- **Win metric:** longest **uncontested** control time inside that zone (dominance while no rival contest — not raw “standing on the block” only). Exact tick rules belong in handler docs when implemented.
+- **Win metric (implemented):** [`KothHandler.onTick`](src/main/java/com/darkniightz/core/eventmode/handler/KothHandler.java) awards +1s per second only when **exactly one** active participant is inside the hill cuboid; two or more on the hill = contested (no credit that second). Timer expiry: highest uncontested total wins; ties split cosmetic coins and HC loot per [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java).
 - Players **bring inventory** into the match.
 - **Normal mode:** respawn flows end with rewards; **no permanent item loss** for participants.
 - **Hardcore mode:** respawn remains inside the event; same uncontested-time metric decides the winner. **If top players tie** on that metric, **split the HC loot pool equally** among tied leaders.

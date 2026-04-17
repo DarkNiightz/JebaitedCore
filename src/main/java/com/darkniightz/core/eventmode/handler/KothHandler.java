@@ -13,19 +13,22 @@ import java.util.*;
 /**
  * Handles KOTH and Hardcore KOTH timer-based events.
  *
- * KOTH: Hill-holder accumulates seconds. Most seconds at time expiry wins.
- * HC_KOTH: Same scoring, but dying strips inventory (loot pool) and players
- *          respawn at world spawn — they can still accumulate hill time after respawn.
+ * <p><b>Uncontested rule:</b> each 1s tick, at most one active participant may be
+ * inside the hill cuboid. If exactly one player is in the zone, they earn +1s toward
+ * their total. If zero or two or more are in the zone, nobody earns that second
+ * (contested or empty hill). At time expiry, the highest uncontested total wins;
+ * hardcore ties at the top split the loot pool equally (see {@code EventEngine}).
  */
 public final class KothHandler implements EventHandler {
 
     private final Plugin plugin;
     private final SessionCuboidSupplier cuboidSupplier;
-    private final LocationSupplier worldSpawnSupplier;
+    /** Arena spawns when configured; otherwise engine falls back to SMP world spawn. */
+    private final SessionLocationSupplier respawnLocationSupplier;
     private final FinishCallback finishCallback;
 
     @FunctionalInterface public interface SessionCuboidSupplier { Cuboid get(EventSession session); }
-    @FunctionalInterface public interface LocationSupplier { Location get(); }
+    @FunctionalInterface public interface SessionLocationSupplier { Location get(EventSession session); }
     @FunctionalInterface public interface FinishCallback   { void onKothExpired(EventSession session); }
 
     /** Minimal axis-aligned bounding box for the KOTH hill. Auto-normalises min/max on construction. */
@@ -46,11 +49,11 @@ public final class KothHandler implements EventHandler {
     }
 
     public KothHandler(Plugin plugin, SessionCuboidSupplier cuboidSupplier,
-                       LocationSupplier worldSpawnSupplier, FinishCallback finishCallback) {
-        this.plugin              = plugin;
-        this.cuboidSupplier      = cuboidSupplier;
-        this.worldSpawnSupplier  = worldSpawnSupplier;
-        this.finishCallback      = finishCallback;
+                       SessionLocationSupplier respawnLocationSupplier, FinishCallback finishCallback) {
+        this.plugin                     = plugin;
+        this.cuboidSupplier             = cuboidSupplier;
+        this.respawnLocationSupplier    = respawnLocationSupplier;
+        this.finishCallback             = finishCallback;
     }
 
     @Override
@@ -81,12 +84,12 @@ public final class KothHandler implements EventHandler {
                 double hp = Math.max(1.0, Math.min(player.getMaxHealth(), 20.0));
                 player.setHealth(hp);
                 player.setFoodLevel(20);
-                Location spawn = worldSpawnSupplier.get();
+                Location spawn = respawnLocationSupplier.get(session);
                 if (spawn != null) player.teleport(spawn);
             } else {
                 if (snapshot != null) snapshot.restore(player);
                 else {
-                    Location spawn = worldSpawnSupplier.get();
+                    Location spawn = respawnLocationSupplier.get(session);
                     if (spawn != null) player.teleport(spawn);
                 }
             }
@@ -101,11 +104,16 @@ public final class KothHandler implements EventHandler {
         }
         Cuboid hill = cuboidSupplier.get(session);
         if (hill == null) return;
+        List<UUID> onHill = new ArrayList<>();
         for (UUID id : session.active) {
             Player p = Bukkit.getPlayer(id);
             if (p == null || !p.isOnline()) continue;
-            if (!hill.contains(p.getLocation())) continue;
-            session.kothSeconds.merge(id, 1, Integer::sum);
+            if (hill.contains(p.getLocation())) {
+                onHill.add(id);
+            }
+        }
+        if (onHill.size() == 1) {
+            session.kothSeconds.merge(onHill.get(0), 1, Integer::sum);
         }
     }
 
@@ -119,16 +127,21 @@ public final class KothHandler implements EventHandler {
         long remain = session.endsAtMs > 0
                 ? Math.max(0, (session.endsAtMs - System.currentTimeMillis()) / 1000L) : 0;
 
-        // Find current hill holder
+        // Who is on hill (contested if 2+)
         Cuboid hill = cuboidSupplier.get(session);
         String holder = "§7Nobody";
         if (hill != null) {
+            List<Player> on = new ArrayList<>();
             for (UUID id : session.active) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null && hill.contains(p.getLocation())) {
-                    holder = "§e" + p.getName();
-                    break;
+                    on.add(p);
                 }
+            }
+            if (on.size() == 1) {
+                holder = "§e" + on.get(0).getName();
+            } else if (on.size() > 1) {
+                holder = "§cContested §7(" + on.size() + ")";
             }
         }
 
@@ -137,14 +150,14 @@ public final class KothHandler implements EventHandler {
         sorted.sort(Map.Entry.<UUID, Integer>comparingByValue().reversed());
 
         List<String> lines = new ArrayList<>();
-        lines.add("§7Holder: " + holder);
-        lines.add("§7Time: §f" + remain + "s");
+        lines.add("§7Hill: " + holder);
+        lines.add("§7Match ends: §f" + remain + "s");
         for (int i = 0; i < Math.min(3, sorted.size()); i++) {
             UUID id = sorted.get(i).getKey();
             int secs = sorted.get(i).getValue();
             Player p = Bukkit.getPlayer(id);
             String name = p != null ? p.getName() : id.toString().substring(0, 6);
-            lines.add("§e" + (i + 1) + ". §f" + name + " §8— §a" + secs + "s");
+            lines.add("§e" + (i + 1) + ". §f" + name + " §8— §a" + secs + "s unc.");
         }
         return lines;
     }
