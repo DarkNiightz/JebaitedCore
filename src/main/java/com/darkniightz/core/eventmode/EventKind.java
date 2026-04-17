@@ -3,9 +3,6 @@ package com.darkniightz.core.eventmode;
 import java.util.Locale;
 
 public enum EventKind {
-    CHAT_MATH,
-    CHAT_SCRABBLE,
-    CHAT_QUIZ,
     KOTH,
     FFA,
     DUELS,
@@ -24,10 +21,6 @@ public enum EventKind {
         return this == FFA || this == DUELS || this == HARDCORE || this == HARDCORE_FFA || this == HARDCORE_DUELS;
     }
 
-    public boolean isChat() {
-        return this == CHAT_MATH || this == CHAT_SCRABBLE || this == CHAT_QUIZ;
-    }
-
     public boolean isKoth() {
         return this == KOTH || this == HARDCORE_KOTH;
     }
@@ -40,15 +33,13 @@ public enum EventKind {
                 || this == CTF;
     }
 
-    /** Parse a raw config/command key into an EventKind. */
+    /** Parse a raw config/command key into an EventKind (combat only; chat games use {@link ChatGameKind}). */
     public static EventKind fromKey(String raw) {
         if (raw == null) return OTHER;
+        if (ChatGameKeys.isChatGameConfigKey(raw)) {
+            return OTHER;
+        }
         return switch (raw.toLowerCase(Locale.ROOT).trim()) {
-            case "chat_math", "math", "chatmath"         -> CHAT_MATH;
-            case "chat_scrabble", "scrabble",
-                 "chat_anagram", "chat_word", "anagram",
-                 "word"                                  -> CHAT_SCRABBLE;
-            case "chat_quiz", "quiz", "question"         -> CHAT_QUIZ;
             case "koth"                                  -> KOTH;
             case "ffa", "lms"                            -> FFA;
             case "duels"                                 -> DUELS;

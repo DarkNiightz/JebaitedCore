@@ -1,6 +1,6 @@
 ﻿# JebaitedCore — Feature Roadmap
 
-> Last updated: April 2026 (P21 — Event death architecture overhaul shipped; `EntityDamageEvent` cancel approach proven; HC loot, 5-second end delay, spectator mode, snapshot restore all working; GraveListener/GraveManager event-world guards added)  
+> Last updated: April 2026 — Chat games parallel runtime: [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + `/chatgame`, config `chat_games`, panel `POST /api/server/chat-game-event`  
 > Package root: `com.darkniightz`  
 > All DB changes go through SchemaManager migrations (`src/main/resources/db/`).
 
@@ -96,7 +96,7 @@
 
 | # | Feature | Who Benefits | Priority | Status |
 |---|---------|-------------|----------|--------|
-| A | Donor Perk Commands (`/repair`, `/feed`, `/kit`, `/deathtp`) | Donor players | Next | Planned |
+| A | Donor Perk Commands (`/repair`, `/feed`, `/kit`, `/deathtp`) | Donor players | Shipped | ✅ Shipped |
 | B | MOTD / Login Summary | All players | Soon | Planned |
 | C | Server Boosters | All players | Soon | Planned |
 | D | Personal Boosters | Donor players | Soon | Planned |
@@ -116,6 +116,54 @@
 | O | [Multi-Server Network (Velocity)](#22-network-overhaul-full-velocity-network) | All players | Deferred | 🧱 Scaffold done (ServerType + NetworkManager stub) |
 | P | **Pre-Production Audit** — full codebase security pass (OWASP Top 10), messy code cleanup, dead code removal, SQL injection/XSS review, permission audit. Hard gate before v1.0 public release. | Dev | Before v1.0 | Planned |
 
+### Active P1 implementation backlog (tracked in repo plan)
+
+**Ongoing (process)** — not a one-time checkbox:
+
+| Item | Notes |
+|------|--------|
+| **Grafter: Settings + Debug** | On every feature/fix pass, review player **Settings** (`SettingKey`, category menus, persistence) and dev **Debug** (`DebugMenu`, `DebugFeedManager`, `DebugStateManager`)—see [`.cursor/skills/grafter/SKILL.md`](.cursor/skills/grafter/SKILL.md), section **Player and developer surfaces**. |
+| **Next theme pick (default)** | Continue **mcMMO wrapper parity** (`/mcability`, `/mccooldown`, `/ptp` when party TP is defined) in parallel with roadmap pillars: **events overhaul** ([§21](#21-events-system-overhaul)), **profile GUI** ([§6](#6-player-profile-overhaul-stats)), **shop** ([§17](#17-server-shop-shop)). |
+
+**Baseline shipped in code** — spot-check in staging when convenient (paths are authoritative):
+
+| Item | Where it lives |
+|------|----------------|
+| **Screen effects** | `PresentationPreference`, `SettingsCategoryMenu` — **Gameplay** → Screen effects (Full / Some / None). |
+| **Moderation matrix** | [`CommandSecurityListener`](src/main/java/com/darkniightz/core/system/CommandSecurityListener.java): helper `tempban`/`tempmute`; mod `ban`/`mute`; srmod `unban`/`unmute`. [`BanCommand`](src/main/java/com/darkniightz/core/commands/mod/BanCommand.java) / [`MuteCommand`](src/main/java/com/darkniightz/core/commands/mod/MuteCommand.java) + [`ModerationLimits`](src/main/java/com/darkniightz/core/moderation/ModerationLimits.java) (helper max **7 days** on temp actions). |
+| **Grave insurance** | [`GraveManager.isInsuredRank`](src/main/java/com/darkniightz/core/system/GraveManager.java) — donor **Legend+** only (not staff-alone; Diamond does not qualify). |
+| **Combat tag on death** | [`CombatTagListener.onDeath`](src/main/java/com/darkniightz/core/system/CombatTagListener.java) clears tag + message. |
+| **Scoreboard compact economy** | [`ServerScoreboardManager.compactNumber`](src/main/java/com/darkniightz/core/system/ServerScoreboardManager.java) for hub coins + SMP balance. |
+| **Private vault instant save** | [`PrivateVaultListener`](src/main/java/com/darkniightz/core/gui/PrivateVaultListener.java) `onInventoryClickSave` / `onInventoryDragSave` (monitor), not only on close. |
+| **mcMMO command ownership** | [`JebaitedCore.registerCommands`](src/main/java/com/darkniightz/main/JebaitedCore.java) → `reassertMcMMOCommandOwnership()` (`party`, `pa`, `p`, `inspect`, `mcinspect`, `mmoinspect`, `mcrank`, `mcstats`, `mctop`). |
+
+### Resolved quick wins (staging verification only)
+
+Former BUGS table — implementation is in place; only **in-game verification** (especially with mcMMO loaded) remains:
+
+| Topic | Verify |
+|-------|--------|
+| mcMMO `/party` + `/p` | Tab completes Jebaited behaviour after eviction. |
+| mcMMO `/compat` | Shows mcMMO version, live `getPowerLevel` bridge line, and `bridge_self_test` flag; follow the printed staging checklist. |
+| mcMMO `/mcstats`, `/mctop`, `/inspect`, `/mcrank` | Jebaited prefix + no `[mcMMO]`; `/inspect` requires a player argument. |
+| Graves / insurance copy | No Diamond-tier insurance; messaging in [`GraveManager`](src/main/java/com/darkniightz/core/system/GraveManager.java) / [`GraveListener`](src/main/java/com/darkniightz/core/system/GraveListener.java). |
+| Moderation ranks | Helpers cannot perm-ban or exceed 7d temp; mods/srmod gates as above. |
+| Scoreboard + PV | Compact numbers + click/drag save paths as linked. |
+
+### OVERHAULS (multi-session)
+
+**1. Combat tag polish (medium — 1–2 sessions)**  
+**Shipped:** tag clears on death + player message ([`CombatTagListener.onDeath`](src/main/java/com/darkniightz/core/system/CombatTagListener.java)); `/combatlogs` (+ `/combatlog`, `/ctag`) — [`CombatLogsCommand`](src/main/java/com/darkniightz/core/commands/CombatLogsCommand.java).  
+**Still open:** optional enter/exit messages; **party members exempt** from tagging each other; align **TP warmup** blocks with the combat-tag command gate in [`CombatTagListener`](src/main/java/com/darkniightz/core/system/CombatTagListener.java).  
+**mcMMO overlaps:** [`reassertMcMMOCommandOwnership`](src/main/java/com/darkniightz/main/JebaitedCore.java) runs on a short delay and when mcMMO enables — if another plugin still wins, check load order / `plugin.yml` `loadbefore` / soft-depend.
+
+**2. Moderation GUI overhaul (large — 2–3 sessions)**  
+Replace inline-only staff commands with optional GUI: action picker, duration presets, reasons via [`ChatInputService`](src/main/java/com/darkniightz/core/gui/ChatInputService.java), offender history from [`ModerationManager`](src/main/java/com/darkniightz/core/moderation/ModerationManager.java) / DB. New menus under `core/gui/`, `/mod` or `/staff` entry, moderator+ gate.
+
+**3. Events overhaul + chat games separation (large — 3–4 sessions)**  
+**Shipped:** [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + [`ChatGameEngine`](src/main/java/com/darkniightz/core/eventmode/ChatGameEngine.java) — chat rounds run **in parallel** with combat [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java) (`/chatgame` / `cg`; config `chat_games.games` + `chat_games.automation`; word/quiz lists remain `event_mode.chat`). DB: `event_sessions.event_type` uses config keys `chat_math` / `chat_scrabble` / `chat_quiz`; [`ChatGamePanelNotifier`](src/main/java/com/darkniightz/core/eventmode/ChatGamePanelNotifier.java) → `{webpanel}/api/server/chat-game-event` (JSON: `type`, `serverId`, `configKey`, `displayName`, `sessionId`, `winnerUuid`, `rewardCoins`, `startedAt`, `endedAt`; header `X-Provision-Secret`).  
+**Still open:** **KOTH → parkour hill** redesign, hardcore loot pool GUI, `/loot`, `LootPoolManager`, `KothParkourHandler` — see existing `eventmode` package and ROADMAP §21 for migration hooks.
+
 ---
 
 ## Feature Index (Detailed Design Docs)
@@ -130,7 +178,7 @@
 | 6 | [Player Profile Overhaul (/stats)](#6-player-profile-overhaul-stats) | Large | Planned |
 | 7 | [Graves Overhaul](#7-graves-overhaul) | Medium | Planned |
 | 8 | [Quest Lines](#8-quest-lines) | Large | Planned |
-| 9 | [Donor Rank Perks](#9-donor-rank-perks) | Large | Planned — next up |
+| 9 | [Donor Rank Perks](#9-donor-rank-perks) | Large | ✅ Core shipped — §9 perk ladder live; optional extras + panel polish ongoing |
 | 10 | [Settings Overhaul](#10-settings-overhaul) | Large | ✅ Shipped (P16) |
 | 11 | [MOTD / Login Summary](#11-motd--login-summary) | Medium | Planned |
 | 12 | [Rank Purchase / Upgrade Pipeline (Tebex)](#12-rank-purchase--upgrade-pipeline-tebex) | Medium | Deferred |
@@ -1347,15 +1395,26 @@ Players never see the underlying plugin branding. Every command that another plu
 - Register a matching `TabCompleter` on every wrapped command — never leave tab completion to the evicted plugin.
 - All wrapper commands follow the standard wiring checklist (class + plugin.yml + bind + PermissionConstants + SecurityListener).
 
-### mcMMO wrappers (planned)
-| Original command | Wrapper class | Notes |
+### mcMMO — version and staging
+- **Reference build:** upstream mcMMO **2.2.049** (API surface `com.gmail.nossr50.api.*`; bridge is reflection-only in [`McMMOIntegration`](src/main/java/com/darkniightz/core/system/McMMOIntegration.java)).
+- **Staging checklist:** `/compat` shows mcMMO enabled + version; leaderboard/stat UIs that use `mcmmo_level` show a number (not N/A everywhere); optional `integrations.mcmmo.bridge_self_test: true` logs a one-line `getPowerLevel` probe on enable.
+- **Alias conflicts (do not ignore):** mcMMO registers `mcstats` with alias `stats` — Jebaited **does not** register that alias so `/stats` stays the **server stats GUI**. mcMMO `partychat` aliases include `p` — Jebaited owns `/p` for **party chat** via the same eviction list as `/party`.
+
+### mcMMO wrappers (status)
+| Original command | Wrapper / handling | Status |
 |---|---|---|
-| `/mcstats` | `McStatsCommand` | Delegates to `McMMOIntegration`, formats output consistently |
-| `/mctop` | `McTopCommand` | Leaderboard-style output matching our `/leaderboard` format |
-| `/mcability` | Disable or no-op | Abilities toggled via Settings menu instead | - Jamie they can still use ./mcability but it would just show our prefix and message format rather than theres. Copy it word for word if needed just change the colours to match our theme.
-| `/party` | Reserved | Will conflict with our Party system — must evict mcMMO's `/party` | - Jamie our party 
-| `/ptp` | Reserved | Party teleport — will be part of our Party system |
-| `/inspect` | `InspectCommand` | Wrap mcMMO skill inspect, apply rank-color formatting |
+| `/party`, `/pa`, `/p` | [`PartyCommand`](src/main/java/com/darkniightz/core/commands/PartyCommand.java) + `reassertMcMMOCommandOwnership` | **Wrapped / evicted** |
+| `/mcstats` | [`McStatsCommand`](src/main/java/com/darkniightz/core/commands/McStatsCommand.java) | **Wrapped / evicted** (no `stats` alias) |
+| `/mctop` | [`McTopCommand`](src/main/java/com/darkniightz/core/commands/McTopCommand.java) | **Wrapped / evicted** |
+| `/mcrank` | [`McRankCommand`](src/main/java/com/darkniightz/core/commands/McRankCommand.java) | **Wrapped / evicted** |
+| `/inspect` | [`McInspectCommand`](src/main/java/com/darkniightz/core/commands/McInspectCommand.java) (`mcinspect`, `mmoinspect`) | **Wrapped / evicted** |
+| `/mcability`, `/mccooldown`, `/mcc` (if used), `/ptp`, `/xprate`, admin cmds | — | Pending / staff-only review |
+| `/mmoinfo`, `/mcmmo`, `/skillreset`, per-skill detail cmds | — | Pending |
+
+### mcMMO upstream command inventory (2.2.x `plugin.yml` — for diffs on upgrade)
+Use this row list when a new mcMMO JAR lands: diff its `commands:` against this set and update the wrapper table + [`JebaitedCore.MCMMO_OWNED_COMMANDS`](src/main/java/com/darkniightz/main/JebaitedCore.java) if new overlaps appear.
+
+`mmoxpbar`, `mmocompat`, `mmodebug`, `mmoinfo`, `xprate`, `mcmmo`, `mctop`, `mcrank`, `addxp`, `addlevels`, `mcability`, `mcrefresh`, `mccooldown`, `mcchatspy`, `mcgod`, `mcstats`, `mcremove`, `mmoedit`, `ptp`, `party`, `inspect`, `mmoshowdb`, `mcconvert`, `partychat`, `skillreset`, per-skill commands (`excavation`, `herbalism`, `mining`, `woodcutting`, `axes`, `archery`, … — see upstream file), plus any new entries in that release.
 
 ### Other plugins
 - Any plugin that registers `/home`, `/warp`, `/spawn`, `/tp` etc. must be evicted on enable — we already own those.
@@ -1363,7 +1422,7 @@ Players never see the underlying plugin branding. Every command that another plu
 
 | Plugin | Commands owned | Status |
 |---|---|---|
-| mcMMO | `/mcstats`, `/mctop`, `/party`, `/ptp`, `/mcability`, `/inspect`, `/mcc`, `/mcrank` | Pending wrap |
+| mcMMO | Core overlaps: `/party`, `/p`, `/inspect` (+aliases), `/mcrank`, `/mcstats`, `/mctop` (**Jebaited eviction + wrappers**); remaining mcMMO commands still use mcMMO handlers until wrapped | Partial — see table above |
 | EssentialsX (if added) | All `/tpa`, `/home`, `/spawn`, `/warp`, `/bal`, `/pay` etc. | Must evict — we own these |
 | Vault (if added) | No player-facing commands | OK |
 
@@ -1371,9 +1430,11 @@ Players never see the underlying plugin branding. Every command that another plu
 
 ## 15. Achievement / Milestone System (The Grind Bible)
 
-**Status:** Next — planning phase  
+**Status:** ✅ Shipped (P18) — design doc below is historical; canonical tables are in [`V001__base_schema.sql`](src/main/resources/db/V001__base_schema.sql) (`player_achievements`, `achievement_vouchers`); code in [`AchievementManager`](src/main/java/com/darkniightz/core/achievements/AchievementManager.java) and related classes.  
 **Size:** XL  
-**Dependencies:** V012 migration (new stat columns), existing `StatsTrackingListener`, `CosmeticsManager`, `PrivateVaultManager`, `GraveManager`
+**Dependencies:** (met) `StatsTrackingListener`, `CosmeticsManager`, `PrivateVaultManager`, [`GraveManager`](src/main/java/com/darkniightz/core/system/GraveManager.java)
+
+> **Note:** Sections below (SQL, class table, wiring checklist) mix original design intent with what shipped. When in doubt, trust `V001` + `migrations.index`, not draft migration names (`V012` / `V014`) in older paragraphs.
 
 ### Goal
 Pure stat-based progression for dedicated players. No items, no coins, no kits handed out — only unpurchasable cosmetic tags that prove real grind. Progress is tracked silently on every existing stat action. Milestones unlock special tags visible in `/tag` (Achievements tab) and Player Profile. Players can choose which 0–6 to display.
@@ -1396,35 +1457,11 @@ Hardcore winners receive exclusive limited-time wardrobe + placeable "Blood Cham
 
 ---
 
-### DB — `V014__achievements.sql`
+### DB (canonical)
 
-> ⚠️ V012 must ship first (adds `blocks_placed` + `distance_travelled` columns to `player_stats`).  
-> V013 is reserved for any intermediate changes between now and this feature.
+**Authoritative DDL:** [`V001__base_schema.sql`](src/main/resources/db/V001__base_schema.sql) (search for `player_achievements`, `achievement_vouchers`). No separate `V013__achievements.sql` / `V014__achievements.sql` exists in [`migrations.index`](src/main/resources/db/migrations.index) — those names were planning-era only.
 
-```sql
-CREATE TABLE IF NOT EXISTS player_achievements (
-    uuid            VARCHAR(36)  NOT NULL,
-    achievement_id  VARCHAR(64)  NOT NULL,
-    progress        BIGINT       NOT NULL DEFAULT 0,
-    unlocked_at     BIGINT,                          -- NULL = in progress, set on unlock
-    claimed_tag     BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (uuid, achievement_id),
-    FOREIGN KEY (uuid) REFERENCES players(uuid) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_achievements_uuid ON player_achievements(uuid);
-
-CREATE TABLE IF NOT EXISTS achievement_vouchers (
-    id              SERIAL PRIMARY KEY,
-    uuid            VARCHAR(36)  NOT NULL,
-    voucher_type    VARCHAR(64)  NOT NULL,           -- e.g. "coins_1000", "secret_cosmetic_tag"
-    granted_at      BIGINT       NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
-    redeemed        BOOLEAN      NOT NULL DEFAULT FALSE,
-    redeemed_at     BIGINT,
-    FOREIGN KEY (uuid) REFERENCES players(uuid) ON DELETE CASCADE
-);
-```
-
-Append both filenames to `migrations.index`.
+**Historical draft (superseded):** early docs proposed `unlocked_at` / `claimed_tag` columns; production uses `tier_reached`, `first_unlock_at`, `last_updated`, and voucher `tier` + `reward_type` / `reward_value`. Do not paste the old draft SQL into new migrations.
 
 ---
 
@@ -1439,7 +1476,7 @@ Append both filenames to `migrations.index`.
 | `core/gui/PlayerProfileMenu.java` | Add `ACHIEVEMENTS` tab; show unlocked tags with progress rings |
 | `core/gui/settings/AchievementDisplaySettingsPage.java` | Toggle which achievements to display (0–6 slots) |
 | `core/system/TagCustomizationManager.java` | Add `"Achievements"` category; hover text shows exact stat + unlock date |
-| `core/world/GraveManager.java` | Legend+ insurance (ttl=-1), auto-loot to vault on death |
+| `core/system/GraveManager.java` | Legend+ insurance (ttl=-1), auto-loot to vault on death |
 | `core/system/PrivateVaultManager.java` | 90% full warning, multi-page fallback logic for auto-vault |
 | `core/cosmetics/CosmeticsManager.java` | Generalized auto-equip for any wardrobe set (HC wins, future events) |
 
@@ -1589,21 +1626,19 @@ Keep this table updated whenever perks are added or changed. Used for pricing, w
 
 ---
 
-### Wiring Checklist
+### Wiring Checklist (P18 — core plugin)
 
-- [ ] `VNEXT__stat_columns.sql` — `blocks_placed INT DEFAULT 0` + `distance_travelled BIGINT DEFAULT 0` on `player_stats`; append to `migrations.index`
-- [ ] `V014__achievements.sql` — tables above; append to `migrations.index`
-- [ ] `AchievementDefinition`, `AchievementManager`, `AchievementListener` classes + JebaitedCore wiring
-- [ ] `AchievementsMenu` (54-slot GUI) + `PlayerProfileMenu` achievements tab
-- [ ] `AchievementDisplaySettingsPage` in Settings → Social
-- [ ] `TagCustomizationManager` — add Achievements category with hover stats
-- [ ] `StatsTrackingListener` — increment `blocks_placed` (BlockPlaceEvent) + `distance_travelled` (PlayerMoveEvent or PlayerStatisticIncrementEvent)
-- [ ] `GraveManager` — Legend/Grandmaster TTL override + `autoLootToVault` call
-- [ ] `PrivateVaultManager` — 90% full warning + multi-page fallback
-- [ ] `CosmeticsManager` — generalized `autoEquipSet()` method
-- [ ] `EventModeManager` — HC win handler → call `autoEquipSet` + give Blood Champion banner item
-- [ ] `ProfileStore.invalidate(uuid)` after achievement unlocks
-- [ ] Panel endpoint `/api/players/:uuid/achievements`
+- [x] Achievement tables in [`V001__base_schema.sql`](src/main/resources/db/V001__base_schema.sql) + [`migrations.index`](src/main/resources/db/migrations.index)
+- [x] `AchievementDefinition`, `AchievementDAO`, `AchievementManager`, `AchievementListener` + JebaitedCore wiring
+- [x] `AchievementsMenu` / `AchievementDetailMenu`, `AchievementsCommand`
+- [x] Settings → Social → achievement display (registry-driven; see `SettingKey` / achievements UI)
+- [x] `StatsTrackingListener` — stat hooks for achievement categories in config
+- [x] [`GraveManager`](src/main/java/com/darkniightz/core/system/GraveManager.java) — donor Legend+ insurance + `autoLootToVault`
+- [x] [`PrivateVaultManager`](src/main/java/com/darkniightz/core/system/PrivateVaultManager.java) — vault fill warning + auto-loot paths
+- [ ] `CosmeticsManager` — generalized `autoEquipSet()` for **exclusive HC/event wardrobe** (Blood Champion, etc.) — partial / event skins still on roadmap
+- [ ] `EventModeManager` — HC win → auto-equip + banner item (ties to **H2** Exclusive Event Skins)
+- [ ] Confirm `ProfileStore.invalidate(uuid)` after achievement/tier unlock if scoreboard/tab still stale (verify in code)
+- [ ] Panel endpoint `/api/players/:uuid/achievements` (web admin — separate repo)
 
 ---
 
@@ -2142,15 +2177,29 @@ The v1.0 tag is only cut after:
 - `restoreSnapshots()`: active players from `session.snapshots`; spectating/eliminated forced SURVIVAL then restored from `session.spectatorSnapshots`.
 
 **What's still planned (remaining work):**
-- `EventParticipantDAO` — write `event_sessions` row on open, upsert `event_participants` per kill/death, finalize both on event end (V006 tables exist, Java not wired yet)
-- `PartyManager` / `FriendDAO` — update `friendship_stats.party_time_ms` for each pair when a party disbands or member leaves (V006 column exists, Java not wired yet)
-- `EventArenaRegistry` + `ArenaConfig` — arena config from config.yml
-- Lobby countdown system (`LOBBY_COUNTDOWN` state, boss bar, forcestart)
-- `TeamEngine` + `Team` — auto-balance with party cohesion
-- `CtfHandler` — CTF event type
-- Live scoreboard lines via `EventHandler.getScoreboardLines()`
-- New commands: `/event spectate`, `/event info`, `/event setreward`, `/event arenas`
+- **Shipped (V006):** `event_sessions` / `event_participants` via [`EventParticipantDAO`](src/main/java/com/darkniightz/core/eventmode/EventParticipantDAO.java) + [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java); `friendship_stats.party_time_ms` via [`FriendDAO.addPartyTimeTogether`](src/main/java/com/darkniightz/core/system/FriendDAO.java) + [`PartyManager`](src/main/java/com/darkniightz/core/party/PartyManager.java).
+- **Shipped (arena + UX slice):** [`EventArenaRegistry`](src/main/java/com/darkniightz/core/eventmode/EventArenaRegistry.java) + [`ArenaConfig`](src/main/java/com/darkniightz/core/eventmode/ArenaConfig.java) (`event_mode.arena_registry` in `config.yml`); KOTH hill + duration from registry; DB spawns still override YAML when present; [`TeamEngine`](src/main/java/com/darkniightz/core/eventmode/team/TeamEngine.java) / [`Team`](src/main/java/com/darkniightz/core/eventmode/team/Team.java) (even split; party cohesion still TODO); [`CtfHandler`](src/main/java/com/darkniightz/core/eventmode/handler/CtfHandler.java) + [`CtfFlagListener`](src/main/java/com/darkniightz/core/eventmode/CtfFlagListener.java); live event lines in [`ServerScoreboardManager`](src/main/java/com/darkniightz/core/system/ServerScoreboardManager.java); `/event spectate` (helper+), `info`, `setreward`, `arenas`, `start <event> [arena]`.
+- Lobby countdown polish (boss bar tuning, `/event leave` during lobby edge cases)
+- **CTF follow-ups:** dropped-flag ground pickup, party-aware `TeamEngine`, HC-CTF rules, nametag colours
 - Blood Champion banner + exclusive HC win cosmetics (§H2)
+
+### Parkour vs KOTH — separate modes (design)
+
+These are **different event products**, not one mode replacing the other. Implementation should prefer a dedicated parkour kind/handler (or race session) rather than overloading today’s hill logic in [`KothHandler`](src/main/java/com/darkniightz/core/eventmode/handler/KothHandler.java); arena shape and spawns stay in [`ArenaConfig`](src/main/java/com/darkniightz/core/eventmode/ArenaConfig.java) / registry as they evolve.
+
+**Parkour race (friendly)**
+
+- Mass start from a shared line; checkpointed track with explicit **start** and **end** markers.
+- Optional: clear inventory before join; **PvP disabled** for the whole round.
+- Participants **vanished from each other** during the run so placement is unknown until finish (spectators/staff visibility TBD).
+
+**KOTH (hill control)**
+
+- Setup: staff configure **player spawns** around the hill; **`pos1` / `pos2`** bound a hill region/volume (current registry patterns apply).
+- **Win metric:** longest **uncontested** control time inside that zone (dominance while no rival contest — not raw “standing on the block” only). Exact tick rules belong in handler docs when implemented.
+- Players **bring inventory** into the match.
+- **Normal mode:** respawn flows end with rewards; **no permanent item loss** for participants.
+- **Hardcore mode:** respawn remains inside the event; same uncontested-time metric decides the winner. **If top players tie** on that metric, **split the HC loot pool equally** among tied leaders.
 
 ---
 
@@ -2380,7 +2429,7 @@ Tab completion shows arena keys to admins, hides staff-only subcommands from pla
 
 ### Migration requirements
 
-**V006 — shipped.** `event_sessions` + `event_participants` tables added. `friendship_stats.party_time_ms` column added.
+**V006 — shipped (schema + Java).** `event_sessions` + `event_participants` tables; `friendship_stats.party_time_ms`; runtime wiring in `EventParticipantDAO`, `EventEngine`, `FriendDAO` / `PartyManager`.
 
 Every completed event writes one `event_sessions` row (via `EventEngine.finalizeEvent()`) and one `event_participants` row per player (upserted during the event). This feeds Jebaited Wrapped (favourite event type, total events, event K/D, win streaks) and the web panel events dashboard.
 

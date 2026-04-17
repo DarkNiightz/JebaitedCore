@@ -1,10 +1,11 @@
 package com.darkniightz.core.eventmode;
 
+import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-
+import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Mutable live state for a single running event session.
  * Created when an event opens (OPEN state); discarded when it returns to IDLE.
@@ -26,6 +27,35 @@ public final class EventSession {
     /** Non-HC eliminated players spectating the remainder. */
     public final Set<UUID> spectating    = ConcurrentHashMap.newKeySet();
 
+    /** Staff (helper+) visiting via {@code /event spectate} — not participants. */
+    public final Set<UUID> spectatorVisitors = ConcurrentHashMap.newKeySet();
+    public final Map<UUID, SpectatorVisitState> spectatorVisitorState = new ConcurrentHashMap<>();
+
+    /** Arena row from {@code event_mode.arena_registry} (null = legacy DB / koth.yml only). */
+    public volatile String selectedArenaKey;
+
+    /** Live coin payout; staff may override with {@code /event setreward}. */
+    public volatile int runtimeCoinReward;
+
+    // ── CTF ───────────────────────────────────────────────────────────────────
+    public final Set<UUID> ctfTeamRed  = ConcurrentHashMap.newKeySet();
+    public final Set<UUID> ctfTeamBlue = ConcurrentHashMap.newKeySet();
+    public final AtomicInteger ctfRedScore  = new AtomicInteger(0);
+    public final AtomicInteger ctfBlueScore = new AtomicInteger(0);
+    public volatile UUID ctfRedFlagCarrier;
+    public volatile UUID ctfBlueFlagCarrier;
+    public volatile boolean ctfRedFlagAtBase = true;
+    public volatile boolean ctfBlueFlagAtBase = true;
+    public volatile Location ctfRedFlagDropLocation;
+    public volatile Location ctfBlueFlagDropLocation;
+    public volatile long ctfRedFlagReturnAtMs;
+    public volatile long ctfBlueFlagReturnAtMs;
+    /** Set by {@link com.darkniightz.core.eventmode.handler.CtfHandler} when win score reached; engine finalises. */
+    public volatile java.util.UUID ctfPendingWinnerUuid;
+
+    /** Resolved arena row for this run (set at launch). */
+    public volatile ArenaConfig resolvedArenaConfig;
+
     // ── Inventory snapshots ──────────────────────────────────────────────────
     /** Pre-event snapshot for active participants. */
     public final Map<UUID, InventorySnapshot> snapshots         = new ConcurrentHashMap<>();
@@ -39,25 +69,24 @@ public final class EventSession {
     // ── HC loot pool ─────────────────────────────────────────────────────────
     public final List<ItemStack> hardcoreLootPool = new ArrayList<>();
 
+    /** PostgreSQL {@code event_sessions.id}; 0 until async insert completes. */
+    public volatile int persistenceSessionId;
+
+    /** Per-player event combat stats (V006 {@code event_participants}). */
+    public final Map<UUID, AtomicInteger> eventKills  = new ConcurrentHashMap<>();
+    public final Map<UUID, AtomicInteger> eventDeaths = new ConcurrentHashMap<>();
+
     // ── Timing ───────────────────────────────────────────────────────────────
     /** Epoch-ms at which the KOTH timer (or CTF time limit) expires. */
     public volatile long endsAtMs           = 0L;
     /** Lobby countdown seconds remaining (decremented each tick). */
     public volatile int  countdownSecondsLeft = 0;
 
-    // ── Chat events ───────────────────────────────────────────────────────────
-    public volatile String chatAnswer;
-
     // ── State ─────────────────────────────────────────────────────────────────
     public volatile EventState state = EventState.IDLE;
 
     public EventSession(EventSpec spec) {
         this.spec = spec;
-    }
-
-    /** @return true if this is a chat-answer style event (Math/Scrabble/Quiz). */
-    public boolean isChatEvent() {
-        return spec.kind.isChat();
     }
 
     /** @return true if this event has a sign-up queue. */

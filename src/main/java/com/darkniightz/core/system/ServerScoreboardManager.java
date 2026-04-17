@@ -91,8 +91,8 @@ public class ServerScoreboardManager {
         boolean hub = worldManager.isHub(player);
         String resourceLabel = hub ? "Coins" : "Balance";
         String resourceValue = hub
-                ? "§6" + (profile != null ? profile.getCosmeticCoins() : 0)
-                : "§a$" + String.format(Locale.ROOT, "%.2f", profile != null ? profile.getBalance() : 0D);
+                ? "§6" + compactNumber(profile != null ? profile.getCosmeticCoins() : 0L)
+                : "§a$" + compactNumber(profile != null ? profile.getBalance() : 0D);
 
         int score = "minimal".equalsIgnoreCase(mode) ? 8 : 11;
         if (!"minimal".equalsIgnoreCase(mode)) {
@@ -102,6 +102,36 @@ public class ServerScoreboardManager {
         }
 
         objective.getScore("§fWorld: §a" + worldTag).setScore(score--);
+        if (plugin instanceof com.darkniightz.main.JebaitedCore jc && jc.getEventModeManager() != null) {
+            java.util.List<String> eventLines = jc.getEventModeManager().getEventScoreboardLines();
+            java.util.List<String> chatLines = jc.getEventModeManager().getChatGameScoreboardLines();
+            if ((eventLines != null && !eventLines.isEmpty()) || (chatLines != null && !chatLines.isEmpty())) {
+                objective.getScore("§3").setScore(score--);
+                int ex = 0;
+                if (eventLines != null) {
+                    for (String line : eventLines) {
+                        if (score <= 1) break;
+                        ChatColor pad = ChatColor.values()[ex++ % ChatColor.values().length];
+                        String unique = line + pad + ChatColor.RESET;
+                        if (unique.length() > 64) {
+                            unique = unique.substring(0, 64);
+                        }
+                        objective.getScore(unique).setScore(score--);
+                    }
+                }
+                if (chatLines != null) {
+                    for (String line : chatLines) {
+                        if (score <= 1) break;
+                        ChatColor pad = ChatColor.values()[ex++ % ChatColor.values().length];
+                        String unique = line + pad + ChatColor.RESET;
+                        if (unique.length() > 64) {
+                            unique = unique.substring(0, 64);
+                        }
+                        objective.getScore(unique).setScore(score--);
+                    }
+                }
+            }
+        }
         objective.getScore("§fPlayers: §a" + online).setScore(score--);
         objective.getScore("§1").setScore(score--);
         objective.getScore("§f" + resourceLabel + ": " + resourceValue).setScore(score--);
@@ -238,6 +268,10 @@ public class ServerScoreboardManager {
         if (safe >= 1_000_000D) return String.format(Locale.ROOT, "%.1fm", safe / 1_000_000D);
         if (safe >= 1_000D) return String.format(Locale.ROOT, "%.1fk", safe / 1_000D);
         return String.format(Locale.ROOT, "%.0f", safe);
+    }
+
+    private String compactNumber(long value) {
+        return compactNumber((double) Math.max(0L, value));
     }
 
     private ChatColor resolveColor(RankManager.RankStyle style) {

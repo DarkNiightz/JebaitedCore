@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
@@ -32,6 +33,15 @@ public class CombatTagListener implements Listener {
         if (attacker == null || attacker.getUniqueId().equals(victim.getUniqueId())) return;
 
         combatTags.tag(attacker, victim);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        if (!combatTags.isTagged(player)) return;
+        combatTags.clear(player);
+        player.sendMessage(com.darkniightz.core.Messages.prefixed(
+                "§aCombat tag cleared — you died."));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

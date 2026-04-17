@@ -178,7 +178,9 @@ public class CommandSecurityListener implements Listener {
                     || (donorRank != null && ranks.isAtLeast(donorRank, "gold"));
             case "kit" -> donorRank != null;
             case "kick", "warn", "staffchat", "history", "vanish", "notes", "whois", "generatepassword" -> ranks.isAtLeast(rank, "helper");
-            case "mute", "tempmute", "unmute", "ban", "tempban", "unban", "freeze", "slowmode" -> ranks.isAtLeast(rank, "moderator");
+            case "tempmute", "tempban" -> ranks.isAtLeast(rank, "helper");
+            case "mute", "ban", "freeze", "slowmode" -> ranks.isAtLeast(rank, "moderator");
+            case "unmute", "unban" -> ranks.isAtLeast(rank, "srmod");
             case "setrank" -> ranks.isAtLeast(rank, "srmod");
             case "setspawn", "eco", "setwarp", "delwarp", "setdonor", "worldstatus", "compat", "leaderboard", "previewpedestal", "maintenance" -> ranks.isAtLeast(rank, "admin");
             case "jreload", "debug", "devdebug", "devmode" -> ranks.isAtLeast(rank, "developer") || ranks.isAtLeast(rank, "admin");
@@ -220,9 +222,9 @@ public class CommandSecurityListener implements Listener {
             return defaultMs;
         }
         return switch (label.toLowerCase(Locale.ROOT)) {
-            case "worldstatus", "compat", "history", "whois", "balancetop", "leaderboard", "debug", "devdebug", "jreload" -> heavyMs;
+            case "worldstatus", "compat", "history", "whois", "balancetop", "leaderboard", "mctop", "mcrank", "debug", "devdebug", "jreload" -> heavyMs;
             case "generatepassword" -> externalMs;
-            case "trade", "coins", "balance", "stats", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay", "party", "pa", "p", "event", "achievements", "ach", "achieve", "back", "feed", "repair", "deathtp", "dtp", "enderchest", "ec", "craft", "anvil", "kit" -> Math.max(defaultMs, 600L);
+            case "trade", "coins", "balance", "stats", "mcstats", "inspect", "mcinspect", "mmoinspect", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay", "party", "pa", "p", "event", "chatgame", "cg", "achievements", "ach", "achieve", "back", "feed", "repair", "deathtp", "dtp", "enderchest", "ec", "craft", "anvil", "kit", "combatlogs", "combatlog", "ctag" -> Math.max(defaultMs, 600L);
             default -> defaultMs;
         };
     }

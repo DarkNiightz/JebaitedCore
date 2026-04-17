@@ -67,6 +67,12 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         return profile != null && ranks.isAtLeast(profile.getPrimaryRank(), "srmod");
     }
 
+    private boolean isHelper(Player p) {
+        if (devMode != null && devMode.isActive(p.getUniqueId())) return true;
+        var profile = profiles.getOrCreate(p, ranks.getDefaultGroup());
+        return profile != null && ranks.isAtLeast(profile.getPrimaryRank(), "helper");
+    }
+
     //  Command 
 
     @Override
@@ -102,6 +108,31 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if ("info".equals(sub)) {
+            sender.sendMessage(Messages.prefixed(eventModeManager.getEventInfoSummary()));
+            return true;
+        }
+
+        if ("spectate".equals(sub)) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(Messages.prefixed("§cOnly players can spectate."));
+                return true;
+            }
+            if (!isHelper(player)) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+            String spectSub = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "enter";
+            if ("leave".equals(spectSub) || "quit".equals(spectSub) || "exit".equals(spectSub)) {
+                var r = eventModeManager.staffSpectateLeave(player);
+                sender.sendMessage(Messages.prefixed(r.message()));
+            } else {
+                var r = eventModeManager.staffSpectateEnter(player);
+                sender.sendMessage(Messages.prefixed(r.message()));
+            }
+            return true;
+        }
+
         //  Staff gate: srmod+ 
         if (sender instanceof Player p && !isSrmod(p)) {
             sender.sendMessage(Messages.noPerm());
@@ -112,7 +143,8 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         boolean adminOnly = sub.equals("setup") || sub.equals("rebuildworld")
                 || sub.equals("resetworld") || sub.equals("wipeworld")
                 || sub.equals("tp") || sub.equals("teleport")
-                || sub.equals("world") || sub.equals("edit");
+                || sub.equals("world") || sub.equals("edit")
+                || sub.equals("setreward") || sub.equals("arenas");
         if (adminOnly && sender instanceof Player p && !isAdmin(p)) {
             sender.sendMessage(Messages.noPerm());
             return true;
@@ -153,8 +185,38 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
                     sendStartUsage(sender, label);
                     return true;
                 }
-                var result = eventModeManager.startEvent(args[1]);
+                var result = args.length >= 3
+                        ? eventModeManager.startEvent(args[1], args[2])
+                        : eventModeManager.startEvent(args[1]);
                 sender.sendMessage(Messages.prefixed(result.message()));
+                return true;
+            }
+
+            case "setreward" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Messages.prefixed("§eUsage: §f/" + label + " setreward <coins>"));
+                    return true;
+                }
+                try {
+                    int coins = Integer.parseInt(args[1]);
+                    var result = eventModeManager.setRuntimeCoinReward(coins);
+                    sender.sendMessage(Messages.prefixed(result.message()));
+                } catch (NumberFormatException ex) {
+                    sender.sendMessage(Messages.prefixed("§cCoins must be a number."));
+                }
+                return true;
+            }
+
+            case "arenas" -> {
+                List<String> lines = eventModeManager.listArenaRegistryLines();
+                if (lines.isEmpty()) {
+                    sender.sendMessage(Messages.prefixed("§7No arenas in §fevent_mode.arena_registry§7."));
+                } else {
+                    sender.sendMessage(Messages.prefixed("§dArena registry §8(" + lines.size() + ")"));
+                    for (String line : lines) {
+                        sender.sendMessage(Messages.prefixed(line));
+                    }
+                }
                 return true;
             }
 
@@ -320,16 +382,20 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(helpHeader("Event Control  /" + label));
         sender.sendMessage(helpSection("Info"));
         sender.sendMessage(helpEntry(label, "status",               "",               "Current event state"));
+        sender.sendMessage(helpEntry(label, "info",                 "",               "Kind, arena, queue, participants"));
+        sender.sendMessage(helpEntry(label, "spectate",             "[leave]",        "Helper+ visit running event as spectator"));
         sender.sendMessage(helpEntry(label, "list",                 "",               "All configured events (clickable)"));
         sender.sendMessage(helpSection("Queue"));
         sender.sendMessage(helpEntry(label, "join",                 "",               "Join the event queue"));
         sender.sendMessage(helpEntry(label, "join confirm",         "",               "Confirm HC join  items at risk"));
         sender.sendMessage(helpEntry(label, "leave",                "",               "Leave the event queue"));
         sender.sendMessage(helpSection("Lifecycle  (srmod+)"));
-        sender.sendMessage(helpEntry(label, "start",                "<event>",        "Open lobby for a named event"));
+        sender.sendMessage(helpEntry(label, "start",                "<event> [arena]", "Open lobby (optional arena_registry key)"));
         sender.sendMessage(helpEntry(label, "stop",                 "",               "Stop the active event"));
         sender.sendMessage(helpEntry(label, "forcestart",           "",               "Skip lobby countdown"));
         sender.sendMessage(helpEntry(label, "complete",             "<name> [coins]", "Declare winner + optional coin override"));
+        sender.sendMessage(helpEntry(label, "setreward",            "<coins>",        "Override coin reward (running event)"));
+        sender.sendMessage(helpEntry(label, "arenas",               "",               "List YAML arena_registry entries"));
         sender.sendMessage(helpSection("Setup  (admin)"));
         sender.sendMessage(helpEntry(label, "setup",                "<type> ...",     "Arena/hill config  see /" + label + " setup"));
         sender.sendMessage(helpEntry(label, "tp",                   "",               "Teleport to event world"));
@@ -389,12 +455,23 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         String typing = args.length > 0 ? args[args.length - 1].toLowerCase(Locale.ROOT) : "";
 
         if (args.length == 1) {
-            List<String> opts = new ArrayList<>(List.of("join", "leave", "status"));
+            List<String> opts = new ArrayList<>(List.of("join", "leave", "status", "info"));
+            if (sender instanceof Player p) {
+                if (isHelper(p)) {
+                    opts.add("spectate");
+                }
+            }
             if (!(sender instanceof Player p) || isSrmod(p)) {
                 opts.addAll(List.of("list", "start", "stop", "forcestart",
-                                    "complete", "setup", "tp", "rebuildworld"));
+                                    "complete", "setup", "tp", "rebuildworld",
+                                    "setreward", "arenas"));
             }
             return StringUtil.copyPartialMatches(typing, opts, new ArrayList<>());
+        }
+
+        if (args.length == 2 && "spectate".equalsIgnoreCase(args[0])
+                && sender instanceof Player ph && isHelper(ph) && !isSrmod(ph)) {
+            return StringUtil.copyPartialMatches(typing, List.of("leave", "quit", "exit"), new ArrayList<>());
         }
 
         // All deeper completions require srmod+
@@ -436,6 +513,11 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
                 && ARENA_TYPES.contains(arg1) && "view".equals(arg2)) {
             return StringUtil.copyPartialMatches(typing,
                 List.of("30", "60", "120"), new ArrayList<>());
+        }
+
+        if (args.length == 3 && ("start".equals(sub) || "on".equals(sub) || "enable".equals(sub))) {
+            return StringUtil.copyPartialMatches(typing,
+                    eventModeManager.listArenaKeysForKind(arg1), new ArrayList<>());
         }
 
         return List.of();

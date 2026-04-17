@@ -52,8 +52,21 @@ public final class PermissionConstants {
     public static final String CMD_PARTY      = "jebaited.party.use";
     public static final String CMD_PARTY_CHAT = "jebaited.party.chat";
 
+    /** View own combat tag status (/combatlogs). */
+    public static final String CMD_COMBATLOG    = "jebaited.combatlog.use";
+
+    // ── mcMMO wrappers (optional soft-depend) ────────────
+    public static final String CMD_MCSTATS        = "jebaited.mcmmo.mcstats";
+    public static final String CMD_MCSTATS_OTHERS = "jebaited.mcmmo.mcstats.others";
+    public static final String CMD_MCTOP          = "jebaited.mcmmo.mctop";
+    public static final String CMD_MCINSPECT      = "jebaited.mcmmo.inspect";
+    public static final String CMD_MCRANK         = "jebaited.mcmmo.mcrank";
+
     // ── Achievements ─────────────────────────────────────
     public static final String CMD_ACHIEVEMENTS = "jebaited.achievements.use";
+
+    /** Optional extra gate for /chatgame staff actions (primary gate is srmod+ in {@link com.darkniightz.core.commands.ChatGameCommand}). */
+    public static final String CMD_CHATGAME = "jebaited.chatgame.use";
 
     // ── Donor Perks ──────────────────────────────────────
     public static final String CMD_BACK         = "jebaited.back.use";

@@ -1,6 +1,7 @@
 package com.darkniightz.core.gui;
 
 import com.darkniightz.core.Messages;
+import com.darkniightz.core.eventmode.ChatGameManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
@@ -216,6 +217,9 @@ public class PlayerProfileMenu extends BaseMenu {
             for (String key : cfg.getKeys(false)) {
                 merged.put(key, stored.getOrDefault(key, new PlayerProfileDAO.EventStatRecord(0, 0, 0)));
             }
+        }
+        for (String cgKey : ChatGameManager.chatGameStatKeys(plugin)) {
+            merged.putIfAbsent(cgKey, stored.getOrDefault(cgKey, new PlayerProfileDAO.EventStatRecord(0, 0, 0)));
         }
         for (var entry : stored.entrySet()) {
             merged.putIfAbsent(entry.getKey(), entry.getValue());

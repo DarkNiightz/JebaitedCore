@@ -20,11 +20,11 @@ import java.util.*;
 public final class KothHandler implements EventHandler {
 
     private final Plugin plugin;
-    private final CuboidSupplier cuboidSupplier;
+    private final SessionCuboidSupplier cuboidSupplier;
     private final LocationSupplier worldSpawnSupplier;
     private final FinishCallback finishCallback;
 
-    @FunctionalInterface public interface CuboidSupplier  { Cuboid get(); }
+    @FunctionalInterface public interface SessionCuboidSupplier { Cuboid get(EventSession session); }
     @FunctionalInterface public interface LocationSupplier { Location get(); }
     @FunctionalInterface public interface FinishCallback   { void onKothExpired(EventSession session); }
 
@@ -45,7 +45,7 @@ public final class KothHandler implements EventHandler {
         }
     }
 
-    public KothHandler(Plugin plugin, CuboidSupplier cuboidSupplier,
+    public KothHandler(Plugin plugin, SessionCuboidSupplier cuboidSupplier,
                        LocationSupplier worldSpawnSupplier, FinishCallback finishCallback) {
         this.plugin              = plugin;
         this.cuboidSupplier      = cuboidSupplier;
@@ -99,7 +99,7 @@ public final class KothHandler implements EventHandler {
             finishCallback.onKothExpired(session);
             return;
         }
-        Cuboid hill = cuboidSupplier.get();
+        Cuboid hill = cuboidSupplier.get(session);
         if (hill == null) return;
         for (UUID id : session.active) {
             Player p = Bukkit.getPlayer(id);
@@ -120,7 +120,7 @@ public final class KothHandler implements EventHandler {
                 ? Math.max(0, (session.endsAtMs - System.currentTimeMillis()) / 1000L) : 0;
 
         // Find current hill holder
-        Cuboid hill = cuboidSupplier.get();
+        Cuboid hill = cuboidSupplier.get(session);
         String holder = "§7Nobody";
         if (hill != null) {
             for (UUID id : session.active) {

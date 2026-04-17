@@ -4,6 +4,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.Plugin;
 
@@ -29,6 +30,10 @@ public class EventModeCombatListener implements Listener {
         if (player.getHealth() - event.getFinalDamage() > 0) return;
         // Cancel the killing blow — player stays alive, zero death screen, zero respawn dance
         event.setCancelled(true);
-        manager.handleParticipantFatalDamage(player);
+        Player killer = null;
+        if (event instanceof EntityDamageByEntityEvent by && by.getDamager() instanceof Player damager) {
+            killer = damager;
+        }
+        manager.handleParticipantFatalDamage(player, killer);
     }
 }

@@ -4,8 +4,10 @@ import org.bukkit.Location;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory data container for a single party.
@@ -21,6 +23,8 @@ public final class Party {
     /** UUIDs currently in party-chat-send mode (/p toggle). */
     private final Set<UUID> chatToggle    = new LinkedHashSet<>();
     private final long createdAt;
+    /** Epoch ms when each member joined this party (for {@code friendship_stats.party_time_ms}). */
+    private final Map<UUID, Long> memberJoinedAtMs = new ConcurrentHashMap<>();
 
     /** Whether party members can damage each other. Default: off. */
     private boolean friendlyFire = false;
@@ -37,6 +41,7 @@ public final class Party {
         this.leader    = leader;
         this.members.add(leader);
         this.createdAt = System.currentTimeMillis();
+        this.memberJoinedAtMs.put(leader, this.createdAt);
     }
 
     //  Immutable getters 
@@ -64,8 +69,26 @@ public final class Party {
 
     //  Mutations (package-private  PartyManager owns all state) 
 
-    void addMember(UUID uuid)          { members.add(uuid); pendingInvites.remove(uuid); }
-    void removeMember(UUID uuid)       { members.remove(uuid); chatToggle.remove(uuid); }
+    void addMember(UUID uuid) {
+        members.add(uuid);
+        pendingInvites.remove(uuid);
+        memberJoinedAtMs.put(uuid, System.currentTimeMillis());
+    }
+
+    void removeMember(UUID uuid) {
+        members.remove(uuid);
+        chatToggle.remove(uuid);
+        memberJoinedAtMs.remove(uuid);
+    }
+
+    long joinedAtMs(UUID uuid) {
+        return memberJoinedAtMs.getOrDefault(uuid, createdAt);
+    }
+
+    /** Snapshot of current members for party-time flush (ordered iteration). */
+    Set<UUID> memberSnapshot() {
+        return Set.copyOf(members);
+    }
     void addInvite(UUID uuid)          { pendingInvites.add(uuid); }
     void removeInvite(UUID uuid)       { pendingInvites.remove(uuid); }
     void setLeader(UUID uuid)          { this.leader = uuid; }

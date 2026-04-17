@@ -21,7 +21,7 @@ import java.util.Set;
  *   Row 1   [NOTIFICATIONS] [SOUNDS] [CHAT]
  *   Row 2   glass spacer
  *   Row 3   [SOCIAL] [EVENTS] [GAMEPLAY]
- *   Row 4   [RANK DISPLAY] donor only, centred
+ *   Row 4   [RANK DISPLAY] donor only, centred (screen effects live under Gameplay category)
  *   Row 5   glass border with [CLOSE] at slot 49
  *
  * Adding a category: add to SettingCategory, map a slot constant, add to
@@ -127,10 +127,18 @@ public class SettingsMenu extends BaseMenu {
         long enabled = keys.stream()
                 .filter(k -> profile.getPreference(k.key, k.defaultValue))
                 .count();
+        int totalSettings = keys.size();
+        if (category == SettingCategory.GAMEPLAY) {
+            totalSettings += 1;
+            String mode = profile.getScreenEffectsMode();
+            if (mode == null || !"none".equalsIgnoreCase(mode)) {
+                enabled += 1;
+            }
+        }
         List<String> lore = new ArrayList<>();
         lore.add(category.description);
         lore.add("");
-        lore.add("§7Settings: §f" + keys.size() + "  §8|  §7Active: §a" + enabled);
+        lore.add("§7Settings: §f" + totalSettings + "  §8|  §7Active: §a" + enabled);
         lore.add("");
         lore.add("§eClick to manage");
         return new ItemBuilder(category.material)

@@ -84,6 +84,12 @@ near:
   min_rank: vip
   radius: 200
 
+# Optional integrations (mcMMO is soft-depend — upgrade mcMMO on staging first; see README)
+integrations:
+  mcmmo:
+    # On enable, log a one-line getPowerLevel probe for the first online player (ops / staging)
+    bridge_self_test: false
+
 # Donor kits — cooldown applies to each kit independently
 # Valid range: 0 to 604800000 (7 days). Default is 86400000 (24 hours).
 kits:
@@ -206,7 +212,39 @@ bossbar:
     - "This is a test"
     - "Another Config TesTTTTTT"
 
+# Chat mini-games (parallel to combat /event). Word lists + quiz stay under event_mode.chat below.
+chat_games:
+  automation:
+    enabled: true
+    interval_seconds: 180
+  games:
+    chat_math:
+      enabled: true
+      display_name: "Chat Game: Math Question"
+      target_server: "SMP"
+      coin_reward: 50
+    chat_scrabble:
+      enabled: true
+      display_name: "Chat Game: Scrabble"
+      target_server: "SMP"
+      coin_reward: 35
+    chat_quiz:
+      enabled: true
+      display_name: "Chat Game: Quiz"
+      target_server: "SMP"
+      coin_reward: 40
+
 event_mode:
+  # Optional structured arenas (spawns + KOTH hill + CTF layout). DB spawns from /event setup still override YAML when present.
+  # See ROADMAP §21 for full schema. Keys under each list must be unique per kind.
+  arena_registry:
+    ffa: []
+    duels: []
+    koth: []
+    hardcore_koth: []
+    ctf: []
+  ctf:
+    duration_seconds: 600
   automation:
     enabled: true
   interval-seconds: 300
@@ -272,21 +310,13 @@ event_mode:
       coin_reward: 200
       min_players: 2
       max_players: 32
-    chat_scrabble:
-      enabled: true
-      display_name: "Chat Game: Scrabble"
+    ctf:
+      enabled: false
+      display_name: "Capture The Flag"
       target_server: "SMP"
-      coin_reward: 35
-    chat_math:
-      enabled: true
-      display_name: "Chat Game: Math Question"
-      target_server: "SMP"
-      coin_reward: 50
-    chat_quiz:
-      enabled: true
-      display_name: "Chat Game: Quiz"
-      target_server: "SMP"
-      coin_reward: 40
+      coin_reward: 120
+      min_players: 4
+      max_players: 16
   koth:
     duration_seconds: 120
     world: "smp"
