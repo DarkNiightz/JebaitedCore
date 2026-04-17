@@ -6,3 +6,4 @@ V002__schema_catchup.sql
 V003__homes_reshape.sql
 V004__donor_perks.sql
 V005__homes_column_fix.sql
+V006__event_persistence.sql

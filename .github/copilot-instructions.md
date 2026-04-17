@@ -14,7 +14,7 @@ This is a Paper 1.21.11 / Java 21 Minecraft plugin. These instructions are loade
 - **Web admin:** `C:\Users\jamie\Documents\Vibe Code\web-admin` — Node.js/Express, runs on port 3001
 - **Target:** Paper API `1.21.11-R0.1-SNAPSHOT`, Java 21, `api-version: 1.21` in plugin.yml
 - **DB:** HikariCP + PostgreSQL via `DatabaseManager` — always use try-with-resources, never open raw connections
-- **Migrations:** V001–V003 applied. Next available: **V004** (V001=base schema squash, V002=column catchup for pre-existing tables, V003=player_homes reshape). Old V004–V015 numbering in legacy notes is superseded — the migrations.index file is the authoritative order.
+- **Migrations:** V001–V006 applied. Next available: **V007**. V001 is a squashed base schema (all tables for a fresh install). V002=schema catch-up (ADD COLUMN IF NOT EXISTS for pre-squash DBs), V003=homes reshape, V004=donor perks (kit_cooldowns), V005=homes column fix, V006=event_sessions + event_participants + friendship_stats.party_time_ms. The `migrations.index` file is the authoritative order — **never assign a V-number from memory, always check the file first.**
 
 > ⚠️ **PATH RULE — NEVER VIOLATE:** The plugin repo lives at `C:\Users\jamie\Documents\Vibe Code\IdeaProjects\JebaitedCore`. It is NOT in OneDrive. Never reference, build from, or deploy from the OneDrive path. If you see the OneDrive path anywhere in build commands, file edits, or instructions — correct it immediately.
 
@@ -36,6 +36,11 @@ This is a Paper 1.21.11 / Java 21 Minecraft plugin. These instructions are loade
 | `core/system/` | Singleton managers + services |
 | `core/tracking/` | `StatsTrackingListener`, `CommandTrackingListener` |
 | `core/world/` | Spawn, graves, homes, warps, world routing |
+| `core/achievements/` | `AchievementManager`, `AchievementDefinition`, `AchievementListener`, `AchievementDAO` |
+| `core/friends/` | `FriendManager`, `FriendDAO`, `FriendCache`, `FriendListener` |
+| `core/party/` | `Party`, `PartyManager`, `PartyListener`, `PartyStatDAO` |
+| `core/eventmode/` | `EventEngine`, `EventState`, `EventSession`, `EventSpec`, `EventArenaRegistry`; handler sub-package: `FfaHandler`, `KothHandler`, `DuelsHandler` |
+| `core/settings/` | `SettingCategory`, `SettingKey` enums — registry pattern for all per-player settings |
 
 ## Rank ladder (descending power)
 `owner` → `developer` → `admin` → `srmod` → `moderator` → `helper` → `vip` → `builder` → `grandmaster` → `legend` → `diamond` → `gold` → `pleb`
@@ -81,6 +86,7 @@ try { AuditLogService.getInstance().log(actor, action, detail); } catch (Excepti
 6. **Prefix all player-visible messages with `Messages.prefix()`.** Never send bare text without the prefix.
 7. **Tab completion returns filtered, ranked `List<String>` — always call `StringUtil.copyPartialMatches(arg, options, new ArrayList<>())`** so partial input works correctly.
 8. **GUIs must open via `menu.open(player)`** — never `player.openInventory()` directly and never `MenuService.get().open()` with a freshly constructed menu. The inventory must be initialised before registration.
+9. **Persist player activity data to the DB — always.** If a feature produces any data that could feed Jebaited Wrapped (events, social interactions, party sessions, game outcomes, etc.), it **must** write to the database. Do not leave anything "in-memory only" that has a historical or analytical use. When in doubt about whether something should be persisted — **ask Jamie before implementing it as in-memory only**.
 
 ## Critical gotchas
 
@@ -98,12 +104,13 @@ try { AuditLogService.getInstance().log(actor, action, detail); } catch (Excepti
 12. **Permission strings in `PermissionConstants` only.** Never hardcode `"jebaited.x"` inline.
 13. **Schema changes go through `SchemaManager`.** Never add `ALTER TABLE` or `CREATE TABLE` inline in Java — not even in manager `init` methods. Create `src/main/resources/db/VXXX__description.sql` and append its filename to `migrations.index`. Migrations run exactly once and are tracked in `schema_migrations`. Fresh install gets the full schema from V001; existing DBs get only the delta they're missing. Any inline `ALTER TABLE` in Java will fail on existing servers where the column was already added by a prior migration — this is exactly what broke `player_homes` (inline ALTER referenced a column the old table never had).
 14. **Donor rank pipeline.** `SetDonorCommand` auto-elevates primary rank from pleb and sets `rankDisplayMode="donor"` on assignment. `SetRankCommand` does NOT reset `rankDisplayMode` when a donor rank exists. `SettingsMenu` slot 33 shows a rank display toggle only for players with a donor rank. `buildTabDisplay` uses `getDisplayRank()` not `getPrimaryRank()`.
-15. **Hardcore events.** `HARDCORE_FFA`, `HARDCORE_DUELS`, `HARDCORE_KOTH` are full EventKind values. Legacy config key `"hardcore"` routes to `HARDCORE_FFA`. HC_FFA/HC_DUELS are elimination-based; HC_KOTH is timer-based (die → lose items → respawn at worldSpawn → still score hill time). All HC kinds strip inventory and `giveLootToWinner` in `finalizeEvent`. Normal KOTH/FFA/Duels restore inventory on death.
+15. **Hardcore events.** `HARDCORE_FFA`, `HARDCORE_DUELS`, `HARDCORE_KOTH` are full EventKind values. Legacy config key `"hardcore"` routes to `HARDCORE_FFA`. HC_FFA/HC_DUELS are elimination-based; HC_KOTH is timer-based (die → lose items → respawn at worldSpawn → still score hill time). All HC kinds strip inventory and `giveLootToWinner` in `finalizeEvent`. Normal KOTH/FFA/Duels restore inventory on death. **Death is intercepted via `EntityDamageEvent` cancel (see gotcha #21) — players never actually die.**
 16. **`- Jamie` notes in ROADMAP.md.** When a feature description or section contains a comment ending in `- Jamie`, treat it as a design intent note from the author. Read it silently, improve on the idea, and present a before/after of the relevant ROADMAP text before implementing. Never skip these — they carry intentional direction.
 17. **Tab completion hygiene — always.** Every `CommandExecutor` needs a paired `TabCompleter`. Players must never see completions for commands or subcommands they can't use. Donor-only and staff-only subcommands must return an empty list (not `null`) for players below rank. `null` from a TabCompleter falls through to Bukkit's default behaviour and leaks online player names.
 18. **Evict plugin commands we own.** On `onEnable`, call `evictBuiltInCommand(name)` for every command we register that another plugin might also register (mcMMO's `/party`, `/ptp`, etc.). Check the Plugin Command Wrappers table (ROADMAP §14) before each session — add any new conflicts found.
 19. **No foreign branding in output.** Wrapped commands must never produce output from the underlying plugin. If the original plugin's method prints to chat, intercept it or use the plugin's API instead of calling the command handler directly.
 20. **Config validation at startup.** Any configurable value with a sane range must be validated in `onEnable`. Log a warning and use the default if out of range — never crash, never silently accept a stupid value.
+21. **NEVER use `PlayerDeathEvent` to handle event participant deaths.** The death packet is sent to the client *before* any handler runs — `DO_IMMEDIATE_RESPAWN`, `spigot().respawn()`, `setKeepInventory(true)`, and `setCancelled(true)` on `PlayerDeathEvent` all still show the death screen. The only working approach: cancel `EntityDamageEvent` when `player.getHealth() - event.getFinalDamage() <= 0` at `HIGHEST` priority. The player never reaches 0 HP → no death packet → no death screen. This is the proven architecture in `EventModeCombatListener`. Never revert to `PlayerDeathEvent` for event participants. Normal (SMP) players can still use the regular death pathway via `WorldChangeListener`.
 
 ## Build & deploy
 ```powershell
@@ -158,6 +165,8 @@ All obtained via `JebaitedCore.getInstance().getXxx()`:
 | `MaterialCompat` | Safe `Material.valueOf` with fallbacks for 1.21.x |
 | `SoundCompat` | Safe Sound enum resolution |
 | `McMMOIntegration` | Optional mcMMO hook — always check `isEnabled()` guard |
+| `NetworkManager` | Server-type awareness — `isHub()`, `isSmp()`, `getServerId()`, `isNetworkEnabled()`. When `network.enabled=false` (default), `isHub()` and `isSmp()` both return `true` (single-server passthrough). |
+| `ServerType` | Enum for `HUB`, `SMP`, `CREATIVE`, `PVP`, `MINIGAMES`, `UNKNOWN`. Use `ServerType.fromConfig(str)` for safe parsing. |
 
 ## Web admin panel — surface awareness
 
@@ -168,8 +177,11 @@ Pattern examples:
 - New economy transaction type → panel economy page needs the category
 - New moderation action → panel moderation log needs the type label
 - New quest/achievement → panel profile page needs a completion badge
+- New event outcome → `event_sessions` + `event_participants` rows must be written
 - New spawner data → panel spawner management page
 - Player shop listings → panel marketplace view
+
+**Rule: if it can appear in Jebaited Wrapped, it must be in the DB.** This includes but is not limited to: event sessions, party sessions, kills, deaths, social interactions, game outcomes, time-spent stats. Active in-memory state (current party members, live event participants) can stay memory — but the *record of it having happened* must be persisted. If unsure whether something needs DB persistence — **ask before implementing as in-memory only**.
 
 When implementing anything with a panel surface, note the following:
 ```
@@ -186,23 +198,22 @@ Data shape: <JSON example>
 |---|---|
 | ~~Next~~ | ~~Achievement / Milestone System — shipped P18~~ |
 | ~~Next~~ | ~~Graves overhaul — Grave Insurance (Legend/Grandmaster) — shipped P19~~ |
-| Next | Grave Insurance (Legend/Grandmaster) — ttl=-1, auto-loot to vault on death, 90% vault full warning, `/back` for Grandmaster |
+| ~~Next~~ | ~~Grave Insurance + /back — shipped P19~~ |
+| ~~Next~~ | ~~Event death screen fix + HC loot + 5-second end delay — shipped P21~~ |
 | Next | Exclusive Event Skins + Blood Champion banner — HC win wardrobe auto-unlock, placeable NBT banner, floating hologram |
 | Next | Graves overhaul — custom floating nametag (ArmorStand), donor auto-equip on loot, GraveNametagTask |
 | Next | Player Profile overhaul (/stats) — tabbed 54-slot GUI, friend/party/settings buttons |
-| Next | Donor perk commands — `/back`, `/repair`, `/feed`, `/near`, `/kit`, `/deathtp`, BackManager, KitManager |
+| Next | Donor perk commands — `/repair`, `/feed`, `/near`, `/kit`, `/deathtp`, KitManager. `/back` already shipped P19. |
 | Soon | MOTD / Login Summary — `MotdService`, per-player toggleable login summary, gated by `motd.*` settings keys |
 | Soon | Server/Personal Boosters — BoosterManager, BoosterListener, V007__boosters.sql, timed XP/drop multipliers |
-| Soon | Recruit-a-Friend — ReferralManager, V006__referrals.sql, qualifying playtime gate, cosmetic coin reward |
+| Soon | Recruit-a-Friend — ReferralManager, qualifying playtime gate, cosmetic coin reward |
 | Soon | Economy store + player shops — storefront GUI, listing DB table, PanelConnectorService push |
 | Soon | Custom TP/TPA/enchant/gamemode commands replacing Paper defaults |
-| Soon | PvP/Duels expansion — kit selection, coin/item reward chooser, scoreboard integration |
-| Soon | Spawner system — custom spawner ownership, GUI config, DB-backed |
 | ~~Next~~ | ~~Party system — shipped P15, overhauled P17~~ |
 | ~~After Party~~ | ~~Settings Overhaul — shipped P16~~ |
 | Deferred | Quest lines — multi-step quest engine, progress tracking, rewards |
 | Deferred | Custom items/enchants/attributes — NBT tags, ItemRegistry, attribute engine |
-| Deferred | Multi-server network layer — Velocity proxy, cross-server messaging via DB or Redis |
+| Deferred | Multi-server network layer (ROADMAP §22) — Velocity proxy, Redis real-time state, cross-server friends/party. **Scaffold done (P23):** `ServerType` enum + `NetworkManager` stub + `network:` config block added. `NetworkManager.isHub()` / `isSmp()` return `true` when `network.enabled=false` (passthrough). Full overhaul — feature gating, V016 migration, cross-server commands, Redis — done all-at-once when Velocity is ready. |
 | Deferred | McMMO stat streaming to leaderboard — currently polled, consider event-driven |
 
 ## Completed sessions
@@ -228,5 +239,6 @@ Data shape: <JSON example>
 | P17 | Party overhaul — Party.java (friendlyFire, open flag, warpLocation), PartyManager (join open party, toggleFF, toggleOpen, setWarp/clearWarp/warpToParty, clickable Adventure API invite, promote-on-disconnect, rank-colored names), PartyMenu full 54-slot GUI (member skulls, pending skulls, status strip, warp/FF/lock toggles, ChatInputService invite), PartyListener (tiered XP sharing by donor rank: gold=5%/64b, diamond=10%/96b, legend=15%/160b, grandmaster=25%/256b; FF prevention), PartyCommand (join/open/ff/setwarp/warp/clearwarp/gui added, clickable help). Bugfixes: SettingsMenu §-codes stripped, openCategory NPE (must call menu.open() not MenuService.open(new Menu())), plugin.yml missing friend/friends/fl/pv entries, /event blocked for plebs by CommandSecurityListener. |
 | P18 | Achievement / Milestone System — V013__achievements.sql (player_achievements + achievement_vouchers), AchievementDefinition (AchievementType enum + AchievementTier record), AchievementDAO (loadAll/upsert/upsertAll/grantVoucher), AchievementManager (cache + dirty flush, loadDefinitions from config with jar fallback, increment + tier unlock, tag/coins/cosmetic rewards), AchievementListener (join/quit cache lifecycle + kills/deaths/mobs/blocks/distance/fish events), AchievementsMenu (54-slot paginated, progress bar lore, next-tier reward, click→detail), AchievementDetailMenu (27-slot, green=done/lime=in-progress/red=locked mystery), AchievementsCommand (/achievements [player], helper+ view others), PermissionConstants CMD_ACHIEVEMENTS, plugin.yml aliases ach/achieve, CommandSecurityListener 600ms bucket, TagCustomizationManager.unlockAchievementTag(), config.yml achievements.categories (5 achievements: kills/blocks_broken/fish_caught/distance_travelled/playtime), SchemaManager.splitStatements() -- comment fix, V011 comment semicolon fix. Also fixed in P19: migrations.index was missing V013 entry. |
 | P19 | Grave Insurance + /back — migrations.index: added missing V013__achievements.sql entry; no V014 needed (grave insurance required no schema change). GraveManager: TTL_INSURED = Long.MAX_VALUE sentinel, isInsuredRank() (Legend/GM primary or donor rank), createNormalGrave sets ttl=-1 for insured players + calls triggerAutoLoot async, sendOwnerInfo shows insurance message vs countdown, startTracker shows ✦ Insured Grave bossbar without countdown. PrivateVaultManager: autoLootToVault() (async page-load → main-thread addItem → async save, returns overflow via Consumer callback), getVaultFillPercent() (cached pages only, -1 if uncached, 90% fill pre-warn). GraveListener.onDeath: records death location in BackManager for all SMP deaths. BackManager.java: in-memory last-death store (recordDeath/consumeDeathLocation/hasDeathLocation/clear). BackCommand.java: /back Grandmaster-only, checks combat tag + SMP world + hasDeathLocation, one-use via consumeDeathLocation. 5-place wiring: BackCommand class + plugin.yml + JebaitedCore.bindCommand("back") + PermissionConstants.CMD_BACK + CommandSecurityListener (canAccess grandmaster gate + 600ms cooldown bucket). |
-| P20 | Bug-fix pass — 10 in-game bugs fixed (teleport cancel on move LOW priority, death ghosting 3L tick delay, event join § codes, HC warning panel, /near+/pv hub block, staff PV inspection, devmode gamemode bypass, nether/end death routing, portal world routing). DB schema fixes: V002__schema_catchup.sql adds 8 missing columns to players, 7 to player_stats, recreates maintenance_whitelist. V003__homes_reshape.sql: renames uuid→player_uuid, name→home_name, world→world_name, adds yaw/pitch, converts created_at to BIGINT epoch ms, fixes PK. HomesManager initDatabase() stripped of all inline ALTER TABLE (violates migration rule). Server Shop design added to ROADMAP §17 with full pricing table, DB schema, and wiring checklist. Migration state reset: V001–V003 applied, V004 is next. |
-| P20 | Bug-fix pass + nether/end SMP treatment + instructions overhaul — Fixed 7 in-game bugs (teleport cancel on move via TeleportWarmupManager, SMP spawn persistence via V015__server_settings.sql + SpawnManager DB-backed, PV border slots removable + next-page arrow, /togglerank label fixes, event auto-start default=false, non-HC events keep inventory, ghost player after death). Fixed /achievements for regular players (removed permission hard-gate). Fixed SnakeYAML crash. Wired AchievementManager/DAO/Listener/Command into JebaitedCore (were entirely missing). Consolidated all startup INFO logs into a single boxed block with DB/worlds/services/migrations detail (startup logger filter + printStartupBlock). SchemaManager now returns MigrationResult record. WorldManager.isSmp() extended to cover smp_nether + smp_the_end (all SMP rules cascade automatically to nether/end). Startup block updated to show nether/end lazy-load status. Repo moved from OneDrive to C:\Users\jamie\Documents\Vibe Code\IdeaProjects\JebaitedCore. Instructions updated: path rule, quality/polish standards, migration state V016 next. |
+| P20 | Bug-fix pass + nether/end SMP treatment + instructions overhaul — Fixed 7 in-game bugs (teleport cancel on move via TeleportWarmupManager, SMP spawn persistence via SpawnManager DB-backed, PV border slots removable + next-page arrow, /togglerank label fixes, event auto-start default=false, non-HC events keep inventory, ghost player after death). Fixed /achievements for regular players. Fixed SnakeYAML crash. Wired AchievementManager/DAO/Listener/Command into JebaitedCore. Consolidated startup logs into boxed block. SchemaManager returns MigrationResult. WorldManager.isSmp() extended to cover smp_nether + smp_the_end. Repo moved from OneDrive to correct path. |
+| P21 | Event death architecture overhaul — Root cause: `PlayerDeathEvent` always sends death packet to client before any handler runs. **Solution:** `EventModeCombatListener` fully rewritten to a single `@EventHandler(priority=HIGHEST) onFatalDamage(EntityDamageEvent)` — cancels when `player.getHealth() - finalDamage <= 0` for any active participant. Player never dies → no death packet → no death screen. `EventEngine.handleParticipantFatalDamage(Player)`: FFA/Duels/HC → collect HC loot → move snapshot to spectatorSnapshots → set SPECTATOR next tick → call `checkAndScheduleEnd()`. KOTH/HC_KOTH → full heal → teleport to world spawn → player stays active. `checkAndScheduleEnd()`: if non-eliminated active ≤ 1 → ENDING state → 5-second countdown → `finalizeEvent`. `restoreSnapshots()` forces SURVIVAL before restoring spectating/eliminated players. `GraveListener` + `GraveManager`: return early for event participants and event world. Confirmed working in-game. |
+| P22 | Documentation + DB persistence fix — Corrected instructions: migration state was wrong (had V001–V015, actual state was V001–V005). Created **V006__event_persistence.sql**: `event_sessions`, `event_participants` tables + `friendship_stats.party_time_ms` column. Updated V001 squash schema to include new tables. Updated migrations.index. Added quality rule #9: persist everything that can appear in Wrapped. Fixed web panel surface awareness section. Updated ROADMAP §21 migration requirements and §16 Wrapped data sources. Java wiring for EventParticipantDAO and party_time_ms tracking is **pending next session**. |

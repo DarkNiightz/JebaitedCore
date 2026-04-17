@@ -180,6 +180,10 @@ public final class JebaitedCore extends JavaPlugin {
             }
             return true;
         });
+
+        // Network/server-type awareness — init early so every manager can call NetworkManager.getInstance()
+        com.darkniightz.core.system.NetworkManager.init(getConfig(), getLogger());
+
         this.panelConnectorService = new com.darkniightz.core.system.PanelConnectorService(this);
         this.opsAlertService = new OpsAlertService(this);
         this.minecraftVersionMonitor = new MinecraftVersionMonitor(this, this.opsAlertService);

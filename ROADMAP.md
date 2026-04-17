@@ -1,6 +1,6 @@
 ﻿# JebaitedCore — Feature Roadmap
 
-> Last updated: April 2026 (P22 — Events System Overhaul roadmap added §21; death screen 1L respawn fix; vault guard in createNormalGrave; helper+ PV access)  
+> Last updated: April 2026 (P21 — Event death architecture overhaul shipped; `EntityDamageEvent` cancel approach proven; HC loot, 5-second end delay, spectator mode, snapshot restore all working; GraveListener/GraveManager event-world guards added)  
 > Package root: `com.darkniightz`  
 > All DB changes go through SchemaManager migrations (`src/main/resources/db/`).
 
@@ -103,7 +103,7 @@
 | E | Recruit-a-Friend | All players | Soon | Planned |
 | F | Player Profile Overhaul (`/stats` tabbed GUI) | All players | Soon | Planned |
 | G | Graves Overhaul (nametag ArmorStand, donor auto-equip) | All players | Soon | Planned |
-| H | **Events System Overhaul** — full rewrite: per-event-type arenas, auto-countdown lobby, team auto-balance (party-aware), CTF, live sidebar + boss bar, coins+XP+item rewards, spectator mode polish | All players | **Next** | Planned |
+| H | **Events System Overhaul** — full rewrite: per-event-type arenas, auto-countdown lobby, team auto-balance (party-aware), CTF, live sidebar + boss bar, coins+XP+item rewards, spectator mode polish | All players | **Next** | 🔧 In Progress (death arch shipped P21) |
 | H2 | Exclusive Event Skins + Blood Champion Banner | Hardcore event winners | Soon | Planned |
 | I | **Server Shop** (`/shop`) — 9-category GUI, buy/sell, DB-backed prices | All players | Soon | Planned |
 | I2 | Player Shops — player-to-player storefronts | All players | Later | Planned |
@@ -113,7 +113,7 @@
 | L | Custom Enchants / Special Items | All players | Later | Deferred |
 | M | Temp Rank System | Staff / Admin | Later | Deferred |
 | N | Rank Purchase Pipeline (Tebex) | Donor players | Later | Deferred |
-| O | Multi-Server Network (Velocity) | All players | Deferred | Deferred |
+| O | [Multi-Server Network (Velocity)](#22-network-overhaul-full-velocity-network) | All players | Deferred | 🧱 Scaffold done (ServerType + NetworkManager stub) |
 | P | **Pre-Production Audit** — full codebase security pass (OWASP Top 10), messy code cleanup, dead code removal, SQL injection/XSS review, permission audit. Hard gate before v1.0 public release. | Dev | Before v1.0 | Planned |
 
 ---
@@ -139,7 +139,8 @@
 | 15 | [Achievement / Milestone System (The Grind Bible)](#15-achievement--milestone-system-the-grind-bible) | XL | ✅ Shipped (P18) |
 | 16 | [Jebaited Wrapped](#16-jebaited-wrapped) | Medium | Planned |
 | 17 | [Server Shop (`/shop`)](#17-server-shop-shop) | Large | Planned |
-| 21 | [Events System Overhaul](#21-events-system-overhaul) | XL | Planned — next up |
+| 21 | [Events System Overhaul](#21-events-system-overhaul) | XL | 🔧 In Progress — death arch shipped P21 |
+| 22 | [Network Overhaul (Full Velocity Network)](#22-network-overhaul-full-velocity-network) | XL | 🧱 Scaffold done — full overhaul deferred until Velocity ready |
 
 ---
 
@@ -1659,8 +1660,21 @@ Annual year-end stats showcase. Every player gets a personal "Wrapped" — top m
 - `WrappedManager` — queries all wrapped data async per UUID.
 - `WrappedCommand` — `/wrapped [year] [player]`, helper+ can view others.
 - `WrappedMenu` — 54-slot slideshow GUI, NEXT button advances through category slides.
-- No new migration needed — all data comes from existing tables scoped by year.
+- All data comes from existing tables (`player_stats`, `player_achievements`, `player_party_stats`, `event_sessions`, `event_participants`, `friendship_stats`) scoped by year via epoch ms range.
 - Epoch ms timestamps can be year-filtered with: `WHERE timestamp >= epoch_start AND timestamp < epoch_end`.
+
+**Data sources per category:**
+
+| Wrapped category | DB source |
+|---|---|
+| Combat | `player_stats.kills` / `deaths`; `event_participants` for event-specific K/D |
+| Events | `event_sessions` JOIN `event_participants` — entries, wins, favourite type, best streak |
+| Best party friend | `friendship_stats.party_time_ms` (pair with highest ms = best friend) |
+| Social | `friendship_stats.xp_together` + `kills_together`; `player_stats.messages_sent` |
+| Builder / Fisher | `player_stats.blocks_broken`, `fish_caught` |
+| Achievements | `player_achievements` filtered by `first_unlock_at` epoch ms |
+| Economy | `player_stats` + `players.cosmetic_coins` snapshots |
+| Playtime | `players.playtime_seconds` diff from year start snapshot |
 
 ### Panel surface
 ```
@@ -2098,6 +2112,48 @@ The v1.0 tag is only cut after:
 
 ## 21. Events System Overhaul
 
+---
+
+### What Has Shipped (P21 — April 2026)
+
+**Root cause found and fixed:** `PlayerDeathEvent` sends the death packet to the client *before* any plugin handler runs. `DO_IMMEDIATE_RESPAWN`, `spigot().respawn()`, `setKeepInventory(true)`, and `setCancelled(true)` on `PlayerDeathEvent` are **completely ineffective** at preventing the death screen. This was the bug that persisted across multiple failed fix attempts.
+
+**Proven solution:** Cancel the `EntityDamageEvent` before the player's HP reaches zero. No death event fires, no packet sent, no death screen.
+
+**Files changed:**
+
+| File | What changed |
+|------|--------------|
+| `EventModeCombatListener.java` | **Full rewrite.** Single `@EventHandler(priority=HIGHEST, ignoreCancelled=true) onFatalDamage(EntityDamageEvent)`. Cancels when `player.getHealth() - event.getFinalDamage() <= 0` for any active participant. All `PlayerDeathEvent`, `PlayerRespawnEvent`, `setKeepInventory`, `spigot().respawn()` code removed. |
+| `EventEngine.java` | Added `handleParticipantFatalDamage(Player)`, `collectHardcoreLootFromInventory(Player)`, `checkAndScheduleEnd()`. Updated `onEliminationTrigger` to use `ENDING` state + 5-second (100L) delay. Updated `restoreSnapshots()` to force `setGameMode(SURVIVAL)` on spectating/eliminated players before restoring. |
+| `EventModeManager.java` | Added `handleParticipantFatalDamage(Player)` delegate → `engine.handleParticipantFatalDamage(player)`. |
+| `GraveListener.java` | Returns early if `isParticipant(player)` OR event world. Sends killer message when victim has grave insurance. |
+| `GraveManager.java` | `createNormalGrave` short-circuits for event participants and event world. `isInsuredRank()` made public. |
+
+**Behaviour by event type:**
+
+| Event type | On fatal damage |
+|------------|-----------------|
+| FFA / Duels / HC_FFA / HC_Duels | HC: collect inventory into `hardcoreLootPool` then clear. All: move snapshot to `spectatorSnapshots`, add to `eliminated`, set SPECTATOR next tick, call `checkAndScheduleEnd()`. |
+| KOTH / HC_KOTH | HC: collect loot then clear inventory. All: full heal, teleport to world spawn, player stays active (still scores hill time). |
+
+**End-of-event flow:**
+- `checkAndScheduleEnd()` counts non-eliminated active players. If ≤ 1: set `ENDING` state, broadcast countdown, `runTaskLater(100L)` → `finalizeEvent`. ENDING state prevents double-trigger.
+- `restoreSnapshots()`: active players from `session.snapshots`; spectating/eliminated forced SURVIVAL then restored from `session.spectatorSnapshots`.
+
+**What's still planned (remaining work):**
+- `EventParticipantDAO` — write `event_sessions` row on open, upsert `event_participants` per kill/death, finalize both on event end (V006 tables exist, Java not wired yet)
+- `PartyManager` / `FriendDAO` — update `friendship_stats.party_time_ms` for each pair when a party disbands or member leaves (V006 column exists, Java not wired yet)
+- `EventArenaRegistry` + `ArenaConfig` — arena config from config.yml
+- Lobby countdown system (`LOBBY_COUNTDOWN` state, boss bar, forcestart)
+- `TeamEngine` + `Team` — auto-balance with party cohesion
+- `CtfHandler` — CTF event type
+- Live scoreboard lines via `EventHandler.getScoreboardLines()`
+- New commands: `/event spectate`, `/event info`, `/event setreward`, `/event arenas`
+- Blood Champion banner + exclusive HC win cosmetics (§H2)
+
+---
+
 ### Goal
 Full clean-room rewrite of the events system. The current `EventModeManager` is a single 600-line god-class that conflates arena config, participant tracking, inventory snapshots, HC loot, spectator state, KOTH scoring, and elimination logic into one synchronized blob. Every new event type makes it worse.
 
@@ -2324,9 +2380,11 @@ Tab completion shows arena keys to admins, hides staff-only subcommands from pla
 
 ### Migration requirements
 
-No new DB migrations required. The rewrite is purely in-memory during an event session. Stats (`event_wins`, `kills`, `deaths`) are written via existing `PlayerProfileDAO` paths — no schema changes.
+**V006 — shipped.** `event_sessions` + `event_participants` tables added. `friendship_stats.party_time_ms` column added.
 
-If future per-event-type leaderboards are added, a new `V0XX__event_stats.sql` will be required. That is explicitly **deferred** from this overhaul — keeping the stats surface unchanged was a design decision.
+Every completed event writes one `event_sessions` row (via `EventEngine.finalizeEvent()`) and one `event_participants` row per player (upserted during the event). This feeds Jebaited Wrapped (favourite event type, total events, event K/D, win streaks) and the web panel events dashboard.
+
+`friendship_stats.party_time_ms` accumulates milliseconds two friends have spent in the same party together. Written when a party disbands or a member leaves. Feeds Wrapped "best party friend" calculation.
 
 ---
 
@@ -2370,3 +2428,140 @@ If future per-event-type leaderboards are added, a new `V0XX__event_stats.sql` w
 | 10 | Reward: XP + optional item via `setreward` | Low |
 | 11 | Arena spawn teleport on event start (replace current hardcoded warp) | Medium |
 | 12 | Full manual test cycle on all existing event kinds before CTF | Critical |
+
+---
+
+## 22. Network Overhaul (Full Velocity Network)
+
+> **Status:** 🧱 Scaffold done (P23). Full overhaul is deferred until the Velocity proxy is provisioned and both servers are ready. **Do not enable `network.enabled: true` until the overhaul session.**
+
+### Goal
+
+Convert JebaitedCore into a true multi-server Velocity network plugin while keeping a **single JAR** deployed on every backend server.
+
+- **1× HUB** — cosmetics lounge, hotbar navigator, toybox, preview pedestal, NPC quests, player shops, community area
+- **1× SMP** — survival worlds (`smp`, `smp_nether`, `smp_the_end`), events, graves, RTP, combat, etc.
+- Future servers (`creative`, `pvp`, `minigames`, …) added easily with a new `server_type` value
+
+**Global via shared PostgreSQL:** ranks, stats, economy, cosmetics ownership, friends, parties, achievements, graves, private vaults — all network-aware, all in the same DB.
+
+---
+
+### What is already done (P23 scaffold)
+
+| File | What was added |
+|------|---------------|
+| `core/system/ServerType.java` | Enum: `HUB`, `SMP`, `CREATIVE`, `PVP`, `MINIGAMES`, `UNKNOWN`. Helpers: `isHub()`, `isSmp()`, `fromConfig(String)` |
+| `core/system/NetworkManager.java` | Stub singleton — reads `network.*` config, exposes `isHub()`, `isSmp()`, `getServerId()`, `getServerName()`, `isNetworkEnabled()`. No feature gating yet. |
+| `config.yml` | `network:` block added (disabled by default). `server_type`, `server_id`, `server_name`, `redis.*` keys present but inert until the overhaul. |
+| `JebaitedCore.java` | `NetworkManager.init(getConfig())` called early in `onEnable` |
+
+The scaffold means every future session can call `NetworkManager.getInstance().isHub()` without building infrastructure mid-feature. The full gating, Redis, cross-server commands, and V016 migration all land together in the overhaul session.
+
+---
+
+### Full overhaul scope (all done together when Velocity is ready)
+
+#### Feature behaviour by server type
+
+| Feature | HUB | SMP | Other |
+|---------|-----|-----|-------|
+| Cosmetics lounge / wardrobe | ✅ | ❌ | ❌ |
+| Hotbar navigator | ✅ | ❌ | ❌ |
+| Toybox / preview pedestal | ✅ | ❌ | ❌ |
+| NPC quests / player shops | ✅ | ❌ | ❌ |
+| Events system | ❌ | ✅ | ❌ |
+| Graves / RTP / combat tag | ❌ | ✅ | ❌ |
+| Homes / warps | ❌ | ✅ | ❌ |
+| Friends (core) | ✅ | ✅ | ✅ |
+| Party (core) | ✅ | ✅ | ✅ |
+| Achievements | ✅ | ✅ | ✅ |
+| Economy / private vaults | ✅ | ✅ | ✅ |
+| Ranks / permissions | ✅ | ✅ | ✅ |
+
+Commands on the wrong server return: `§cThis command is only available on the Hub server.` (or `…SMP server.` as appropriate).
+
+#### New components added during the overhaul
+
+| Component | Purpose |
+|-----------|---------|
+| Feature gating in every hub/smp-only manager, listener, command, GUI | Calls `NetworkManager.getInstance().isHub()` / `isSmp()` — one line per gate |
+| Updated `/hub`, `/smp` commands | Real Velocity server-switch when `network.enabled=true`; fall-through to world routing when disabled |
+| Friends: server location + "Join Server" button | Cross-server Velocity send; shows friend's current server name in friends list |
+| `V016__server_instances.sql` | New table: `server_instances(id, server_type, server_id, server_name, player_count, max_players, last_heartbeat_at)` |
+| Redis integration (optional) | Real-time friends online status, party invites, cross-server events. DB-only fallback included. Config toggle: `network.redis.enabled` |
+| `PanelConnectorService` network push | Heartbeat every 30s to `server_instances`, pushes `player_count`. Panel `/admin/network` reads this. |
+| Full Velocity plugin message channel `jebaited:network` | Server-switch, cross-server party invites, real-time online status |
+
+#### Config additions (added together during overhaul)
+
+```yaml
+feature_flags:
+  server_mode:
+    hub:
+      cosmetics: true
+      hotbar_navigator: true
+      toybox: true
+      preview_pedestal: true
+      npcs: true
+      player_shops: true
+    smp:
+      events: true
+      graves: true
+      rtp: true
+      combat_tag: true
+      homes: true
+      warps: true
+```
+
+#### V016 migration (added during overhaul)
+
+```sql
+CREATE TABLE IF NOT EXISTS server_instances (
+    id SERIAL PRIMARY KEY,
+    server_id   VARCHAR(64) NOT NULL UNIQUE,
+    server_type VARCHAR(32) NOT NULL,
+    server_name VARCHAR(64) NOT NULL,
+    player_count INT NOT NULL DEFAULT 0,
+    max_players  INT NOT NULL DEFAULT 0,
+    online       BOOLEAN NOT NULL DEFAULT FALSE,
+    last_heartbeat_at BIGINT DEFAULT NULL
+);
+```
+
+---
+
+### Backwards compatibility
+
+- Until `network.enabled: true` is set, **nothing changes** from current single-server behaviour.
+- `network.enabled: false` (default) → all feature gates pass through, `/hub` and `/smp` continue world-routing as today.
+- V016 migration is idempotent (`CREATE TABLE IF NOT EXISTS`).
+- No existing features (friends, parties, achievements, graves, etc.) break — they become network-aware only when the flag flips.
+
+---
+
+### Panel surface
+
+```
+[PANEL SURFACE]
+Feature: Network Dashboard
+DB tables added: server_instances
+Suggested panel page: /admin/network
+Data shape: array of { id, server_type, server_name, player_count, max_players, online, last_heartbeat_at }
+```
+
+---
+
+### Implementation order (for the overhaul session)
+
+| Step | What | Risk |
+|------|------|------|
+| 1 | Set `network.enabled: true` in config + provision Velocity | Zero code risk |
+| 2 | `V016__server_instances.sql` migration + `PanelConnectorService` heartbeat | Low |
+| 3 | Feature gating in hub-only managers/listeners (cosmetics, hotbar, toybox, pedestal, NPC, player shops) | Low — one-line gate each |
+| 4 | Feature gating in smp-only managers/listeners (events, graves, RTP, combat tag, homes, warps) | Low |
+| 5 | `feature_flags` config block parsed in `NetworkManager` for per-feature overrides | Low |
+| 6 | Update `/hub` + `/smp` commands to send Velocity plugin message when `isNetworkEnabled()` | Medium |
+| 7 | Friends: add server location column read + "Join Server" ClickEvent in `FriendsMenu` / `FriendChatUI` | Medium |
+| 8 | Redis integration (if enabled): real-time online status, cross-server party invites | High |
+| 9 | Full manual test cycle: hub features absent on SMP, SMP features absent on hub, cross-server friend join | Critical |

@@ -293,12 +293,13 @@ CREATE TABLE IF NOT EXISTS friend_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_friend_requests_receiver ON friend_requests (receiver_uuid);
 
--- XP/kill stats shared between friends while online together
+-- XP/kill/party stats shared between friends while online together
 CREATE TABLE IF NOT EXISTS friendship_stats (
     player_a       VARCHAR(36) NOT NULL,
     player_b       VARCHAR(36) NOT NULL,
     xp_together    BIGINT      NOT NULL DEFAULT 0,
     kills_together INT         NOT NULL DEFAULT 0,
+    party_time_ms  BIGINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (player_a, player_b),
     FOREIGN KEY (player_a, player_b) REFERENCES friendships(player_a, player_b) ON DELETE CASCADE
 );
@@ -351,7 +352,7 @@ CREATE TABLE IF NOT EXISTS server_settings (
     updated_at    BIGINT      NOT NULL DEFAULT 0
 );
 
--- Player homes (canonical new schema — V003 reshapes this on existing DBs)
+-- Player homes (canonical new schema — V003 reshapes this on existing DBs)   
 CREATE TABLE IF NOT EXISTS player_homes (
     player_uuid UUID         NOT NULL,
     home_name   VARCHAR(64)  NOT NULL,
@@ -364,3 +365,33 @@ CREATE TABLE IF NOT EXISTS player_homes (
     created_at  BIGINT       NOT NULL DEFAULT 0,
     PRIMARY KEY (player_uuid, home_name)
 );
+
+-- ── Event sessions ────────────────────────────────────────────────────────────
+-- Persisted for Jebaited Wrapped + web panel analytics.
+CREATE TABLE IF NOT EXISTS event_sessions (
+    id                SERIAL       PRIMARY KEY,
+    event_type        VARCHAR(32)  NOT NULL,
+    arena_key         VARCHAR(64)  DEFAULT NULL,
+    started_at        BIGINT       NOT NULL,
+    ended_at          BIGINT       DEFAULT NULL,
+    winner_uuid       VARCHAR(36)  DEFAULT NULL,
+    winning_team      VARCHAR(16)  DEFAULT NULL,
+    participant_count INT          NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS event_participants (
+    id             SERIAL      PRIMARY KEY,
+    session_id     INT         NOT NULL REFERENCES event_sessions(id) ON DELETE CASCADE,
+    player_uuid    VARCHAR(36) NOT NULL,
+    kills          INT         NOT NULL DEFAULT 0,
+    deaths         INT         NOT NULL DEFAULT 0,
+    result         VARCHAR(16) NOT NULL DEFAULT 'LOSS',
+    coins_earned   INT         NOT NULL DEFAULT 0,
+    xp_earned      INT         NOT NULL DEFAULT 0,
+    UNIQUE (session_id, player_uuid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_participants_player  ON event_participants (player_uuid);
+CREATE INDEX IF NOT EXISTS idx_event_participants_session ON event_participants (session_id);
+CREATE INDEX IF NOT EXISTS idx_event_sessions_type        ON event_sessions (event_type);
+CREATE INDEX IF NOT EXISTS idx_event_sessions_started     ON event_sessions (started_at);

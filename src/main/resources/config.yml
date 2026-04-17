@@ -1069,3 +1069,18 @@ leaderboards:
       x: 954.4807409205554
       y: 73.37378271200545
       z: 10056.886685815609
+
+# Network  Velocity multi-server support (ROADMAP 22)
+# Set network.enabled to true ONLY when the full Velocity proxy is provisioned
+# and both servers are prepared. Until then, all feature gates pass through
+# and single-server behaviour is completely unchanged.
+network:
+  enabled: false
+  server_type: "hub"      # hub | smp | creative | pvp | minigames
+  server_id: "hub-01"     # unique identifier for this instance
+  server_name: "§aHub"   # display name used in menus and panel
+  redis:
+    enabled: false
+    host: "localhost"
+    port: 6379
+    password: ""
