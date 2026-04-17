@@ -65,6 +65,16 @@ public class GraveListener implements Listener {
         GraveManager.Grave grave = graves.createNormalGrave(player, player.getLocation(), drops);
         if (grave == null) return;
 
+        // If this was an insured grave (Legend/GM), let the killer know their effort was "absorbed"
+        Player killer = player.getKiller();
+        if (killer != null && graves.isInsuredRank(player)) {
+            killer.sendMessage(com.darkniightz.core.Messages.prefixed(
+                    "§7Darn — §f" + player.getName() + " §7had §d§lGrave Insurance§7. "
+                    + "Their items were auto-transferred to their vault."));
+            killer.sendMessage(com.darkniightz.core.Messages.prefixed(
+                    "§8Upgrade your rank to §dLegend §8or higher for the same protection."));
+        }
+
         event.getDrops().clear();
         event.setDroppedExp(0);
         event.setKeepLevel(true);

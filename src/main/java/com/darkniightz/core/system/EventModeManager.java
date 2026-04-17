@@ -39,6 +39,7 @@ public class EventModeManager {
 
     public boolean submitChatAnswer(Player player, String answer)   { return engine.submitChatAnswer(player, answer); }
 
+    public void    handleParticipantFatalDamage(Player player)      { engine.handleParticipantFatalDamage(player); }
     public void    handleParticipantDeath(Player player)            { engine.handleParticipantDeath(player);   }
     public boolean isParticipant(Player player)                     { return engine.isParticipant(player);     }
     public boolean isParticipantInHardcore(Player player)           { return engine.isParticipantInHardcore(player); }

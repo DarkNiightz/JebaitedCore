@@ -1,14 +1,17 @@
 package com.darkniightz.core.system;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.Plugin;
 
+/**
+ * Intercepts fatal damage for event participants so they NEVER actually die.
+ * Cancelling the damage event means no death screen, no respawn sequence, no DO_IMMEDIATE_RESPAWN
+ * fight. The engine decides what happens next (spectator for FFA/Duels, world-spawn for KOTH).
+ */
 public class EventModeCombatListener implements Listener {
     private final EventModeManager manager;
     private final Plugin plugin;
@@ -18,33 +21,14 @@ public class EventModeCombatListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onDeath(PlayerDeathEvent event) {
-        Player player = event.getEntity();
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFatalDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
         if (!manager.isParticipant(player)) return;
-
-        manager.handleParticipantDeath(player);
-        if (manager.shouldKeepInventoryOnDeath(player)) {
-            event.setKeepInventory(true);
-            event.getDrops().clear();
-            event.setDeathMessage(null);
-        } else if (manager.isParticipantInHardcore(player)) {
-            // Collect all drops into the loot pool — winner claims everything
-            manager.collectHardcoreLoot(player, event.getDrops());
-            event.getDrops().clear();
-            event.setDeathMessage(null);
-        }
-
-        // Force auto-respawn after 1 tick — enough for the death packet to process without a visible death screen.
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (player.isOnline() && player.isDead()) {
-                player.spigot().respawn();
-            }
-        }, 1L);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onRespawn(PlayerRespawnEvent event) {
-        manager.handleParticipantRespawn(event.getPlayer());
+        // Only intercept damage that would actually kill (health would reach 0 or below)
+        if (player.getHealth() - event.getFinalDamage() > 0) return;
+        // Cancel the killing blow — player stays alive, zero death screen, zero respawn dance
+        event.setCancelled(true);
+        manager.handleParticipantFatalDamage(player);
     }
 }

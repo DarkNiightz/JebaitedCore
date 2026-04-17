@@ -210,6 +210,8 @@ event_mode:
   automation:
     enabled: true
   interval-seconds: 300
+  lobby_countdown_seconds: 30
+  admin_edit_window_seconds: 600
   world: "events"
   world_border_size: 10000
   use_superflat_world: true

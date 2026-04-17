@@ -87,6 +87,8 @@ public class GraveManager {
         if (owner == null || deathLoc == null || contents == null || contents.isEmpty()) return null;
         // Never create graves for event participants — their inventory is managed by EventModeManager.
         if (plugin.getEventModeManager() != null && plugin.getEventModeManager().isParticipant(owner)) return null;
+        // Belt-and-suspenders: never create graves when death occurs in the event world.
+        if (isEventWorld(deathLoc.getWorld())) return null;
         Location placed = findPlacement(deathLoc);
         if (placed == null || placed.getWorld() == null) return null;
 
@@ -126,7 +128,7 @@ public class GraveManager {
     }
 
     /** Returns true if the player has Legend or higher as primary or donor rank. */
-    private boolean isInsuredRank(Player player) {
+    public boolean isInsuredRank(Player player) {
         if (player == null) return false;
         com.darkniightz.core.players.PlayerProfile profile = plugin.getProfileStore().get(player.getUniqueId());
         if (profile == null) return false;

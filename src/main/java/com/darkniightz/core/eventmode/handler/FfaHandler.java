@@ -68,7 +68,8 @@ public final class FfaHandler implements EventHandler {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (isHC) {
-                // HC: teleport to world spawn, reset vitals, no inventory to restore
+                // HC: player already lost their items to the loot pool — they get nothing back.
+                // Snapshot is discarded. Just reset vitals and send them to world spawn.
                 double hp = Math.max(1.0, Math.min(player.getMaxHealth(), 20.0));
                 player.setHealth(hp);
                 player.setFoodLevel(20);

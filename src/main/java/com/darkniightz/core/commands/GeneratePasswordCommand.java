@@ -63,7 +63,7 @@ public class GeneratePasswordCommand implements CommandExecutor {
 
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) {
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) {
             sender.sendMessage(Messages.noPerm());
             return true;
         }

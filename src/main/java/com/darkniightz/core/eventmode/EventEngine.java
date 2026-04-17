@@ -239,6 +239,103 @@ public final class EventEngine {
 
     // ── Participant lifecycle (called by EventModeCombatListener) ─────────────
 
+    /**
+     * Called when a participant receives damage that would be fatal.
+     * The damage event has already been cancelled — the player is alive.
+     * For FFA/Duels: mark eliminated, switch to SPECTATOR, schedule 5s end if last alive.
+     * For KOTH: strip HC loot if applicable, teleport to world spawn, player stays active.
+     */
+    public synchronized void handleParticipantFatalDamage(Player player) {
+        if (player == null || session == null || session.state != EventState.RUNNING) return;
+        UUID id = player.getUniqueId();
+        if (!session.active.contains(id)) return;
+
+        EventKind kind   = session.spec.kind;
+        boolean isHC     = kind.isHardcore();
+        boolean isKoth   = kind == EventKind.KOTH || kind == EventKind.HARDCORE_KOTH;
+
+        // HC: collect whatever is in inventory into the loot pool, then strip it
+        if (isHC) {
+            collectHardcoreLootFromInventory(player);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(new ItemStack[4]);
+            player.getInventory().setItemInOffHand(null);
+            player.updateInventory();
+        }
+
+        if (isKoth) {
+            // KOTH: not elimination — player respawns at world spawn and can still hold the hill
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                Location spawn = getWorldSpawn();
+                if (spawn != null) player.teleport(spawn);
+                player.sendMessage(Component.text("☠ Eliminated from the hill! Respawning at world spawn.",
+                        NamedTextColor.RED));
+            });
+        } else {
+            // FFA / Duels / HC variants: elimination — convert to spectator
+            session.eliminated.add(id);
+            // Move snapshot to spectator bucket so restoreSnapshots restores gamemode to SURVIVAL
+            InventorySnapshot snap = session.snapshots.remove(id);
+            session.spectatorSnapshots.put(id, snap);
+            session.spectating.add(id);
+
+            // Check if the event should end (schedules 5s finalise if only 1 alive)
+            checkAndScheduleEnd();
+
+            // Switch to spectator next tick (can't safely change gamemode mid-damage-event)
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setGameMode(GameMode.SPECTATOR);
+                player.sendMessage(Component.text("✗ Eliminated! Spectating the rest of the event.",
+                        NamedTextColor.RED));
+            });
+        }
+    }
+
+    /** Collects whatever is currently in a player's inventory into the HC loot pool. */
+    private void collectHardcoreLootFromInventory(Player player) {
+        if (session == null) return;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() != Material.AIR) session.hardcoreLootPool.add(item.clone());
+        }
+        for (ItemStack item : player.getInventory().getArmorContents()) {
+            if (item != null && item.getType() != Material.AIR) session.hardcoreLootPool.add(item.clone());
+        }
+        ItemStack off = player.getInventory().getItemInOffHand();
+        if (off != null && off.getType() != Material.AIR) session.hardcoreLootPool.add(off.clone());
+    }
+
+    /**
+     * Checks whether the FFA/Duels event is down to 1 survivor and, if so, transitions
+     * to ENDING and schedules finaliseEvent after a 5-second grace period.
+     * No-op if called while state != RUNNING (prevents double-fire).
+     */
+    private synchronized void checkAndScheduleEnd() {
+        if (session == null || session.state != EventState.RUNNING) return;
+        List<UUID> alive = new ArrayList<>();
+        for (UUID uid : session.active) {
+            if (!session.eliminated.contains(uid)) alive.add(uid);
+        }
+        if (alive.size() <= 1 && !session.active.isEmpty()) {
+            UUID winner = alive.isEmpty() ? session.active.iterator().next() : alive.get(0);
+            session.state = EventState.ENDING; // prevents re-entry from any concurrent path
+            broadcast("§d★ §f" + session.spec.displayName + " §7ending in §c5 §7seconds...");
+            final UUID finalWinner = winner;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                synchronized (EventEngine.this) {
+                    if (session == null || session.state != EventState.ENDING) return;
+                    finalizeEvent(finalWinner, session.spec.coinReward,
+                            "won " + session.spec.displayName);
+                }
+            }, 100L);
+        }
+    }
+
     public synchronized void handleParticipantDeath(Player player) {
         if (player == null || session == null || session.state != EventState.RUNNING) return;
         if (!session.active.contains(player.getUniqueId())) return;
@@ -526,7 +623,16 @@ public final class EventEngine {
         }
         if (alive.size() <= 1 && !session.active.isEmpty()) {
             UUID winner = alive.isEmpty() ? session.active.iterator().next() : alive.get(0);
-            finalizeEvent(winner, session.spec.coinReward, "won " + session.spec.displayName);
+            session.state = EventState.ENDING;
+            broadcast("§d★ §f" + session.spec.displayName + " §7ending in §c5 §7seconds...");
+            final UUID finalWinner = winner;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                synchronized (EventEngine.this) {
+                    if (session == null || session.state != EventState.ENDING) return;
+                    finalizeEvent(finalWinner, session.spec.coinReward,
+                            "won " + session.spec.displayName);
+                }
+            }, 100L);
         }
     }
 
@@ -648,9 +754,17 @@ public final class EventEngine {
             session.endsAtMs = System.currentTimeMillis() + durationSeconds * 1000L;
             getHandler(kind).onStart(session);
             startTickTask();
+            // KOTH players stay in SMP — set DO_IMMEDIATE_RESPAWN there so the death screen is suppressed.
+            setImmediateRespawn(true);
             broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
             return;
         }
+
+        // Always ensure the event world is loaded before any arena logic.
+        // ensureEventWorld is idempotent — if already loaded it just sets gamerules.
+        // This is what actually sets DO_IMMEDIATE_RESPAWN=true on the events world.
+        String eventWorldName = plugin.getConfig().getString("event_mode.world", "events");
+        ensureEventWorld(eventWorldName);
 
         List<Location> spawns = getArenaSpawns(session.spec.key);
         if (spawns.isEmpty()) {
@@ -689,6 +803,9 @@ public final class EventEngine {
 
         getHandler(kind).onStart(session);
         if (kind.isKoth()) startTickTask(); // covered above, but safety check
+        // Arena events teleport players to events world (DO_IMMEDIATE_RESPAWN already permanent there).
+        // Also set on SMP in case any death happens while still transitioning.
+        setImmediateRespawn(true);
         broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
         checkImmediateElimination();
     }
@@ -744,26 +861,19 @@ public final class EventEngine {
             entry.getValue().restore(p);
         }
         session.snapshots.clear();
-        // Restore spectating (eliminated) players — inventory already kept, just return location + vitals
+        // Restore spectating (eliminated) players — full snapshot restore (inventory + stats + teleport)
         for (Map.Entry<UUID, InventorySnapshot> entry : new HashMap<>(session.spectatorSnapshots).entrySet()) {
             Player p = Bukkit.getPlayer(entry.getKey());
             if (p == null) continue;
             InventorySnapshot snap = entry.getValue();
             p.setGameMode(GameMode.SURVIVAL);
             if (snap != null) {
-                p.setFoodLevel(snap.food());
-                double hp = Math.max(1.0, Math.min(p.getMaxHealth(), snap.health()));
-                p.setHealth(hp);
-                p.setLevel(snap.level());
-                p.setExp(snap.exp());
-                if (snap.returnLocation() != null && snap.returnLocation().getWorld() != null) {
-                    p.teleport(snap.returnLocation());
-                }
+                snap.restore(p); // restores inventory, armor, offhand, health, food, level, exp, and teleports
             } else {
                 Location fallback = getWorldSpawn();
                 if (fallback != null) p.teleport(fallback);
+                p.updateInventory();
             }
-            p.updateInventory();
         }
         session.spectatorSnapshots.clear();
         session.spectating.clear();
@@ -779,8 +889,20 @@ public final class EventEngine {
             session.kothSeconds.clear();
         }
         session = null;
+        // Restore normal death screen behaviour outside of events.
+        setImmediateRespawn(false);
         stopTickTask();
         stopCountdownTask();
+    }
+
+    /** Sets DO_IMMEDIATE_RESPAWN on all event-relevant worlds for the duration of an event. */
+    private void setImmediateRespawn(boolean enabled) {
+        String smpName = plugin.getConfig().getString("worlds.smp", "smp");
+        World smpWorld = Bukkit.getWorld(smpName);
+        if (smpWorld != null) smpWorld.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, enabled);
+        String eventWorldName = plugin.getConfig().getString("event_mode.world", "events");
+        World eventWorld = Bukkit.getWorld(eventWorldName);
+        if (eventWorld != null) eventWorld.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, enabled);
     }
 
     private void giveLootToWinner(UUID winnerId) {
@@ -1088,6 +1210,8 @@ public final class EventEngine {
         if (world != null) {
             world.setGameRule(GameRule.DO_FIRE_TICK, false);
             world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+            // Suppress the "You Died!" screen for event participants — they auto-respawn
+            world.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
             WorldBorder border = world.getWorldBorder();
             border.setCenter(0.0, 0.0);
             border.setSize(Math.max(1000.0, plugin.getConfig().getDouble("event_mode.world_border_size", 10000.0)));
@@ -1148,6 +1272,8 @@ public final class EventEngine {
                 String worldName = rs.getString("world_name");
                 double x = rs.getDouble("x"), y = rs.getDouble("y"), z = rs.getDouble("z");
                 float yaw = rs.getFloat("yaw"), pitch = rs.getFloat("pitch");
+                // If the world isn't loaded yet, force-load it on the main thread.
+                // Paper doesn't auto-load custom worlds (e.g. "events") — ensureEventWorld handles that.
                 World w = Bukkit.getWorld(worldName);
                 if (w != null) {
                     loaded.computeIfAbsent(key, k -> new ArrayList<>()).add(new Location(w, x, y, z, yaw, pitch));
@@ -1155,10 +1281,13 @@ public final class EventEngine {
                     final String fKey = key; final double fx = x, fy = y, fz = z;
                     final float fyaw = yaw, fpitch = pitch; final String fWorld = worldName;
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        World resolved = Bukkit.getWorld(fWorld);
+                        // ensureEventWorld must run on main thread (Bukkit.createWorld requirement).
+                        World resolved = ensureEventWorld(fWorld);
                         if (resolved != null) {
                             spawnCache.computeIfAbsent(fKey, k -> new ArrayList<>())
                                     .add(new Location(resolved, fx, fy, fz, fyaw, fpitch));
+                        } else {
+                            plugin.getLogger().warning("[EventSpawns] Could not load world '" + fWorld + "' — spawn skipped.");
                         }
                     });
                 }
