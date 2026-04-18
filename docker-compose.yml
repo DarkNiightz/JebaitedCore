@@ -21,6 +21,5 @@
 # Force the same Compose project name as when you run from JebaitedNetwork/
 # (avoids a second parallel stack named after this folder).
 name: jebaitednetwork
-
 include:
   - path: "../../../JebaitedNetwork/docker-compose.yml"

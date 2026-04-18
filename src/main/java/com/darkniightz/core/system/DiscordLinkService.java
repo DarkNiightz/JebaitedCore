@@ -108,7 +108,6 @@ public final class DiscordLinkService {
         }
         return -1;
     }
-
     private String nextCode() {
         StringBuilder sb = new StringBuilder(CODE_LENGTH);
         for (int i = 0; i < CODE_LENGTH; i++) {

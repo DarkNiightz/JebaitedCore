@@ -1384,7 +1384,6 @@ public final class EventEngine {
         pendingHardcoreLootClaims.remove(id);
         return delivered;
     }
-
     private void rewardWinner(UUID winner, int reward, String eventDisplay) {
         if (!(plugin instanceof JebaitedCore core)) return;
         ProfileStore store = core.getProfileStore();
