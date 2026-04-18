@@ -2,7 +2,7 @@
 
 **Purpose:** Single file to paste into a **web-admin** AI chat or attach to a panel issue. The **JebaitedCore** plugin owns in-game `/shop`; the **Node/Express panel** reads/writes the **same PostgreSQL** tables. The plugin does **not** ship HTTP admin APIs for shop in MVP.
 
-**Owner:** Jamie implements routes/UI in the **`web-admin`** repository — this plugin repo only ships the DB schema + in-game behaviour; track panel progress outside Grafter.
+**Owner:** Jamie implements routes/UI in the `**web-admin`** repository — this plugin repo only ships the DB schema + in-game behaviour; track panel progress outside Grafter.
 
 **Canonical detail:** [ROADMAP.md §17](../ROADMAP.md) (full GUI, economy rules, staging checklist).
 
@@ -71,13 +71,15 @@ DELIVERABLE: spec + safe SQL/ORM patterns + wireframes for the two pages; staff-
 
 ## What each piece is for
 
-| Piece | Role |
-|-------|------|
-| **`server_shop_prices`** | Catalogue of items the in-game shop can sell/buy. Panel edits this for live tuning. |
-| **`shop_transactions`** | Append-only ledger of BUY/SELL from the plugin (async insert). Panel reads for audits and analytics. |
-| **`players.uuid` FK** | Ensures transaction rows tie to known players; join for display names. |
-| **`/jreload` on MC** | Reconstructs `ShopManager` and reloads price cache from DB without full server restart. |
-| **No plugin HTTP (MVP)** | Keeps panel work independent; avoids duplicating auth and exposing the game server. |
+
+| Piece                    | Role                                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `**server_shop_prices**` | Catalogue of items the in-game shop can sell/buy. Panel edits this for live tuning.                  |
+| `**shop_transactions**`  | Append-only ledger of BUY/SELL from the plugin (async insert). Panel reads for audits and analytics. |
+| `**players.uuid` FK**    | Ensures transaction rows tie to known players; join for display names.                               |
+| `**/jreload` on MC**     | Reconstructs `ShopManager` and reloads price cache from DB without full server restart.              |
+| **No plugin HTTP (MVP)** | Keeps panel work independent; avoids duplicating auth and exposing the game server.                  |
+
 
 ---
 
@@ -118,10 +120,12 @@ WHERE item_key = ?;
 
 ## Plugin reference (read-only for panel devs)
 
-| File | Notes |
-|------|--------|
-| `core/shop/ShopManager.java` | Loads prices, writes transactions, validates rate limits from `config.yml` `server_shop:` |
-| `core/commands/ShopCommand.java` | `/shop`, alias `market` |
+
+| File                             | Notes                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| `core/shop/ShopManager.java`     | Loads prices, writes transactions, validates rate limits from `config.yml` `server_shop:` |
+| `core/commands/ShopCommand.java` | `/shop`, alias `market`                                                                   |
+
 
 ---
 

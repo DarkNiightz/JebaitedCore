@@ -96,6 +96,7 @@ Each finding must include concrete file paths.
 
 ## Scope discipline
 
+- **Execution:** Apply `.env`, `docker-compose.yml`, and config edits in the workspace yourself; follow [`.cursor/rules/jebaited-execution.mdc`](../../rules/jebaited-execution.mdc). Do not offload trivial "add this line" steps to Jamie unless a secret is not in the repo.
 - Keep changes focused on requested outcomes.
 - Do not rewrite large systems unless explicitly requested.
 - After edits, run available lint/build checks relevant to touched files.

@@ -1,0 +1,14 @@
+---
+description: Execute fixes in-repo; do not delegate trivial config edits to the user
+alwaysApply: true
+---
+
+# JebaitedCore — agent execution
+
+1. **Apply changes yourself.** If a fix needs `.env`, `docker-compose.yml`, `config.yml`, `plugin.yml`, or any tracked/ignored file in this workspace, **edit the file** with the tool. Do not tell the user to "add this line" or "put X in .env" unless the secret is genuinely unavailable (e.g. only in a password manager).
+
+2. **After changing Docker or env**, run the relevant `docker compose` / `mvn` command and confirm the service starts or health checks pass when that is practical in the environment.
+
+3. **No chore dumps.** Do not close with a checklist of manual steps that duplicate what you could do in one edit + one command.
+
+4. **Secrets.** Never paste live tokens or passwords into chat. Editing `.env` on disk is fine; do not echo those values back in the reply.

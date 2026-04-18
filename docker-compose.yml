@@ -1,36 +1,17 @@
-services:
-  postgres:
-    image: postgres:16
-    container_name: jebaited-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: jebaited
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: mqJVcJrukDRC7eiH3pMykLEM
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-
-  paper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: jebaited-paper
-    restart: unless-stopped
-    depends_on:
-      - postgres
-    ports:
-      - "25565:25565"
-    environment:
-      EULA: "TRUE"
-      TYPE: "PAPER"
-      VERSION: "LATEST"
-      MEMORY: "4G"
-      JVM_XX_OPTS: "-XX:+UseG1GC"
-    volumes:
-      - minecraft-data:/data
-
-volumes:
-  postgres-data:
-  minecraft-data:
+# =============================================================================
+# SINGLE SOURCE OF TRUTH FOR DOCKER: ../../MC Server/docker-compose.yml
+#
+# That stack runs jebaited-mc (Paper on :25565), PostgreSQL, MySQL, web-admin,
+# Redis, and the Discord bot. Do NOT run a second Paper or second Postgres from
+# this repo — it duplicated ports and broke everything.
+#
+# From repo root:
+#   cd "..\..\..\MC Server"
+#   docker compose up -d --build
+#
+# Deploy this plugin JAR into MC Server's bind-mounted data:
+#   MC Server/plugins/JebaitedCore.jar
+#   (or Vibe Code\scripts\build-jebaitedcore-docker.ps1 with MC Server plugins path)
+# =============================================================================
+include:
+  - path: "../../../JebaitedNetwork/docker-compose.yml"

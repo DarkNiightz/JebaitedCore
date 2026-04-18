@@ -12,6 +12,8 @@ import com.darkniightz.core.commands.DevModeCommand;
 import com.darkniightz.core.commands.DelHomeCommand;
 import com.darkniightz.core.commands.SetWarpCommand;
 import com.darkniightz.core.commands.DelWarpCommand;
+import com.darkniightz.core.commands.DiscordLinkCommand;
+import com.darkniightz.core.commands.DonateCommand;
 import com.darkniightz.core.commands.EcoCommand;
 import com.darkniightz.core.commands.GeneratePasswordCommand;
 import com.darkniightz.core.commands.HomeCommand;
@@ -162,6 +164,12 @@ public final class JebaitedCore extends JavaPlugin {
     private com.darkniightz.core.achievements.AchievementDAO achievementDAO;
     private com.darkniightz.core.achievements.AchievementManager achievementManager;
     private com.darkniightz.core.shop.ShopManager shopManager;
+    private com.darkniightz.core.store.StoreService storeService;
+    private com.darkniightz.core.system.DiscordLinkService discordLinkService;
+    private com.darkniightz.core.system.DiscordIntegrationService discordIntegrationService;
+    private com.darkniightz.core.system.DiscordInboundHttpService discordInboundHttpService;
+    private com.darkniightz.core.system.DiscordActivitySampler discordActivitySampler;
+    private com.darkniightz.core.system.DiscordConsoleLogHandler discordConsoleLogHandler;
     private final java.util.List<String> startupMessages = new java.util.concurrent.CopyOnWriteArrayList<>();
     private com.darkniightz.main.database.SchemaManager.MigrationResult migrationResult;
     private int commandCount = 0;
@@ -241,6 +249,7 @@ public final class JebaitedCore extends JavaPlugin {
         this.partyManager = new com.darkniightz.core.party.PartyManager(this, profileStore, rankManager);
         this.achievementDAO = new com.darkniightz.core.achievements.AchievementDAO(databaseManager, getLogger());
         this.achievementManager = new com.darkniightz.core.achievements.AchievementManager(this, achievementDAO, profileStore, rankManager);
+        this.discordLinkService = new com.darkniightz.core.system.DiscordLinkService(databaseManager, getLogger());
 
         if (databaseManager.isEnabled()) {
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
@@ -332,12 +341,23 @@ public final class JebaitedCore extends JavaPlugin {
     public com.darkniightz.core.achievements.AchievementManager getAchievementManager() { return achievementManager; }
     public com.darkniightz.core.shop.ShopManager getShopManager() { return shopManager; }
 
+    public com.darkniightz.core.store.StoreService getStoreService() {
+        return storeService;
+    }
+    public com.darkniightz.core.system.DiscordLinkService getDiscordLinkService() { return discordLinkService; }
+
+    public com.darkniightz.core.system.DiscordIntegrationService getDiscordIntegrationService() {
+        return discordIntegrationService;
+    }
+
     private void initializeDatabaseTables() {
         migrationResult = new com.darkniightz.main.database.SchemaManager(databaseManager, getLogger()).runMigrations();
     }
 
     private void finishEnable() {
         registerListeners();
+        this.storeService = new com.darkniightz.core.store.StoreService(this);
+        this.storeService.reload();
         startRuntimeServices();
         this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
         this.shopManager.start();
@@ -420,6 +440,26 @@ public final class JebaitedCore extends JavaPlugin {
         if (achievementManager != null) achievementManager.start();
         if (toyboxManager != null) refreshToyboxesForOnline();
         applyStyledTabForOnline();
+
+        this.discordIntegrationService = new com.darkniightz.core.system.DiscordIntegrationService(this);
+        if (discordInboundHttpService != null) {
+            discordInboundHttpService.stop();
+        }
+        discordInboundHttpService = new com.darkniightz.core.system.DiscordInboundHttpService(this);
+        discordInboundHttpService.start();
+        if (discordActivitySampler != null) {
+            discordActivitySampler.stop();
+        }
+        discordActivitySampler = new com.darkniightz.core.system.DiscordActivitySampler(this, databaseManager);
+        discordActivitySampler.start();
+        if (discordConsoleLogHandler != null) {
+            org.bukkit.Bukkit.getLogger().removeHandler(discordConsoleLogHandler);
+            discordConsoleLogHandler = null;
+        }
+        if (discordIntegrationService != null && discordIntegrationService.isConsoleMirrorEnabled()) {
+            discordConsoleLogHandler = new com.darkniightz.core.system.DiscordConsoleLogHandler(this);
+            org.bukkit.Bukkit.getLogger().addHandler(discordConsoleLogHandler);
+        }
     }
 
     private void stopRuntimeServices() {
@@ -437,6 +477,16 @@ public final class JebaitedCore extends JavaPlugin {
         if (minecraftVersionMonitor != null) minecraftVersionMonitor.stop();
         if (graveManager != null) graveManager.stop();
         if (restartManager != null) restartManager.shutdown();
+        if (discordInboundHttpService != null) {
+            discordInboundHttpService.stop();
+        }
+        if (discordActivitySampler != null) {
+            discordActivitySampler.stop();
+        }
+        if (discordConsoleLogHandler != null) {
+            org.bukkit.Bukkit.getLogger().removeHandler(discordConsoleLogHandler);
+            discordConsoleLogHandler = null;
+        }
         if (dbRetryTaskId != -1) {
             Bukkit.getScheduler().cancelTask(dbRetryTaskId);
             dbRetryTaskId = -1;
@@ -477,7 +527,9 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("near", new NearCommand(this));
         bindCommand("rules", new RulesCommand(this));
         bindCommand("rtp", new RtpCommand(this, worldManager));
+        bindCommand("link", new DiscordLinkCommand(this));
         bindCommand("shop", new com.darkniightz.core.commands.ShopCommand(this));
+        bindCommand("donate", new DonateCommand(this));
         MessageCommand messageCommand = new MessageCommand(profileStore, rankManager, messageManager);
         bindCommand("message", messageCommand);
         ReplyCommand replyCommand = new ReplyCommand(profileStore, rankManager, messageManager);
@@ -828,6 +880,8 @@ public final class JebaitedCore extends JavaPlugin {
         this.scoreboardManager = new ServerScoreboardManager(this, profileStore, rankManager, worldManager);
         this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
         this.shopManager.start();
+        this.storeService = new com.darkniightz.core.store.StoreService(this);
+        this.storeService.reload();
         this.dbDependentServicesStarted = false;
         // Keep existing moderation state; no need to recreate moderationManager
         stopRuntimeServices();

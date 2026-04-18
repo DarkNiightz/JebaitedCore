@@ -1,3 +1,4 @@
 # Copy this file to jebaited-deploy.properties (gitignored) and set your Paper server's plugins folder.
-# Use forward slashes or escaped backslashes on Windows, e.g. C:/Minecraft/paper/plugins
+# Use forward slashes on Windows, e.g. C:/Minecraft/paper/plugins
+# Example target inside this repo (optional): .../JebaitedCore/local-paper-server/plugins
 jebaited.deploy.plugins.dir=

@@ -46,11 +46,16 @@ Setup and build
    git clone <this-repo-url>
    cd JebaitedCore
 
-2) Build the plugin JAR
-   mvn clean package
+2) Build the plugin JAR (Maven Wrapper — **no global `mvn` needed** on Windows):
+   From the inner module folder (the one containing `pom.xml` and `src/`):
+   ```
+   ..\mvnw.cmd clean package
+   ```
+   Full step-by-step (deploy path, restart, env vars): [docs/BUILD_AND_RUN_WINDOWS.md](docs/BUILD_AND_RUN_WINDOWS.md)
 
 3) The artifact will be produced at
    target/JebaitedCore.jar
+   Optional: set `JEBAITED_PLUGINS_DIR` or `jebaited-deploy.properties` so `package` also copies the JAR to your Paper `plugins` folder (see Ant echo in build log).
 
 Install and run on a Paper server
 1) Copy target/JebaitedCore.jar into your Paper server's plugins directory.

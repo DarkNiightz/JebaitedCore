@@ -7,3 +7,7 @@ V003__homes_reshape.sql
 V004__donor_perks.sql
 V005__homes_column_fix.sql
 V006__event_persistence.sql
+V007__server_shop.sql
+V008__discord_platform_core.sql
+V009__discord_activity_and_bridge.sql
+V010__store_stripe.sql

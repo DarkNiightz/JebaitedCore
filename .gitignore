@@ -35,6 +35,12 @@ build/
 
 ### Local deploy (post-build JAR copy) ###
 jebaited-deploy.properties
+local-paper-server/plugins/*.jar
+
+### Secrets (Discord bot, DB overrides — never commit) ###
+.env
+.env.local
+discord-plugin-local.yml
 
 ### VS Code ###
 .vscode/

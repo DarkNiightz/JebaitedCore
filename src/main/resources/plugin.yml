@@ -12,6 +12,7 @@ softdepend: [mcMMO]
 libraries:
   - com.zaxxer:HikariCP:5.1.0
   - org.postgresql:postgresql:42.7.3
+  - com.stripe:stripe-java:28.0.0
 
 commands:
   # Core/help
@@ -90,9 +91,20 @@ commands:
   rules:
     description: Show server rules
     usage: /rules
+  link:
+    description: Generate a one-time Discord account link code
+    usage: /link
   rtp:
     description: Teleport to a random location in SMP
     usage: /rtp
+  shop:
+    description: Open the server economy shop (SMP)
+    usage: /shop
+    aliases: [market]
+  donate:
+    description: Open the supporter store (Stripe Checkout)
+    usage: /donate
+    aliases: [store]
   message:
     description: Send a private message to another player
     usage: /message <player> <message>
@@ -351,6 +363,18 @@ permissions:
   jebaited.mcmmo.mcrank:
     description: Use /mcrank (mcMMO rank wrapper)
     default: true
+  jebaited.shop.use:
+    description: Open the server economy shop GUI
+    default: true
+  jebaited.donate.use:
+    description: Open the Stripe supporter store (/donate)
+    default: true
+  jebaited.discord.link:
+    description: Generate one-time Discord linking codes
+    default: true
+  jebaited.discord.bridge.faction:
+    description: Use faction Discord↔MC chat relay when enabled in config
+    default: false
   jebaited.menu.use:
     description: Open the Servers Navigator GUI
     default: true

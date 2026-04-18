@@ -994,6 +994,7 @@ public final class EventEngine {
             setImmediateRespawn(true);
             schedulePersistEventSessionStart(session);
             broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
+            discordNotifyEventRunning();
             return;
         }
 
@@ -1080,7 +1081,22 @@ public final class EventEngine {
         setImmediateRespawn(true);
         schedulePersistEventSessionStart(session);
         broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
+        discordNotifyEventRunning();
         checkImmediateElimination();
+    }
+
+    private void discordNotifyEventRunning() {
+        if (session == null) {
+            return;
+        }
+        if (!(plugin instanceof JebaitedCore core)) {
+            return;
+        }
+        var svc = core.getDiscordIntegrationService();
+        if (svc == null || !svc.isEnabled()) {
+            return;
+        }
+        svc.notifyEventStarted(session.spec.key, session.spec.displayName, session.active.size(), session.spec.kind.name());
     }
 
     private void checkImmediateElimination() {
@@ -1122,6 +1138,19 @@ public final class EventEngine {
         broadcast("§d★ §fEvent Over: §d" + ended.displayName + " §7— Winner: §a" + winnerName + " §8(+§6" + reward + " coins§8)");
         if (reason != null && !reason.isBlank()) broadcast("§7Reason: §f" + reason);
 
+        if (plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventEnded(
+                        ended.key,
+                        ended.displayName,
+                        ended.kind.name(),
+                        winnerName,
+                        reward,
+                        reason == null ? "" : reason);
+            }
+        }
+
         clearState();
         persistFinalizeFromSnapshotAsync(pSnap);
     }
@@ -1161,11 +1190,31 @@ public final class EventEngine {
         broadcast("§d★ §fEvent Over: §d" + ended.displayName + " §7— §eTie §7— §a" + names
                 + " §8(+§6" + rewardTotal + " coins split§8)");
 
+        StringBuilder tiePlain = new StringBuilder();
+        for (int i = 0; i < winners.size(); i++) {
+            if (i > 0) {
+                tiePlain.append(", ");
+            }
+            OfflinePlayer ow = Bukkit.getOfflinePlayer(winners.get(i));
+            String nm = ow.getName() != null ? ow.getName() : winners.get(i).toString().substring(0, 8);
+            tiePlain.append(nm);
+        }
+        if (plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventTie(ended.key, ended.displayName, ended.kind.name(), tiePlain.toString(), rewardTotal);
+            }
+        }
+
         clearState();
         persistFinalizeFromSnapshotAsync(pSnap);
     }
 
     private synchronized void doStopEvent(String reason) {
+        EventSpec specForDiscordCancel = null;
+        if (session != null && session.state == EventState.RUNNING) {
+            specForDiscordCancel = session.spec;
+        }
         EventPersistenceSnap snap = null;
         if (session != null) {
             if (session.persistenceSessionId > 0 && session.state == EventState.RUNNING) {
@@ -1176,6 +1225,15 @@ public final class EventEngine {
             removeCountdownBar();
         }
         clearState();
+        if (specForDiscordCancel != null
+                && reason != null
+                && !reason.toLowerCase(Locale.ROOT).contains("plugin shutdown")
+                && plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventCancelled(specForDiscordCancel.key, specForDiscordCancel.displayName, reason);
+            }
+        }
         persistFinalizeFromSnapshotAsync(snap);
     }
 

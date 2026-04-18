@@ -19,6 +19,13 @@ public final class ModerationLogger {
             }
         }
         dao.logModerationAction(target, entry);
+        try {
+            com.darkniightz.main.JebaitedCore core = com.darkniightz.main.JebaitedCore.getInstance();
+            if (core != null && core.getDiscordIntegrationService() != null) {
+                core.getDiscordIntegrationService().notifyModerationMirror(entry);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     public static Map<String, Object> entry(String type, String actorName, UUID actorId, String reason, Long durationMs, Long expiresAt) {

@@ -67,6 +67,13 @@ public final class PermissionConstants {
 
     /** Server balance shop GUI ({@code /shop}). */
     public static final String CMD_SHOP = "jebaited.shop.use";
+    /** Stripe store / donate GUI ({@code /donate}). */
+    public static final String CMD_DONATE = "jebaited.donate.use";
+    /** Discord account linking ({@code /link}). */
+    public static final String CMD_DISCORD_LINK = "jebaited.discord.link";
+
+    /** Receives Discord → in-game messages on the faction bridge channel (optional). */
+    public static final String DISCORD_BRIDGE_FACTION = "jebaited.discord.bridge.faction";
 
     /** Optional extra gate for /chatgame staff actions (primary gate is srmod+ in {@link com.darkniightz.core.commands.ChatGameCommand}). */
     public static final String CMD_CHATGAME = "jebaited.chatgame.use";
