@@ -1,6 +1,7 @@
 package com.darkniightz.main;
 
 import com.darkniightz.core.players.PlayerProfile;
+import com.darkniightz.core.system.NetworkManager;
 import com.darkniightz.main.database.DatabaseManager;
 
 import java.sql.*;
@@ -40,38 +41,56 @@ public class PlayerProfileDAO {
      * @param entry      A map containing details of the moderation action.
      */
     public void logModerationAction(UUID targetUuid, Map<String, Object> entry) {
-        String sql = "INSERT INTO moderation_history (target_uuid, target_name, type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
+        String sql = "INSERT INTO moderation_history (target_uuid, target_name, type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp, status, server, pardon_actor, pardon_actor_uuid, pardon_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+        String type = (String) entry.get("type");
+        String status = isPardonAction(type) ? "pardoned" : "active";
+        String actor = (String) entry.get("actor");
+        String actorUuid = (String) entry.get("actorUuid");
+        long now = System.currentTimeMillis();
+        long ts = entry.get("ts") instanceof Long t ? t : now;
 
-        try (Connection conn = dbManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, targetUuid.toString());
-            pstmt.setString(2, resolveTargetName(conn, targetUuid, entry));
-            pstmt.setString(3, (String) entry.get("type"));
-            pstmt.setString(4, (String) entry.get("actor"));
-            pstmt.setString(5, (String) entry.get("actorUuid"));
-            pstmt.setString(6, (String) entry.get("reason"));
-
-            // Handle nullable Long values
-            Object duration = entry.get("durationMs");
-            if (duration instanceof Long) {
-                pstmt.setLong(7, (Long) duration);
-            } else {
-                pstmt.setNull(7, Types.BIGINT);
+        try (Connection conn = dbManager.getConnection()) {
+            markExpiredModerationActions(conn, targetUuid);
+            if (isPardonAction(type)) {
+                markPardonedRecords(conn, targetUuid, type, actor, actorUuid, ts);
             }
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, targetUuid.toString());
+                pstmt.setString(2, resolveTargetName(conn, targetUuid, entry));
+                pstmt.setString(3, type);
+                pstmt.setString(4, actor);
+                pstmt.setString(5, actorUuid);
+                pstmt.setString(6, (String) entry.get("reason"));
 
-            Object expires = entry.get("expiresAt");
-            if (expires instanceof Long) {
-                pstmt.setLong(8, (Long) expires);
-            } else {
-                pstmt.setNull(8, Types.BIGINT);
+                Object duration = entry.get("durationMs");
+                if (duration instanceof Long) {
+                    pstmt.setLong(7, (Long) duration);
+                } else {
+                    pstmt.setNull(7, Types.BIGINT);
+                }
+
+                Object expires = entry.get("expiresAt");
+                if (expires instanceof Long) {
+                    pstmt.setLong(8, (Long) expires);
+                } else {
+                    pstmt.setNull(8, Types.BIGINT);
+                }
+
+                pstmt.setLong(9, ts);
+                pstmt.setString(10, status);
+                pstmt.setString(11, resolveServerId());
+                if (isPardonAction(type)) {
+                    pstmt.setString(12, actor);
+                    pstmt.setString(13, actorUuid);
+                    pstmt.setLong(14, ts);
+                } else {
+                    pstmt.setNull(12, Types.VARCHAR);
+                    pstmt.setNull(13, Types.VARCHAR);
+                    pstmt.setNull(14, Types.BIGINT);
+                }
+                pstmt.executeUpdate();
             }
-
-            pstmt.setLong(9, (Long) entry.get("ts"));
-
-            pstmt.executeUpdate();
-
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Could not log moderation action for " + targetUuid, e);
         }
@@ -85,6 +104,7 @@ public class PlayerProfileDAO {
         String sql = "SELECT mh.expires_at, mh.reason FROM moderation_history mh " +
                 "WHERE mh.target_uuid = ? " +
                 "AND mh.type IN ('ban', 'tempban') " +
+                "AND mh.status = 'active' " +
                 "AND (mh.expires_at IS NULL OR mh.expires_at > ?) " +
                 "AND NOT EXISTS (" +
                 "  SELECT 1 FROM moderation_history u " +
@@ -96,6 +116,7 @@ public class PlayerProfileDAO {
 
         try (Connection conn = dbManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            markExpiredModerationActions(conn, uuid);
             pstmt.setString(1, uuid.toString());
             pstmt.setLong(2, System.currentTimeMillis());
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -629,11 +650,12 @@ public class PlayerProfileDAO {
      * @return List of rows as maps compatible with ModerationLogger.entry() keys
      */
     public java.util.List<java.util.Map<String, Object>> getModerationHistory(UUID target, int limit) {
-        String sql = "SELECT type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp FROM moderation_history " +
+        String sql = "SELECT type, actor, actor_uuid, reason, duration_ms, expires_at, timestamp, status, pardon_actor, pardon_actor_uuid, pardon_at, server FROM moderation_history " +
                 "WHERE target_uuid = ? ORDER BY timestamp DESC LIMIT ?;";
         java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
         try (Connection conn = dbManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            markExpiredModerationActions(conn, target);
             ps.setString(1, target.toString());
             ps.setInt(2, Math.max(1, Math.min(500, limit)));
             try (ResultSet rs = ps.executeQuery()) {
@@ -651,6 +673,16 @@ public class PlayerProfileDAO {
                     if (!rs.wasNull()) m.put("durationMs", duration);
                     long expires = rs.getLong("expires_at");
                     if (!rs.wasNull()) m.put("expiresAt", expires);
+                    String status = rs.getString("status");
+                    if (status != null && !status.isEmpty()) m.put("status", status);
+                    String pardonActor = rs.getString("pardon_actor");
+                    if (pardonActor != null && !pardonActor.isEmpty()) m.put("pardonActor", pardonActor);
+                    String pardonActorUuid = rs.getString("pardon_actor_uuid");
+                    if (pardonActorUuid != null && !pardonActorUuid.isEmpty()) m.put("pardonActorUuid", pardonActorUuid);
+                    long pardonAt = rs.getLong("pardon_at");
+                    if (!rs.wasNull()) m.put("pardonAt", pardonAt);
+                    String server = rs.getString("server");
+                    if (server != null && !server.isEmpty()) m.put("server", server);
                     rows.add(m);
                 }
             }
@@ -853,6 +885,130 @@ public class PlayerProfileDAO {
                 logger.log(Level.WARNING, "Failed to mark rank request " + id + " as applied", e);
             }
         }
+    }
+
+    public boolean persistRankImmediate(UUID uuid, String username, String rank) {
+        if (uuid == null || rank == null || rank.isBlank()) return false;
+        String sql = "UPDATE players SET rank = ?, username = COALESCE(?, username), last_joined = ? WHERE uuid = ?;";
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, rank);
+            ps.setString(2, username);
+            ps.setLong(3, System.currentTimeMillis());
+            ps.setString(4, uuid.toString());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Failed to persist rank immediately for " + uuid, e);
+            return false;
+        }
+    }
+
+    public void upsertBoosterInventory(UUID playerUuid, String boosterKey, int quantity) {
+        if (playerUuid == null || boosterKey == null || boosterKey.isBlank()) return;
+        String sql = "INSERT INTO booster_inventory (player_uuid, booster_key, quantity, updated_at) VALUES (?, ?, ?, ?) " +
+                "ON CONFLICT (player_uuid, booster_key) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = EXCLUDED.updated_at;";
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setString(2, boosterKey);
+            ps.setInt(3, Math.max(0, quantity));
+            ps.setLong(4, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Failed to upsert booster inventory for " + playerUuid, e);
+        }
+    }
+
+    public void addActiveBooster(UUID playerUuid, String boosterKey, double multiplier, long expiresAt, String source, String serverId) {
+        if (playerUuid == null || boosterKey == null || boosterKey.isBlank()) return;
+        String sql = "INSERT INTO active_boosters (player_uuid, booster_key, multiplier, started_at, expires_at, source, server) VALUES (?, ?, ?, ?, ?, ?, ?);";
+        long now = System.currentTimeMillis();
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setString(2, boosterKey);
+            ps.setDouble(3, Math.max(0.01D, multiplier));
+            ps.setLong(4, now);
+            ps.setLong(5, Math.max(now, expiresAt));
+            ps.setString(6, source);
+            ps.setString(7, serverId == null || serverId.isBlank() ? resolveServerId() : serverId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Failed to insert active booster for " + playerUuid, e);
+        }
+    }
+
+    public void upsertPlayerQuest(UUID playerUuid, String questKey, String status, int progress, int goal, String metadata) {
+        if (playerUuid == null || questKey == null || questKey.isBlank()) return;
+        String sql = "INSERT INTO player_quests (player_uuid, quest_key, status, progress, goal, updated_at, completed_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT (player_uuid, quest_key) DO UPDATE SET status = EXCLUDED.status, progress = EXCLUDED.progress, goal = EXCLUDED.goal, updated_at = EXCLUDED.updated_at, completed_at = EXCLUDED.completed_at, metadata = EXCLUDED.metadata;";
+        long now = System.currentTimeMillis();
+        boolean complete = "completed".equalsIgnoreCase(status);
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setString(2, questKey);
+            ps.setString(3, status == null || status.isBlank() ? "active" : status.toLowerCase(java.util.Locale.ROOT));
+            ps.setInt(4, Math.max(0, progress));
+            ps.setInt(5, Math.max(0, goal));
+            ps.setLong(6, now);
+            if (complete) ps.setLong(7, now); else ps.setNull(7, Types.BIGINT);
+            ps.setString(8, metadata);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Failed to upsert quest row for " + playerUuid, e);
+        }
+    }
+
+    private void markPardonedRecords(Connection conn, UUID targetUuid, String pardonType, String actor, String actorUuid, long when) throws SQLException {
+        if (targetUuid == null || pardonType == null) return;
+        String targetType = switch (pardonType.toLowerCase(java.util.Locale.ROOT)) {
+            case "unban" -> "ban";
+            case "unmute" -> "mute";
+            case "unfreeze" -> "freeze";
+            default -> null;
+        };
+        if (targetType == null) return;
+        String sql = "UPDATE moderation_history SET status = 'pardoned', pardon_actor = ?, pardon_actor_uuid = ?, pardon_at = ? " +
+                "WHERE target_uuid = ? AND status = 'active' AND type IN (?, ?) AND (expires_at IS NULL OR expires_at > ?);";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, actor);
+            ps.setString(2, actorUuid);
+            ps.setLong(3, when);
+            ps.setString(4, targetUuid.toString());
+            ps.setString(5, targetType);
+            ps.setString(6, "temp" + targetType);
+            ps.setLong(7, when);
+            ps.executeUpdate();
+        }
+    }
+
+    private void markExpiredModerationActions(Connection conn, UUID targetUuid) throws SQLException {
+        String sql = "UPDATE moderation_history SET status = 'expired' " +
+                "WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= ? " +
+                (targetUuid == null ? "" : "AND target_uuid = ? ");
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, System.currentTimeMillis());
+            if (targetUuid != null) {
+                ps.setString(2, targetUuid.toString());
+            }
+            ps.executeUpdate();
+        }
+    }
+
+    private boolean isPardonAction(String type) {
+        if (type == null) return false;
+        return type.equalsIgnoreCase("unban")
+                || type.equalsIgnoreCase("unmute")
+                || type.equalsIgnoreCase("unfreeze");
+    }
+
+    private String resolveServerId() {
+        NetworkManager networkManager = NetworkManager.getInstance();
+        if (networkManager != null && networkManager.getServerId() != null && !networkManager.getServerId().isBlank()) {
+            return networkManager.getServerId();
+        }
+        return "hub-01";
     }
 
     private Set<String> parseKeySet(String raw) {

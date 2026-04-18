@@ -91,6 +91,24 @@ public final class DiscordLinkService {
         }
     }
 
+    /**
+     * Returns the number of active (not unlinked) Discord connections.
+     * Used by lightweight surfaces such as tablist/footer status.
+     */
+    public int countActiveLinks() {
+        String sql = "SELECT COUNT(*) FROM discord_links WHERE unlinked_at IS NULL;";
+        try (Connection conn = databaseManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return Math.max(0, rs.getInt(1));
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to count active Discord links: " + e.getMessage());
+        }
+        return -1;
+    }
+
     private String nextCode() {
         StringBuilder sb = new StringBuilder(CODE_LENGTH);
         for (int i = 0; i < CODE_LENGTH; i++) {

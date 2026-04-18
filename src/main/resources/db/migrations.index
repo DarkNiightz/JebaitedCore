@@ -11,3 +11,6 @@ V007__server_shop.sql
 V008__discord_platform_core.sql
 V009__discord_activity_and_bridge.sql
 V010__store_stripe.sql
+V011__moderation_status_lifecycle.sql
+V012__server_id_columns.sql
+V013__booster_and_quest_tables.sql

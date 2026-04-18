@@ -152,6 +152,13 @@ public class EventModeManager {
     public ActionResult rebuildEventWorld(boolean confirmed) { return wrap(engine.rebuildEventWorld(confirmed)); }
 
     public List<String> getEventScoreboardLines() { return engine.getEventScoreboardLines(); }
+    public int getPendingHardcoreLootCount(Player player) {
+        return player == null ? 0 : engine.getPendingHardcoreLootCount(player.getUniqueId());
+    }
+    public List<ItemStack> getPendingHardcoreLootPreview(Player player) {
+        return player == null ? List.of() : engine.getPendingHardcoreLootPreview(player.getUniqueId());
+    }
+    public int claimPendingHardcoreLoot(Player player) { return engine.claimPendingHardcoreLoot(player); }
 
     private ActionResult wrap(EventEngine.ActionResult r) { return new ActionResult(r.ok(), r.message()); }
 }

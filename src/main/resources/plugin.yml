@@ -105,6 +105,9 @@ commands:
     description: Open the supporter store (Stripe Checkout)
     usage: /donate
     aliases: [store]
+  loot:
+    description: Open your hardcore event loot pool and claim rewards
+    usage: /loot [claim]
   message:
     description: Send a private message to another player
     usage: /message <player> <message>
@@ -115,7 +118,7 @@ commands:
     aliases: [r]
   maintenance:
     description: Toggle or inspect server maintenance mode
-    usage: /maintenance <on|off|status|add|remove|list>
+    usage: /maintenance <on|off|status|add|allow|remove|list>
     aliases: [maint]
   notes:
     description: View staff notes for a player
@@ -160,6 +163,9 @@ commands:
   freeze:
     description: Toggle freeze on a player
     usage: /freeze <player>
+  unfreeze:
+    description: Force-unfreeze a player
+    usage: /unfreeze <player>
   vanish:
     description: Toggle staff vanish
     usage: /vanish
@@ -193,7 +199,7 @@ commands:
     aliases: [nav]
   cosmetics:
     description: Open the Cosmetics Lounge
-    usage: /cosmetics
+    usage: /cosmetics | /cosmetics <give|take> <id> <player> | /cosmetics wipe <player>
     aliases: [cos]
   wardrobe:
     description: Open the Wardrobe
@@ -369,11 +375,17 @@ permissions:
   jebaited.donate.use:
     description: Open the Stripe supporter store (/donate)
     default: true
+  jebaited.loot.use:
+    description: Open and claim hardcore event loot pool rewards
+    default: true
   jebaited.discord.link:
     description: Generate one-time Discord linking codes
     default: true
   jebaited.discord.bridge.faction:
     description: Use faction Discord↔MC chat relay when enabled in config
+    default: false
+  jebaited.tablist.hide:
+    description: Use compact tablist footer mode (staff utility)
     default: false
   jebaited.menu.use:
     description: Open the Servers Navigator GUI

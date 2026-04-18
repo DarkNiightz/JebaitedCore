@@ -1,9 +1,11 @@
 package com.darkniightz.core.system;
 
+import com.darkniightz.core.permissions.PermissionConstants;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
 import com.darkniightz.core.world.WorldManager;
+import com.darkniightz.main.JebaitedCore;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -25,6 +27,9 @@ public class ServerScoreboardManager {
     private final WorldManager worldManager;
     private BukkitTask task;
     private int frame;
+    private volatile int discordLinkedCount = -1;
+    private volatile long lastDiscordLinkedRefreshMs = 0L;
+    private volatile boolean discordRefreshInFlight;
 
     public ServerScoreboardManager(Plugin plugin, ProfileStore profiles, RankManager ranks, WorldManager worldManager) {
         this.plugin = plugin;
@@ -51,6 +56,7 @@ public class ServerScoreboardManager {
 
     private void tick() {
         frame++;
+        refreshDiscordLinkedCountAsync();
         if (Bukkit.getScoreboardManager() != null) {
             applyNametagTeams(Bukkit.getScoreboardManager().getMainScoreboard());
         }
@@ -141,6 +147,7 @@ public class ServerScoreboardManager {
         }
 
         player.setScoreboard(board);
+        applyTablist(player);
     }
 
     public void clear(Player player) {
@@ -344,5 +351,62 @@ public class ServerScoreboardManager {
             out.append(c).append(ChatColor.BOLD).append(text.charAt(i));
         }
         return out.toString();
+    }
+
+    private void refreshDiscordLinkedCountAsync() {
+        if (!plugin.getConfig().getBoolean("scoreboard.tablist.enabled", true)) {
+            return;
+        }
+        if (!(plugin instanceof JebaitedCore core) || core.getDiscordLinkService() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long minIntervalMs = Math.max(3000L, plugin.getConfig().getLong("scoreboard.tablist.interval_seconds", 10L) * 1000L);
+        if (discordRefreshInFlight || (now - lastDiscordLinkedRefreshMs) < minIntervalMs) {
+            return;
+        }
+        discordRefreshInFlight = true;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                discordLinkedCount = core.getDiscordLinkService().countActiveLinks();
+                lastDiscordLinkedRefreshMs = System.currentTimeMillis();
+            } finally {
+                discordRefreshInFlight = false;
+            }
+        });
+    }
+
+    private void applyTablist(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        if (!plugin.getConfig().getBoolean("scoreboard.tablist.enabled", true)) {
+            return;
+        }
+        String header = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("scoreboard.server_name", "&fJebaited Network"));
+        if (player.hasPermission(PermissionConstants.TABLIST_HIDE)) {
+            String hidden = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("scoreboard.tablist.hidden_footer", "&fJebaited Network"));
+            player.setPlayerListHeaderFooter(header, hidden);
+            return;
+        }
+        List<String> categories = plugin.getConfig().getStringList("scoreboard.tablist.categories");
+        if (categories == null || categories.isEmpty()) {
+            categories = List.of("help", "store", "discord", "network");
+        }
+        long interval = Math.max(3L, plugin.getConfig().getLong("scoreboard.tablist.interval_seconds", 10L));
+        int index = (int) ((System.currentTimeMillis() / 1000L / interval) % categories.size());
+        String category = categories.get(Math.max(0, Math.min(index, categories.size() - 1))).toLowerCase(Locale.ROOT);
+        String footer = switch (category) {
+            case "store" -> "§6Store§7: §f/donate";
+            case "discord" -> {
+                if (discordLinkedCount >= 0) {
+                    yield "§9Discord Linked§7: §f" + discordLinkedCount;
+                }
+                yield "§9Discord§7: §f/link";
+            }
+            case "network" -> "§aOnline§7: §f" + Bukkit.getOnlinePlayers().size() + "§7/§f" + Bukkit.getMaxPlayers();
+            default -> "§bHelp§7: §f/jebaited";
+        };
+        player.setPlayerListHeaderFooter(header, footer);
     }
 }

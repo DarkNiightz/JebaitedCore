@@ -71,6 +71,8 @@ public final class EventEngine {
 
     // ── Live session ─────────────────────────────────────────────────────────
     private volatile EventSession session;
+    /** Winner claim bucket persisted across event teardown until player claims via /loot. */
+    private final Map<UUID, List<ItemStack>> pendingHardcoreLootClaims = new HashMap<>();
 
     // ── Handler instances ─────────────────────────────────────────────────────
     private FfaHandler  ffaHandler;
@@ -1050,24 +1052,13 @@ public final class EventEngine {
             return;
         }
 
-        boolean isHC = kind.isHardcore();
         int i = 0;
         for (UUID id : session.active) {
             Player p = Bukkit.getPlayer(id);
             if (p == null) continue;
-            if (isHC) {
-                // HC: take snapshot for return location, then clear inventory
-                if (!session.snapshots.containsKey(id)) {
-                    session.snapshots.put(id, InventorySnapshot.capture(p));
-                }
-                p.getInventory().clear();
-                p.getInventory().setArmorContents(new ItemStack[4]);
-                p.getInventory().setItemInOffHand(null);
-                p.updateInventory();
-            } else {
-                if (!session.snapshots.containsKey(id)) {
-                    session.snapshots.put(id, InventorySnapshot.capture(p));
-                }
+            // Keep inventory on hardcore join. Hardcore loss happens on elimination/death.
+            if (!session.snapshots.containsKey(id)) {
+                session.snapshots.put(id, InventorySnapshot.capture(p));
             }
             Location spawn = spawns.get(i % spawns.size());
             p.teleport(spawn);
@@ -1130,7 +1121,7 @@ public final class EventEngine {
         writeEventStats(ended.key, winner);
         restoreSnapshots();
         restoreStaffSpectators();
-        if (ended.kind.isHardcore()) giveLootToWinner(winner);
+        if (ended.kind.isHardcore()) queueLootForWinner(winner);
         getHandler(ended.kind).onEnd(session);
 
         OfflinePlayer w = Bukkit.getOfflinePlayer(winner);
@@ -1175,9 +1166,7 @@ public final class EventEngine {
         writeEventStatsCoWinners(ended.key, winners);
         restoreSnapshots();
         restoreStaffSpectators();
-        if (ended.kind.isHardcore()) {
-            giveLootSplitToWinners(winners);
-        }
+        if (ended.kind.isHardcore()) giveLootSplitToWinners(winners);
         getHandler(ended.kind).onEnd(session);
 
         StringBuilder names = new StringBuilder();
@@ -1290,28 +1279,22 @@ public final class EventEngine {
         if (eventWorld != null) eventWorld.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, enabled);
     }
 
-    private void giveLootToWinner(UUID winnerId) {
+    private void queueLootForWinner(UUID winnerId) {
         if (session == null || session.hardcoreLootPool.isEmpty()) return;
-        Player online = Bukkit.getPlayer(winnerId);
-        if (online == null) { session.hardcoreLootPool.clear(); return; }
         List<ItemStack> pool = new ArrayList<>(session.hardcoreLootPool);
         session.hardcoreLootPool.clear();
-        int stacks = 0;
-        for (ItemStack item : pool) {
-            if (item == null || item.getType() == Material.AIR) continue;
-            stacks++;
-            Map<Integer, ItemStack> overflow = online.getInventory().addItem(item);
-            for (ItemStack leftover : overflow.values()) {
-                online.getWorld().dropItemNaturally(online.getLocation(), leftover);
-            }
-        }
-        online.updateInventory();
-        if (stacks > 0) {
+        List<ItemStack> cleaned = sanitizeLoot(pool);
+        if (cleaned.isEmpty()) return;
+        pendingHardcoreLootClaims.computeIfAbsent(winnerId, k -> new ArrayList<>()).addAll(cleaned);
+        Player online = Bukkit.getPlayer(winnerId);
+        if (online != null && online.isOnline()) {
             online.sendMessage(Component.text("⚔ ", NamedTextColor.GOLD)
-                    .append(Component.text("You claimed ", NamedTextColor.YELLOW))
-                    .append(Component.text(stacks + " loot stack" + (stacks == 1 ? "" : "s"),
+                    .append(Component.text("Hardcore loot pool ready: ", NamedTextColor.YELLOW))
+                    .append(Component.text(cleaned.size() + " stack" + (cleaned.size() == 1 ? "" : "s"),
                             NamedTextColor.GOLD, TextDecoration.BOLD))
-                    .append(Component.text(" from fallen players!", NamedTextColor.YELLOW)));
+                    .append(Component.text(". Claim with ", NamedTextColor.YELLOW))
+                    .append(Component.text("/loot", NamedTextColor.AQUA))
+                    .append(Component.text(".", NamedTextColor.YELLOW)));
             online.playSound(online.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 0.8f);
         }
     }
@@ -1321,36 +1304,85 @@ public final class EventEngine {
         if (session == null || session.hardcoreLootPool.isEmpty() || winnerIds == null || winnerIds.isEmpty()) {
             return;
         }
-        List<Player> online = new ArrayList<>();
-        for (UUID id : winnerIds) {
-            Player p = Bukkit.getPlayer(id);
-            if (p != null && p.isOnline()) {
-                online.add(p);
-            }
-        }
-        if (online.isEmpty()) {
-            session.hardcoreLootPool.clear();
-            return;
-        }
+        List<UUID> eligible = new ArrayList<>(winnerIds);
+        if (eligible.isEmpty()) return;
         List<ItemStack> pool = new ArrayList<>(session.hardcoreLootPool);
         session.hardcoreLootPool.clear();
+        List<List<ItemStack>> split = new ArrayList<>();
+        for (int i = 0; i < eligible.size(); i++) split.add(new ArrayList<>());
         int wi = 0;
         for (ItemStack item : pool) {
             if (item == null || item.getType() == Material.AIR) continue;
-            Player target = online.get(wi % online.size());
+            List<ItemStack> bucket = split.get(wi % split.size());
             wi++;
-            Map<Integer, ItemStack> overflow = target.getInventory().addItem(item);
-            for (ItemStack leftover : overflow.values()) {
-                target.getWorld().dropItemNaturally(target.getLocation(), leftover);
-            }
-            target.updateInventory();
+            bucket.add(item.clone());
         }
-        for (Player p : online) {
+        for (int i = 0; i < eligible.size(); i++) {
+            UUID id = eligible.get(i);
+            List<ItemStack> cleaned = sanitizeLoot(split.get(i));
+            if (!cleaned.isEmpty()) {
+                pendingHardcoreLootClaims.computeIfAbsent(id, k -> new ArrayList<>()).addAll(cleaned);
+            }
+        }
+        for (UUID id : eligible) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null || !p.isOnline()) continue;
+            int count = pendingHardcoreLootClaims.getOrDefault(id, List.of()).size();
             p.sendMessage(Component.text("⚔ ", NamedTextColor.GOLD)
-                    .append(Component.text("Tie win — you received a share of the hardcore loot pool.",
-                            NamedTextColor.YELLOW)));
+                    .append(Component.text("Tie win — your hardcore loot share is ready (", NamedTextColor.YELLOW))
+                    .append(Component.text(count + " stack" + (count == 1 ? "" : "s"), NamedTextColor.GOLD, TextDecoration.BOLD))
+                    .append(Component.text("). Use ", NamedTextColor.YELLOW))
+                    .append(Component.text("/loot", NamedTextColor.AQUA))
+                    .append(Component.text(" to claim.", NamedTextColor.YELLOW)));
             p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 0.8f);
         }
+    }
+
+    private List<ItemStack> sanitizeLoot(List<ItemStack> raw) {
+        List<ItemStack> cleaned = new ArrayList<>();
+        if (raw == null) return cleaned;
+        for (ItemStack item : raw) {
+            if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) continue;
+            cleaned.add(item.clone());
+        }
+        return cleaned;
+    }
+
+    public synchronized int getPendingHardcoreLootCount(UUID playerId) {
+        if (playerId == null) return 0;
+        return pendingHardcoreLootClaims.getOrDefault(playerId, List.of()).size();
+    }
+
+    public synchronized List<ItemStack> getPendingHardcoreLootPreview(UUID playerId) {
+        if (playerId == null) return List.of();
+        List<ItemStack> list = pendingHardcoreLootClaims.get(playerId);
+        if (list == null || list.isEmpty()) return List.of();
+        List<ItemStack> copy = new ArrayList<>(list.size());
+        for (ItemStack item : list) {
+            if (item != null && item.getType() != Material.AIR) {
+                copy.add(item.clone());
+            }
+        }
+        return copy;
+    }
+
+    public synchronized int claimPendingHardcoreLoot(Player player) {
+        if (player == null) return 0;
+        UUID id = player.getUniqueId();
+        List<ItemStack> list = pendingHardcoreLootClaims.get(id);
+        if (list == null || list.isEmpty()) return 0;
+        int delivered = 0;
+        for (ItemStack item : list) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            delivered++;
+            Map<Integer, ItemStack> overflow = player.getInventory().addItem(item);
+            for (ItemStack leftover : overflow.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        }
+        player.updateInventory();
+        pendingHardcoreLootClaims.remove(id);
+        return delivered;
     }
 
     private void rewardWinner(UUID winner, int reward, String eventDisplay) {
@@ -1612,9 +1644,9 @@ public final class EventEngine {
         player.sendMessage(Component.empty());
         player.sendMessage(Component.text("  ☠ HARDCORE EVENT WARNING", NamedTextColor.DARK_RED, TextDecoration.BOLD));
         player.sendMessage(Component.text("  ─────────────────────────────────────", NamedTextColor.DARK_GRAY));
-        player.sendMessage(Component.text("  • Your entire inventory will be cleared on join.", NamedTextColor.RED));
-        player.sendMessage(Component.text("  • If you die, your items are gone — permanently.", NamedTextColor.RED));
-        player.sendMessage(Component.text("  • Items go to the winner. No grave. No vault transfer.", NamedTextColor.RED));
+        player.sendMessage(Component.text("  • You KEEP inventory on join.", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("  • If you die, your full inventory is added to the hardcore loot pool.", NamedTextColor.RED));
+        player.sendMessage(Component.text("  • Only winner(s) can claim that pool at the end via /loot.", NamedTextColor.RED));
         player.sendMessage(Component.text("  • Grave Insurance does NOT apply in hardcore events.", NamedTextColor.RED));
         player.sendMessage(Component.text("  ─────────────────────────────────────", NamedTextColor.DARK_GRAY));
         player.sendMessage(Component.text("  [CLICK TO CONFIRM AND JOIN]", NamedTextColor.RED, TextDecoration.BOLD)
@@ -1628,9 +1660,9 @@ public final class EventEngine {
             case KOTH          -> "Earn the most uncontested hill time (sole player in zone) to win.";
             case FFA           -> "Free-for-all. Last player standing wins. Gear is restored on death.";
             case DUELS         -> "1v1 duel. Best of one. Gear is restored after the match.";
-            case HARDCORE, HARDCORE_FFA  -> "Hardcore FFA — die and lose your items, last survivor claims the pool.";
-            case HARDCORE_DUELS          -> "Hardcore duel — the loser drops everything to the winner.";
-            case HARDCORE_KOTH           -> "Hardcore KOTH — die and lose your items. Most uncontested hill time wins; ties split the loot pool.";
+            case HARDCORE, HARDCORE_FFA  -> "Hardcore FFA — keep gear on join; die and lose items to the loot pool. Winner claims via /loot.";
+            case HARDCORE_DUELS          -> "Hardcore duel — keep gear on join; loser inventory goes to the loot pool. Winner claims via /loot.";
+            case HARDCORE_KOTH           -> "Hardcore KOTH — keep gear on join; deaths feed loot pool. Most uncontested hill time wins; ties split claimable pool.";
             case CTF           -> "Capture the Flag — steal the enemy flag and bring it to your base.";
             default            -> plugin.getConfig().getString("event_mode.events." + spec.key + ".description",
                                        "Compete to win " + spec.coinReward + " coins.");
