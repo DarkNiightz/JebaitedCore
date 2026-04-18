@@ -69,11 +69,15 @@ public final class PermissionConstants {
     public static final String CMD_SHOP = "jebaited.shop.use";
     /** Stripe store / donate GUI ({@code /donate}). */
     public static final String CMD_DONATE = "jebaited.donate.use";
+    /** Hardcore loot claim GUI ({@code /loot}). */
+    public static final String CMD_LOOT = "jebaited.loot.use";
     /** Discord account linking ({@code /link}). */
     public static final String CMD_DISCORD_LINK = "jebaited.discord.link";
 
     /** Receives Discord → in-game messages on the faction bridge channel (optional). */
     public static final String DISCORD_BRIDGE_FACTION = "jebaited.discord.bridge.faction";
+    /** Uses the compact tablist footer override. */
+    public static final String TABLIST_HIDE = "jebaited.tablist.hide";
 
     /** Optional extra gate for /chatgame staff actions (primary gate is srmod+ in {@link com.darkniightz.core.commands.ChatGameCommand}). */
     public static final String CMD_CHATGAME = "jebaited.chatgame.use";

@@ -530,6 +530,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("link", new DiscordLinkCommand(this));
         bindCommand("shop", new com.darkniightz.core.commands.ShopCommand(this));
         bindCommand("donate", new DonateCommand(this));
+        bindCommand("loot", new com.darkniightz.core.commands.LootCommand(this));
         MessageCommand messageCommand = new MessageCommand(profileStore, rankManager, messageManager);
         bindCommand("message", messageCommand);
         ReplyCommand replyCommand = new ReplyCommand(profileStore, rankManager, messageManager);
@@ -589,6 +590,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("tempban", new BanCommand(this, profileStore, rankManager, devModeManager, false));
         bindCommand("unban", new UnbanCommand(profileStore, rankManager, devModeManager));
         bindCommand("freeze", new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager));
+        bindCommand("unfreeze", new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager, false));
         bindCommand("vanish", new VanishCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("staffchat", new StaffChatCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("clearchat", new ClearChatCommand(profileStore, rankManager, devModeManager));

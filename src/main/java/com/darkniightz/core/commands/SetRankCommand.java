@@ -12,6 +12,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -38,17 +39,20 @@ public class SetRankCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player p)) {
-            sender.sendMessage(Messages.prefixed("§cOnly in-game staff can set ranks in this MVP."));
-            return true;
-        }
-        PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        String actorRankEarly = actor.getPrimaryRank();
-        boolean bypassEarly = devMode != null && devMode.isActive(p.getUniqueId());
-        boolean actorIsDevOrOwnerEarly = equalsAny(actorRankEarly, "owner", "developer");
-        if (!bypassEarly && !actorIsDevOrOwnerEarly && !ranks.isAtLeast(actorRankEarly, "srmod")) {
-            sender.sendMessage(Messages.noPerm());
-            return true;
+        final boolean consoleBypass = sender instanceof ConsoleCommandSender || !(sender instanceof Player);
+        PlayerProfile actor = null;
+        String actorRankEarly = ranks.getDefaultGroup();
+        boolean bypassEarly = consoleBypass;
+        boolean actorIsDevOrOwnerEarly = consoleBypass;
+        if (sender instanceof Player p) {
+            actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            actorRankEarly = actor.getPrimaryRank();
+            bypassEarly = devMode != null && devMode.isActive(p.getUniqueId());
+            actorIsDevOrOwnerEarly = equalsAny(actorRankEarly, "owner", "developer");
+            if (!bypassEarly && !actorIsDevOrOwnerEarly && !ranks.isAtLeast(actorRankEarly, "srmod")) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
         }
         if (args.length < 2) {
             sender.sendMessage(Messages.prefixed("§eUsage: §f/" + label + " <player> <group>"));
@@ -71,7 +75,7 @@ public class SetRankCommand implements CommandExecutor, TabCompleter {
 
         PlayerProfile tp = profiles.getOrCreate(target, ranks.getDefaultGroup());
 
-        String actorRank = actor.getPrimaryRank();
+        String actorRank = actor == null ? "owner" : actor.getPrimaryRank();
         String targetRank = tp.getPrimaryRank();
 
         boolean bypass = bypassEarly;
@@ -100,6 +104,13 @@ public class SetRankCommand implements CommandExecutor, TabCompleter {
             tp.setRankDisplayMode("primary");
         }
         profiles.save(tuid);
+        if (JebaitedCore.getInstance() != null && JebaitedCore.getInstance().getPlayerProfileDAO() != null) {
+            boolean persisted = JebaitedCore.getInstance().getPlayerProfileDAO()
+                    .persistRankImmediate(tuid, target.getName(), effectiveGroup);
+            if (!persisted) {
+                JebaitedCore.getInstance().getLogger().warning("[SetRank] Immediate rank persist affected 0 rows for " + targetName + " (" + tuid + ")");
+            }
+        }
 
         String targetDisplayName = target.getName() != null ? target.getName() : target.getUniqueId().toString();
         if (!effectiveGroup.equals(newGroup)) {
@@ -133,13 +144,18 @@ public class SetRankCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player p)) return List.of();
-        PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
-        boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        boolean actorIsDevOrOwner = equalsAny(actor.getPrimaryRank(), "owner", "developer");
-        // Must be at least able to set ranks
-        if (!bypass && !actorIsDevOrOwner && !ranks.isAtLeast(actor.getPrimaryRank(), "srmod")) {
-            return List.of();
+        boolean consoleBypass = sender instanceof ConsoleCommandSender || !(sender instanceof Player);
+        PlayerProfile actor = null;
+        boolean bypass = consoleBypass;
+        boolean actorIsDevOrOwner = consoleBypass;
+        if (sender instanceof Player p) {
+            actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
+            bypass = devMode != null && devMode.isActive(p.getUniqueId());
+            actorIsDevOrOwner = equalsAny(actor.getPrimaryRank(), "owner", "developer");
+            // Must be at least able to set ranks
+            if (!bypass && !actorIsDevOrOwner && !ranks.isAtLeast(actor.getPrimaryRank(), "srmod")) {
+                return List.of();
+            }
         }
         String prefix = args.length > 0 ? args[args.length - 1].toLowerCase(Locale.ROOT) : "";
         if (args.length == 1) {
@@ -151,9 +167,12 @@ public class SetRankCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2) {
             // arg[1] = rank name — only suggest ranks the actor can assign
-            boolean actorIsAdminTab = bypass || actorIsDevOrOwner || ranks.isAtLeast(actor.getPrimaryRank(), "admin");
+            final boolean bypassFinal = bypass;
+            final boolean actorIsDevOrOwnerFinal = actorIsDevOrOwner;
+            final String actorRankForTab = actor == null ? null : actor.getPrimaryRank();
+            boolean actorIsAdminTab = bypassFinal || actorIsDevOrOwnerFinal || (actorRankForTab != null && ranks.isAtLeast(actorRankForTab, "admin"));
             return ranks.getLadder().stream()
-                    .filter(r -> bypass || actorIsDevOrOwner || ranks.outranksStrict(actor.getPrimaryRank(), r))
+                    .filter(r -> bypassFinal || actorIsDevOrOwnerFinal || (actorRankForTab != null && ranks.outranksStrict(actorRankForTab, r)))
                     .filter(r -> actorIsAdminTab || !ranks.isAtLeast(r, "moderator")) // srmod cap at helper
                     .filter(r -> r.startsWith(prefix))
                     .collect(Collectors.toList());

@@ -5,16 +5,27 @@ Copy the block below into the first message when starting a **new** chat so cont
 ```
 ## Handoff
 - **Repo:** JebaitedCore (Paper 1.21 plugin). ROADMAP.md is source of truth for intent.
-- **Branch:** (fill)
-- **Last commit / PR:** (fill)
-- **Handoff saved:** 2026-04-18 — Discord §23 ops + **Stripe `/donate` store** (V010, `StoreService`, webhook route, bot link-gates). **Stripe business onboarding not started** (see deferred list below).
-- **Shipped this pass:** **Plugin** store: `StoreService`, `/donate` + `DonateMenu`, `POST /integrations/stripe/webhook`, `DiscordInboundHttpService` unified bind; **bot** link required for bridge + `/ping` `/server` `/player` `/activity`. **Deploy:** `Vibe Code\scripts\build-jebaitedcore-docker.ps1` defaults to `local-paper-server\plugins`. Prior Discord bridge/console/monitoring as before.
-- **Not done yet:** (1) **Tablist** live Discord member count. (2) **§21** party-aware CTF / factions plugin integration if you replace permission-based “faction” bridge. (3) **Stripe — finish later (account & live):** complete Stripe Dashboard **business profile** (VAT if registered, **public website or social URL** matching business name). Add **production** `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`; **Dashboard webhook** `https://…/integrations/stripe/webhook` + event `checkout.session.completed` (or keep **Stripe CLI** `stripe listen` for dev). Replace placeholder **success/cancel URLs** in `config.yml` with real pages. (4) **Docker:** single stack **`Vibe Code/MC Server/docker-compose.yml`** (includes Redis + discord-bot; plugin env + **:8789**). Put secrets in **`MC Server/.env`**. Run `docker compose -p jebaitedcore down` to drop old duplicate project; see **[docs/DOCKER.md](docs/DOCKER.md)**.
-- **Working on:** (fill)
-- **Next 1–3 steps:** 1) Wire Docker/compose so **bot → Paper `8789`** (host.docker.internal or shared network) with matching **`JB_PLUGIN_API_TOKEN`** + plugin `integrations.discord.inbound.api_token`. 2) Enable **`Privileged Message Content Intent`** in Discord Developer Portal for bridge + console. 3) Assign `relay_*_in/out` and `console_*` channel IDs in `bot-config.yml` / `.env`.
-- **Files to open first:** `[DiscordInboundHttpService](src/main/java/com/darkniightz/core/system/DiscordInboundHttpService.java)`, `[PluginBridgeClient](bot-service/src/main/java/com/darkniightz/bot/bridge/PluginBridgeClient.java)`, `[DiscordGatewayListener](bot-service/src/main/java/com/darkniightz/bot/discord/DiscordGatewayListener.java)`, `[BotApplication](bot-service/src/main/java/com/darkniightz/bot/BotApplication.java)`, `[bot-config.yml](bot-service/src/main/resources/bot-config.yml)`
-- **Verify:** `.\mvnw.cmd -DskipTests compile`, `.\mvnw.cmd -f bot-service/pom.xml -DskipTests package`, `docker compose config`
-- **Stage 3 config:** match **`integrations.discord.inbound.api_token`** (plugin) with **`JB_PLUGIN_API_TOKEN`** / `plugin_api_token` (bot); expose Paper **8789** to the bot host; enable **`integrations.discord.inbound.enabled`** and **`integrations.discord.relay_chat`** after channel mapping.
+- **Branch:** `cursor/next-steps-2026-04-18`
+- **Last commit / PR:** `8fa4f15` (server-side parity + persistence hardening). PR open link: https://github.com/DarkNiightz/JebaitedCore/compare/main...cursor/next-steps-2026-04-18?expand=1
+- **Handoff saved:** 2026-04-18 — panel/server parity tranche shipped, plus Docker restart hardening notes captured.
+- **Shipped this session (server-side only):**
+  - Command parity: `setrank` console/RCON path, `/unfreeze` label, `maintenance allow` alias, cosmetics admin RCON commands (`give|take|wipe`).
+  - Hardcore flow: no join wipe, death-to-pool, winner claim via `/loot` GUI.
+  - DB migrations: `V011` moderation lifecycle, `V012` server id columns, `V013` booster/quest tables.
+  - Write-path hardening: moderation status transitions + server stamping, audit log server stamping, immediate rank DB persist fallback logging.
+- **Docker/ops learnings (critical):**
+  - Keep one compose project name: `name: jebaitednetwork` (avoid duplicate stacks/port collisions).
+  - Canonical stack path: `Vibe Code/JebaitedNetwork/docker-compose.yml` and `.env` there.
+  - Windows path with spaces: use `JebaitedNetwork/up-build.ps1` (BuildKit off).
+  - mcMMO MySQL host in `MC Server/plugins/mcMMO/config.yml` must be `mysql` (not `jebaited-mysql`).
+- **Quick restart verify:**
+  - `docker restart jnet-mc-hub jnet-mc-smp`
+  - `docker ps --format "table {{.Names}}\t{{.Status}}"` (hub/smp should become healthy)
+  - `docker logs jnet-mc-hub --since 90s` + `docker logs jnet-mc-smp --since 90s` (look for Paper done + JebaitedCore startup report)
+- **Working on next:** §21 KOTH polish / party-aware TeamEngine + HC-CTF; then I2 Player Shops; parallel mcMMO wrappers.
+- **Next 1–3 steps:** 1) Finish §21 event architecture cleanup (KOTH/CTF flow). 2) Start I2 schema + minimal write paths. 3) Continue mcMMO wrapper parity (`/mcability`, `/mccooldown`, `/ptp`).
+- **Files to open first:** [ROADMAP.md](ROADMAP.md), `src/main/java/com/darkniightz/core/eventmode/`, [docs/DOCKER.md](docs/DOCKER.md), [PlayerProfileDAO](src/main/java/com/darkniightz/main/PlayerProfileDAO.java), [AuditLogService](src/main/java/com/darkniightz/core/system/AuditLogService.java).
+- **Verify:** `.\mvnw.cmd -DskipTests compile`; `docker compose -f docker-compose.ci.yml config`; runtime container health checks above.
 ```
 
 Erase or overwrite the bullets each session so the next run does not inherit stale tasks.
@@ -23,7 +34,7 @@ Erase or overwrite the bullets each session so the next run does not inherit sta
 
 ### New session or stay?
 
-- **Start a new Cursor chat** for large tracks: Discord Phase B/C, §21 `TeamEngine`, or multi-file refactors.
+- **Start a new Cursor chat** for large tracks: §21 `TeamEngine`/events, I2 Player Shops, Discord/Stripe if un-parking, or multi-file refactors.
 - **Stay** for tiny fixes (single file, one migration, config tweaks).
 
 The handoff block above is enough for a fresh session to resume without re-reading the whole implementation.

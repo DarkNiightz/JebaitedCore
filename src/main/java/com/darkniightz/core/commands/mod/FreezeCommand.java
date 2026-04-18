@@ -25,12 +25,18 @@ public class FreezeCommand implements CommandExecutor, TabCompleter {
     private final RankManager ranks;
     private final DevModeManager devMode;
     private final ModerationManager moderation;
+    private final Boolean forcedFrozenState;
 
     public FreezeCommand(ProfileStore profiles, RankManager ranks, DevModeManager devMode, ModerationManager moderation) {
+        this(profiles, ranks, devMode, moderation, null);
+    }
+
+    public FreezeCommand(ProfileStore profiles, RankManager ranks, DevModeManager devMode, ModerationManager moderation, Boolean forcedFrozenState) {
         this.profiles = profiles;
         this.ranks = ranks;
         this.devMode = devMode;
         this.moderation = moderation;
+        this.forcedFrozenState = forcedFrozenState;
     }
 
     @Override
@@ -60,7 +66,7 @@ public class FreezeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        boolean now = !moderation.isFrozen(target.getUniqueId());
+        boolean now = forcedFrozenState != null ? forcedFrozenState : !moderation.isFrozen(target.getUniqueId());
         moderation.setFrozen(target.getUniqueId(), now);
         String state = now ? "frozen" : "unfrozen";
 

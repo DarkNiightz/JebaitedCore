@@ -145,26 +145,14 @@ Development notes and scripts
 - CI pipeline
   - GitHub Actions workflow at .github/workflows/ci.yml
   - Runs Maven build on push/PR
-  - Validates Docker Compose configuration
+  - Validates `docker-compose.ci.yml` (syntax only; real stack lives in JebaitedNetwork — see docs)
   - Validates src/main/resources/plugin.yml and src/main/resources/config.yml with scripts/validate_yaml.py
-- Dev server with Docker (Paper + PostgreSQL)
-  - Prerequisites: Docker Desktop
-  - Included files: Dockerfile, docker-compose.yml, .dockerignore
-  - What you get:
-    - A PostgreSQL 16 container named postgres with database "jebaited"
-    - A Paper server container built from the packaged plugin jar
-  - First time setup:
-    1) Build the plugin jar:
-       .\\mvnw.cmd -DskipTests package
-    2) Start the stack:
-       docker compose up -d --build
-    3) Connect your Minecraft client to localhost:25565
-  - Iterating on the plugin:
-    - Rebuild after changes: .\\mvnw.cmd -DskipTests package
-    - Rebuild the container image: docker compose up -d --build
-  - Stopping and cleanup:
-    - Stop containers: docker compose down
-    - Remove volumes too if you want a full reset: docker compose down -v
+- Dev / prod Docker stack (Paper + Postgres + Redis + bot + web-admin)
+  - **Canonical compose:** `Vibe Code/JebaitedNetwork/docker-compose.yml` (project `jebaitednetwork`). This repo’s `docker-compose.yml` only `include`s that file.
+  - **Do not** treat the root `Dockerfile` here as the main server image — the stack uses `itzg/minecraft-server` with `Vibe Code/MC Server` bind-mounted for hub data and `plugins/`.
+  - Full runbook (ports, `.env`, build script): [docs/DOCKER.md](docs/DOCKER.md)
+  - Typical loop: build JAR → copy to `MC Server/plugins/` (or `Vibe Code/scripts/build-jebaitedcore-docker.ps1`) → `docker compose up -d --build` from **JebaitedNetwork** → client to `localhost:25565`.
+  - Stopping / reset: `docker compose down` or `docker compose down -v` from that directory (see DOCKER.md).
 
 Operations automation (MC Server folder)
 - Backups:

@@ -53,7 +53,7 @@ public class MaintenanceCommand implements CommandExecutor {
                 sender.sendMessage(plain ? "OFF" : Messages.prefixed("§aMaintenance mode is now §fOFF§a."));
                 return true;
             }
-            case "add" -> {
+            case "add", "allow" -> {
                 if (args.length < 2) {
                     sender.sendMessage(plain ? "USAGE: /maintenance add <player>" : Messages.prefixed("§eUsage: §f/maintenance add <player>"));
                     return true;
@@ -84,8 +84,8 @@ public class MaintenanceCommand implements CommandExecutor {
             }
             default -> {
                 sender.sendMessage(plain
-                        ? "USAGE: /maintenance <on|off|status|add|remove|list>"
-                        : Messages.prefixed("§eUsage: §f/maintenance <on|off|status|add|remove|list>"));
+                        ? "USAGE: /maintenance <on|off|status|add|allow|remove|list>"
+                        : Messages.prefixed("§eUsage: §f/maintenance <on|off|status|add|allow|remove|list>"));
                 return true;
             }
         }

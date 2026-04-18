@@ -30,11 +30,14 @@ public class AuditLogService implements Listener {
 
     private final JebaitedCore plugin;
     private final DatabaseManager databaseManager;
+    private final String serverId;
     private int cleanupTaskId = -1;
 
     public AuditLogService(JebaitedCore plugin, DatabaseManager databaseManager) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
+        NetworkManager nm = NetworkManager.getInstance();
+        this.serverId = nm != null ? nm.getServerId() : plugin.getConfig().getString("network.server_id", "hub-01");
     }
 
     public void start() {
@@ -88,7 +91,7 @@ public class AuditLogService implements Listener {
     }
 
     public void logChat(UUID playerUuid, String playerName, String message) {
-        queueInsert("INSERT INTO chat_logs (player_uuid, player_name, message) VALUES (?, ?, ?);", playerUuid, playerName, message);
+        queueInsert("INSERT INTO chat_logs (player_uuid, player_name, message, server) VALUES (?, ?, ?, ?);", playerUuid, playerName, message);
     }
 
     public void logCommand(UUID playerUuid, String playerName, String rawCommand) {
@@ -97,11 +100,12 @@ public class AuditLogService implements Listener {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = databaseManager.getConnection();
                  PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO player_command_log (uuid, username, command, timestamp) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING;")) {
+                    "INSERT INTO player_command_log (uuid, username, command, timestamp, server) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;")) {
                 ps.setString(1, playerUuid.toString());
                 ps.setString(2, playerName == null ? "unknown" : playerName);
                 ps.setString(3, rawCommand);
                 ps.setLong(4, ts);
+                ps.setString(5, serverId);
                 ps.executeUpdate();
             } catch (SQLException e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to insert command log row", e);
@@ -118,6 +122,7 @@ public class AuditLogService implements Listener {
                 ps.setObject(1, playerUuid);
                 ps.setString(2, playerName == null ? "unknown" : playerName);
                 ps.setString(3, payload);
+                ps.setString(4, serverId);
                 ps.executeUpdate();
             } catch (SQLException e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to insert audit log row", e);

@@ -1,17 +1,25 @@
 # =============================================================================
-# SINGLE SOURCE OF TRUTH FOR DOCKER: ../../MC Server/docker-compose.yml
+# CANONICAL DOCKER STACK: ../../../JebaitedNetwork/docker-compose.yml
+#   Project name: jebaitednetwork
 #
-# That stack runs jebaited-mc (Paper on :25565), PostgreSQL, MySQL, web-admin,
-# Redis, and the Discord bot. Do NOT run a second Paper or second Postgres from
-# this repo — it duplicated ports and broke everything.
+# This file only *includes* that stack so you can run `docker compose` from the
+# plugin repo. Same file is also included by:
+#   Vibe Code/MC Server/docker-compose.yml  (convenience alias — not a second stack)
 #
-# From repo root:
-#   cd "..\..\..\MC Server"
+# Do NOT add a second Postgres/Paper/Redis stack here — it duplicates ports.
+#
+# Start the stack (pick one working directory):
+#   cd "...\Vibe Code\JebaitedNetwork"
 #   docker compose up -d --build
 #
-# Deploy this plugin JAR into MC Server's bind-mounted data:
-#   MC Server/plugins/JebaitedCore.jar
-#   (or Vibe Code\scripts\build-jebaitedcore-docker.ps1 with MC Server plugins path)
+# Deploy JebaitedCore.jar to the hub Paper data dir (bind-mounted by mc-hub):
+#   Vibe Code\MC Server\plugins\JebaitedCore.jar
+# Or: Vibe Code\scripts\build-jebaitedcore-docker.ps1  (defaults to MC Server\plugins)
+#
+# Details: docs/DOCKER.md
 # =============================================================================
+# Force the same Compose project name as when you run from JebaitedNetwork/
+# (avoids a second parallel stack named after this folder).
+name: jebaitednetwork
 include:
   - path: "../../../JebaitedNetwork/docker-compose.yml"

@@ -22,7 +22,7 @@ Technical plugin steps (keys, webhooks, CLI) remain below.
 
 ## Docker Compose
 
-Production uses `**Vibe Code/MC Server/docker-compose.yml`**. Put `**STRIPE_SECRET_KEY**` and `**STRIPE_WEBHOOK_SECRET**` in `**MC Server/.env**` — they are passed into the `**minecraft**` (jebaited-mc) container. See **[docs/DOCKER.md](DOCKER.md)**.
+Production uses **`Vibe Code/JebaitedNetwork/docker-compose.yml`** (same stack as **`MC Server/docker-compose.yml`**, which only includes the JebaitedNetwork file). Put **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`** in **`JebaitedNetwork/.env`** — `mc-hub` / `mc-smp` load them via `env_file: .env` from that directory. See **[docs/DOCKER.md](DOCKER.md)**.
 
 ## Plugin configuration (`config.yml`)
 
