@@ -7,14 +7,14 @@ Copy the block below into the first message when starting a **new** chat so cont
 - **Repo:** JebaitedCore (Paper 1.21 plugin). ROADMAP.md is source of truth for intent.
 - **Branch:** (fill)
 - **Last commit / PR:** (fill)
-- **Handoff saved:** 2026-04-18 — Discord §23 ops + **Stripe `/donate` store** (V010, `StoreService`, webhook route, bot link-gates). **Stripe business onboarding not started** (see deferred list below).
-- **Shipped this pass:** **Plugin** store: `StoreService`, `/donate` + `DonateMenu`, `POST /integrations/stripe/webhook`, `DiscordInboundHttpService` unified bind; **bot** link required for bridge + `/ping` `/server` `/player` `/activity`. **Deploy:** `Vibe Code\scripts\build-jebaitedcore-docker.ps1` defaults to `local-paper-server\plugins`. Prior Discord bridge/console/monitoring as before.
-- **Not done yet:** (1) **Tablist** live Discord member count. (2) **§21** party-aware CTF / factions plugin integration if you replace permission-based “faction” bridge. (3) **Stripe — finish later (account & live):** complete Stripe Dashboard **business profile** (VAT if registered, **public website or social URL** matching business name). Add **production** `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`; **Dashboard webhook** `https://…/integrations/stripe/webhook` + event `checkout.session.completed` (or keep **Stripe CLI** `stripe listen` for dev). Replace placeholder **success/cancel URLs** in `config.yml` with real pages. (4) **Docker:** single stack **`Vibe Code/MC Server/docker-compose.yml`** (includes Redis + discord-bot; plugin env + **:8789**). Put secrets in **`MC Server/.env`**. Run `docker compose -p jebaitedcore down` to drop old duplicate project; see **[docs/DOCKER.md](docs/DOCKER.md)**.
+- **Handoff saved:** 2026-04-18 — **§17 shop** operator-validated: in-game `/shop`, **web panel** connected, **no inventory space** + **insufficient balance** paths OK. **Discord bot + Stripe `/donate` intro shipped**; **Stripe not production-complete** (business profile, live keys, real success/cancel URLs, production webhook) — **parked**.
+- **Intent this phase:** not continuing Discord/Stripe/Docker wiring unless something breaks; **prefer plugin gameplay** (§21 / I2 / parallel mcMMO).
+- **Shipped (prior work, see ROADMAP):** `StoreService`, `/donate` + `DonateMenu`, webhook route, `DiscordInboundHttpService`, bot bridge + slash commands; `Vibe Code\scripts\build-jebaitedcore-docker.ps1` → **`MC Server\plugins`** (hub bind mount). Full §23/§17 detail in [ROADMAP.md](ROADMAP.md).
+- **Optional backlog (when you return):** tablist live Discord member count; finish Stripe live; bot → Paper **8789** + matching **`JB_PLUGIN_API_TOKEN`** / `integrations.discord.inbound.api_token` — canonical Docker: **[docs/DOCKER.md](docs/DOCKER.md)** (`JebaitedNetwork/docker-compose.yml`, `.env` there).
 - **Working on:** (fill)
-- **Next 1–3 steps:** 1) Wire Docker/compose so **bot → Paper `8789`** (host.docker.internal or shared network) with matching **`JB_PLUGIN_API_TOKEN`** + plugin `integrations.discord.inbound.api_token`. 2) Enable **`Privileged Message Content Intent`** in Discord Developer Portal for bridge + console. 3) Assign `relay_*_in/out` and `console_*` channel IDs in `bot-config.yml` / `.env`.
-- **Files to open first:** `[DiscordInboundHttpService](src/main/java/com/darkniightz/core/system/DiscordInboundHttpService.java)`, `[PluginBridgeClient](bot-service/src/main/java/com/darkniightz/bot/bridge/PluginBridgeClient.java)`, `[DiscordGatewayListener](bot-service/src/main/java/com/darkniightz/bot/discord/DiscordGatewayListener.java)`, `[BotApplication](bot-service/src/main/java/com/darkniightz/bot/BotApplication.java)`, `[bot-config.yml](bot-service/src/main/resources/bot-config.yml)`
-- **Verify:** `.\mvnw.cmd -DskipTests compile`, `.\mvnw.cmd -f bot-service/pom.xml -DskipTests package`, `docker compose config`
-- **Stage 3 config:** match **`integrations.discord.inbound.api_token`** (plugin) with **`JB_PLUGIN_API_TOKEN`** / `plugin_api_token` (bot); expose Paper **8789** to the bot host; enable **`integrations.discord.inbound.enabled`** and **`integrations.discord.relay_chat`** after channel mapping.
+- **Next 1–3 steps:** 1) **§21** — KOTH polish and/or **party-aware `TeamEngine`** + HC-CTF ([ROADMAP.md](ROADMAP.md) **Current focus**). 2) Or scope **I2 Player Shops** / §18 when economy/events APIs feel stable. 3) **Parallel:** mcMMO wrappers (`/mcability`, `/mccooldown`, `/ptp`) per roadmap “Next theme pick”.
+- **Files to open first:** [ROADMAP.md](ROADMAP.md) §21; `[core/eventmode](src/main/java/com/darkniightz/core/eventmode/)`; for I2 later: `[ShopManager](src/main/java/com/darkniightz/core/shop/ShopManager.java)` + `src/main/resources/db/`. **Discord/Stripe ops only if un-parking:** `[DiscordInboundHttpService](src/main/java/com/darkniightz/core/system/DiscordInboundHttpService.java)`, `[PluginBridgeClient](bot-service/src/main/java/com/darkniightz/bot/bridge/PluginBridgeClient.java)`, `[bot-config.yml](bot-service/src/main/resources/bot-config.yml)`.
+- **Verify:** `.\mvnw.cmd -DskipTests compile`; `.\mvnw.cmd -f bot-service/pom.xml -DskipTests package` only if touching bot.
 ```
 
 Erase or overwrite the bullets each session so the next run does not inherit stale tasks.
@@ -23,7 +23,7 @@ Erase or overwrite the bullets each session so the next run does not inherit sta
 
 ### New session or stay?
 
-- **Start a new Cursor chat** for large tracks: Discord Phase B/C, §21 `TeamEngine`, or multi-file refactors.
+- **Start a new Cursor chat** for large tracks: §21 `TeamEngine`/events, I2 Player Shops, Discord/Stripe if un-parking, or multi-file refactors.
 - **Stay** for tiny fixes (single file, one migration, config tweaks).
 
 The handoff block above is enough for a fresh session to resume without re-reading the whole implementation.

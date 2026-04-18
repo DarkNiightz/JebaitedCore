@@ -1,3 +1,6 @@
+# Legacy / optional — NOT used by JebaitedNetwork/docker-compose.yml.
+# The live stack runs itzg/minecraft-server from Docker Hub with MC Server/ bind-mounted.
+# Keep only for ad-hoc experiments or a custom image build; see docs/DOCKER.md.
 FROM itzg/minecraft-server:latest
 
 ENV EULA=TRUE \

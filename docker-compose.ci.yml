@@ -1,0 +1,8 @@
+# CI-only Compose stub — validates `docker compose config` on a clean clone without
+# sibling repos (JebaitedNetwork, web-admin). The real stack is JebaitedNetwork/docker-compose.yml.
+name: jebaitedcore-ci
+
+services:
+  noop:
+    image: alpine:3.20
+    command: ["echo", "compose-syntax-ok"]

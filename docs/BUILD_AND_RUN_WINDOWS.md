@@ -14,11 +14,13 @@ The wrapper lives here:
 
 ## Docker (single stack)
 
-The **only** production Compose file for Minecraft + DB + bot + Redis is:
+The **only** stack definition for Minecraft + DB + bot + Redis + web-admin is:
 
-**`Vibe Code\MC Server\docker-compose.yml`**
+**`Vibe Code\JebaitedNetwork\docker-compose.yml`** (project `jebaitednetwork`)
 
-This repo’s `docker-compose.yml` **includes** that file so you can run Compose from here too. Full port map, `.env` location, and cleanup of old stacks: **[docs/DOCKER.md](DOCKER.md)**.
+**`Vibe Code\MC Server\docker-compose.yml`** is a **thin include** of that same file (so you can `cd` to MC Server and run Compose). This plugin repo’s **`docker-compose.yml`** also **includes** it — not a second stack.
+
+Full port map, `.env`, wiring, and cleanup: **[docs/DOCKER.md](DOCKER.md)**.
 
 ## One script (build + replace JAR for Docker / local Paper)
 
@@ -29,9 +31,7 @@ cd "C:\Users\jamie\Documents\Vibe Code\scripts"
 .\build-jebaitedcore-docker.ps1
 ```
 
-**No config required:** the JAR is copied to  
-`IdeaProjects\JebaitedCore\JebaitedCore\local-paper-server\plugins\JebaitedCore.jar`  
-Point Docker at that `plugins` folder, **or** override:
+**Default (no config):** the JAR is copied to **`Vibe Code\MC Server\plugins\JebaitedCore.jar`** (same folder **mc-hub** bind-mounts in Docker). Override if your Paper `plugins` path differs:
 
 - `-PluginsPath "D:\your\paper\plugins"`, or
 - optional file `docker-plugins.path` (one line, full path), or

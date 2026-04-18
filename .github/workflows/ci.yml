@@ -23,8 +23,8 @@ jobs:
       - name: Build plugin
         run: mvn -B -DskipTests package
 
-      - name: Validate Docker Compose
-        run: docker compose config
+      - name: Validate Docker Compose (CI stub)
+        run: docker compose -f docker-compose.ci.yml config
 
       - name: Set up Python
         uses: actions/setup-python@v5
