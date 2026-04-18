@@ -159,6 +159,7 @@ public final class JebaitedCore extends JavaPlugin {
     private com.darkniightz.core.party.PartyManager partyManager;
     private com.darkniightz.core.party.PartyStatDAO partyStatDAO;
     private com.darkniightz.core.eventmode.EventParticipantDAO eventParticipantDAO;
+    private com.darkniightz.core.shop.PlayerShopListingDAO playerShopListingDAO;
     private com.darkniightz.core.system.BackManager backManager;
     private com.darkniightz.core.system.KitManager kitManager;
     private com.darkniightz.core.achievements.AchievementDAO achievementDAO;
@@ -226,7 +227,9 @@ public final class JebaitedCore extends JavaPlugin {
         this.broadcasterManager = new BroadcasterManager(this);
         this.bossBarManager = new BossBarManager(this);
         this.eventParticipantDAO = new com.darkniightz.core.eventmode.EventParticipantDAO(databaseManager, getLogger());
-        this.eventModeManager = new EventModeManager(this, broadcasterManager, bossBarManager);
+        this.playerShopListingDAO = new com.darkniightz.core.shop.PlayerShopListingDAO(databaseManager, getLogger());
+        this.partyManager = new com.darkniightz.core.party.PartyManager(this, profileStore, rankManager);
+        this.eventModeManager = new EventModeManager(this, broadcasterManager, bossBarManager, partyManager);
         this.spawnManager = new SpawnManager(this, worldManager, worldConfigManager);
         this.economyManager = new EconomyManager(this, profileStore, rankManager);
         this.homesManager = new HomesManager(this);
@@ -246,7 +249,6 @@ public final class JebaitedCore extends JavaPlugin {
         this.kitManager = new com.darkniightz.core.system.KitManager(this, rankManager);
         this.friendManager = new com.darkniightz.core.system.FriendManager(this, databaseManager, profileStore, rankManager);
         this.partyStatDAO = new com.darkniightz.core.party.PartyStatDAO(databaseManager, getLogger());
-        this.partyManager = new com.darkniightz.core.party.PartyManager(this, profileStore, rankManager);
         this.achievementDAO = new com.darkniightz.core.achievements.AchievementDAO(databaseManager, getLogger());
         this.achievementManager = new com.darkniightz.core.achievements.AchievementManager(this, achievementDAO, profileStore, rankManager);
         this.discordLinkService = new com.darkniightz.core.system.DiscordLinkService(databaseManager, getLogger());
@@ -338,6 +340,8 @@ public final class JebaitedCore extends JavaPlugin {
     public com.darkniightz.core.party.PartyManager getPartyManager() { return partyManager; }
     public com.darkniightz.core.party.PartyStatDAO getPartyStatDAO() { return partyStatDAO; }
     public com.darkniightz.core.eventmode.EventParticipantDAO getEventParticipantDAO() { return eventParticipantDAO; }
+
+    public com.darkniightz.core.shop.PlayerShopListingDAO getPlayerShopListingDAO() { return playerShopListingDAO; }
     public com.darkniightz.core.achievements.AchievementManager getAchievementManager() { return achievementManager; }
     public com.darkniightz.core.shop.ShopManager getShopManager() { return shopManager; }
 
@@ -541,7 +545,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("warps", new WarpsCommand(warpsManager, economyManager));
         bindCommand("setwarp", new SetWarpCommand(this, warpsManager, profileStore, rankManager, devModeManager));
         bindCommand("delwarp", new DelWarpCommand(this, warpsManager, profileStore, rankManager, devModeManager));
-        bindCommand("stats", new StatsCommand(this, profileStore, rankManager, devModeManager));
+        bindCommand("stats", new StatsCommand(this, profileStore, rankManager, devModeManager, achievementManager));
         bindCommand("achievements", new com.darkniightz.core.commands.AchievementsCommand(this, achievementManager, profileStore, rankManager));
         bindCommand("settings", new SettingsCommand(this));
         bindCommand("devmode", new DevModeCommand(devModeManager));
@@ -592,7 +596,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("freeze", new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("unfreeze", new FreezeCommand(profileStore, rankManager, devModeManager, moderationManager, false));
         bindCommand("vanish", new VanishCommand(profileStore, rankManager, devModeManager, moderationManager));
-        bindCommand("staffchat", new StaffChatCommand(profileStore, rankManager, devModeManager, moderationManager));
+        bindCommand("staffchat", new StaffChatCommand(this, profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("clearchat", new ClearChatCommand(profileStore, rankManager, devModeManager));
         bindCommand("slowmode", new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("history", new HistoryCommand(profileStore, rankManager, devModeManager));
@@ -605,6 +609,9 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("mcstats", mcStatsCommand);
         com.darkniightz.core.commands.McTopCommand mcTopCommand = new com.darkniightz.core.commands.McTopCommand();
         bindCommand("mctop", mcTopCommand);
+        bindCommand("mcability", new com.darkniightz.core.commands.McMMODelegatedCommand("mcability"));
+        bindCommand("mccooldown", new com.darkniightz.core.commands.McMMODelegatedCommand("mccooldown"));
+        bindCommand("ptp", new com.darkniightz.core.commands.McMMODelegatedCommand("ptp"));
         // Party
         com.darkniightz.core.commands.PartyCommand partyCmd =
             new com.darkniightz.core.commands.PartyCommand(this, partyManager, profileStore);
@@ -627,7 +634,8 @@ public final class JebaitedCore extends JavaPlugin {
     private static final String[] MCMMO_OWNED_COMMANDS = {
             "party", "pa", "p",
             "inspect", "mcinspect", "mmoinspect",
-            "mcrank", "mcstats", "mctop"
+            "mcrank", "mcstats", "mctop",
+            "mcability", "mccooldown", "ptp"
     };
 
     /**

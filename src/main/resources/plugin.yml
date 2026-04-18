@@ -42,6 +42,7 @@ commands:
   stats:
     description: Open the stats GUI
     usage: /stats [player]
+    aliases: [profile, pp]
   settings:
     description: Open your personal settings menu
     usage: /settings
@@ -316,6 +317,18 @@ commands:
     description: Show mcMMO leaderboards (Jebaited wrapper)
     usage: /mctop [skill|page] [page]
     permission: jebaited.mcmmo.mctop
+  mcability:
+    description: mcMMO skill abilities (delegates to mcMMO; Jebaited-owned label)
+    usage: /mcability ...
+    permission: jebaited.mcmmo.mcability
+  mccooldown:
+    description: mcMMO skill cooldowns (delegates to mcMMO; Jebaited-owned label)
+    usage: /mccooldown ...
+    permission: jebaited.mcmmo.mccooldown
+  ptp:
+    description: mcMMO party teleport (delegates to mcMMO — not Jebaited party chat)
+    usage: /ptp <player>
+    permission: jebaited.mcmmo.ptp
   party:
     description: Party management
     usage: /party <create|invite|join|accept|deny|kick|leave|disband|transfer|chat|list|warp|setwarp|clearwarp|open|ff|gui>
@@ -368,6 +381,15 @@ permissions:
     default: true
   jebaited.mcmmo.mcrank:
     description: Use /mcrank (mcMMO rank wrapper)
+    default: true
+  jebaited.mcmmo.mcability:
+    description: Use /mcability (mcMMO delegation)
+    default: true
+  jebaited.mcmmo.mccooldown:
+    description: Use /mccooldown (mcMMO delegation)
+    default: true
+  jebaited.mcmmo.ptp:
+    description: Use /ptp party teleport (mcMMO)
     default: true
   jebaited.shop.use:
     description: Open the server economy shop GUI

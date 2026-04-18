@@ -2,6 +2,7 @@ package com.darkniightz.core.system;
 
 import com.darkniightz.core.eventmode.ChatGameManager;
 import com.darkniightz.core.eventmode.EventEngine;
+import com.darkniightz.core.party.PartyManager;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -19,8 +20,8 @@ public class EventModeManager {
     private final EventEngine engine;
     private final ChatGameManager chatGames;
 
-    public EventModeManager(Plugin plugin, BroadcasterManager broadcasterManager, BossBarManager bossBarManager) {
-        this.engine = new EventEngine(plugin, broadcasterManager, bossBarManager);
+    public EventModeManager(Plugin plugin, BroadcasterManager broadcasterManager, BossBarManager bossBarManager, PartyManager partyManager) {
+        this.engine = new EventEngine(plugin, broadcasterManager, bossBarManager, partyManager);
         this.chatGames = new ChatGameManager(plugin);
     }
 

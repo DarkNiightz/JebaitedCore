@@ -1,0 +1,80 @@
+---
+description: JebaitedCore plugin quality, ROADMAP hygiene, and session handoff so roadmap work can resume in a new chat
+alwaysApply: true
+---
+
+# JebaitedCore — plugin standards + roadmap continuity
+
+Full conventions (commands, DB, Settings/Debug, dead code, web-panel boundary) live in **[`.cursor/skills/grafter/SKILL.md`](../skills/grafter/SKILL.md)** — read it when adding or changing plugin behavior. **Docker/build verification** when touching containers: **[`jebaited-execution.mdc`](jebaited-execution.mdc)**.
+
+---
+
+## Source of truth
+
+| Artifact | Use |
+| -------- | --- |
+| **`ROADMAP.md`** (repo root) | What is shipped, in progress, planned, and **which §** tracks each feature. |
+| **`SESSION_HANDOFF.md`** | Lightweight **resume packet** for the *next* chat — branch, last shipped slice, **next 1–3 steps**, files to open first. |
+
+If `ROADMAP.md` disagrees with other docs, **follow `ROADMAP.md`** and fix stale docs in the same pass when you notice drift.
+
+---
+
+## “Continue the roadmap” / pick up where we left off
+
+When the user (or you) wants to **resume** roadmap work — especially in a **new** chat — do this **before** writing code:
+
+1. Read **`ROADMAP.md`**: the **top blurb** (last updated + current focus), **Feature Showcase** / **Upcoming Features** (status column), **`Current focus (Jamie — ordering)`**, any **active backlog** bullet, and the **detailed §** for the track you are continuing.
+2. Read **`SESSION_HANDOFF.md`** inside the fenced **Handoff** block: **Working on next**, **Next 1–3 steps**, **Files to open first**, **Shipped this session** (for recency).
+3. Open **Grafter** for implementation checklists (commands, migrations, Settings/Debug) when the change is non-trivial.
+
+Do **not** assume memory from an old chat; treat **`ROADMAP.md` + `SESSION_HANDOFF.md`** as the joint checkpoint.
+
+---
+
+## Marking completed work clearly (same session as the code change)
+
+So the next run can see closure without archaeology:
+
+1. **`ROADMAP.md` — top blurb**  
+   - Bump **Last updated** when you materially ship or replan.  
+   - One or two sentences: what **landed**, what is **parked**, and the **current focus / next chunk**.
+
+2. **Tables** (same file)  
+   - **Feature Showcase**: mark rows **✅ Shipped** when the feature is actually live and aligned with code.  
+   - **Upcoming Features**: move rows from Planned / In Progress → done wording, or adjust **Status** (e.g. 🔧 **In Progress**, **Shipped**, **Parked**) so the row matches reality.
+
+3. **Feature Index + detailed §** (throughout `ROADMAP.md`)  
+   - Update the **status** column for the relevant §, and the **detailed section** (files, wiring, what’s left). Same session as the merge; don’t leave “planned” copy next to merged code.
+
+4. **`SESSION_HANDOFF.md` — fenced block**  
+   - **Overwrite** bullets so stale tasks are not inherited (per Grafter).  
+   - Fill **Shipped this session**, **Working on next**, **Next 1–3 steps** (concrete, ordered), **Files to open first**, and refresh **Branch / last commit** when useful.
+
+Grafter’s full **ROADMAP hygiene** list (including § cross-links) is in the skill — follow it for large features.
+
+---
+
+## Steps going forward (always leave a trail)
+
+After a **substantive** roadmap session (multi-file feature, new migration, new surface):
+
+- **`SESSION_HANDOFF.md`**: Must contain an explicit **Next 1–3 steps** list (short, actionable).  
+- **`ROADMAP.md`**: **Current focus** and/or top **Next session** line should point at the **next concrete slice** (not vague “keep improving” unless that’s truly all that remains).
+
+This is what makes **“continue with the roadmap”** one prompt: the next agent reads the two files and knows **done**, **now**, **next**.
+
+---
+
+## Plugin implementation (reminder — detail in Grafter)
+
+- **Commands:** `plugin.yml`, `JebaitedCore` registration, `PermissionConstants`, `CommandSecurityListener`, tab completion.  
+- **Persistent data:** new file under `src/main/resources/db/`, entry in `migrations.index`, DAO + callers.  
+- **Player/dev surfaces:** consider **Settings** (`SettingKey`, menus) and **Debug** (`DebugMenu`, feed, state) on each meaningful change.  
+- **`web-admin`:** not edited from this repo; document APIs/contracts in `ROADMAP.md` and hand off per Grafter.
+
+---
+
+## Response shape when asked “what’s next on the roadmap?”
+
+Answer from **`ROADMAP.md` + `SESSION_HANDOFF.md`**, then optionally Grafter for execution detail: **what shipped**, **what’s in flight**, **next 1–3 steps**, **first files to open**. Do not invent priorities that contradict those files.

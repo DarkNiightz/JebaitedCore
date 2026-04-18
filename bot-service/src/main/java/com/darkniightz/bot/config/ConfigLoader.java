@@ -7,8 +7,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -33,7 +35,7 @@ public final class ConfigLoader {
 
         return new BotConfig(
                 new BotConfig.Discord(
-                        discordToken("JB_BOT_TOKEN", str(discord, "token")),
+                        discordToken(str(discord, "token")),
                         sanitizePlain(env("JB_BOT_GUILD_ID", str(discord, "guild_id"))),
                         env("JB_BOT_STATUS_TEXT", str(discord, "status_text")),
                         roleIds,
@@ -106,13 +108,26 @@ public final class ConfigLoader {
      * Bot token from env or YAML, normalized so common .env mistakes don't break login
      * (surrounding quotes, trailing newline, UTF-8 BOM).
      */
-    private static String discordToken(String key, String yamlFallback) {
-        String fromEnv = System.getenv(key);
-        if (fromEnv != null && !fromEnv.isBlank()) {
+    /** Canonical env key first; common aliases match tutorials, Portainer, and sample compose snippets. */
+    private static final String[] DISCORD_TOKEN_ENV_KEYS = {
+            "JB_BOT_TOKEN", "DISCORD_BOT_TOKEN", "DISCORD_TOKEN", "BOT_TOKEN"
+    };
+
+    private static final String[] DISCORD_TOKEN_SECRET_FILES = {
+            "/run/secrets/jb_bot_token",
+            "/run/secrets/JB_BOT_TOKEN",
+            "/run/secrets/discord_token",
+            "/app/discord_token.txt",
+            "/etc/jebaited/discord_token"
+    };
+
+    private static String discordToken(String yamlFallback) {
+        String fromEnv = firstNonBlankEnv(DISCORD_TOKEN_ENV_KEYS);
+        if (fromEnv != null) {
             return normalizeDiscordToken(sanitizeToken(fromEnv));
         }
         // Local runs: JVM does not load repo .env — read it explicitly (same keys as Docker Compose).
-        String fromDotEnv = readDotEnvValue(key);
+        String fromDotEnv = readDotEnvFirstMatch(DISCORD_TOKEN_ENV_KEYS);
         if (fromDotEnv != null && !fromDotEnv.isBlank()) {
             return normalizeDiscordToken(sanitizeToken(fromDotEnv));
         }
@@ -124,26 +139,62 @@ public final class ConfigLoader {
                 // fall through to yaml
             }
         }
+        for (String secretPath : DISCORD_TOKEN_SECRET_FILES) {
+            try {
+                Path sp = Path.of(secretPath);
+                if (Files.isRegularFile(sp) && Files.isReadable(sp)) {
+                    return normalizeDiscordToken(sanitizeToken(Files.readString(sp, StandardCharsets.UTF_8)));
+                }
+            } catch (Exception ignored) {
+                // try next
+            }
+        }
         return normalizeDiscordToken(sanitizeToken(yamlFallback));
     }
 
     /**
-     * Reads {@code KEY=value} from {@code JB_BOT_ENV_FILE} if set, else {@code .env} in the JVM working directory.
+     * Safe diagnostics for logs when the gateway does not start (never logs token content).
      */
-    private static String readDotEnvValue(String key) {
-        String envPath = System.getenv("JB_BOT_ENV_FILE");
-        Path cwd = Path.of(System.getProperty("user.dir", ".")).normalize();
-        Path[] candidates;
-        if (envPath != null && !envPath.isBlank()) {
-            candidates = new Path[] {Path.of(envPath.trim())};
-        } else {
-            Path parent = cwd.getParent();
-            candidates =
-                    parent != null
-                            ? new Path[] {cwd.resolve(".env"), parent.resolve(".env")}
-                            : new Path[] {cwd.resolve(".env")};
+    public static String discordTokenMissingSummary() {
+        List<String> present = new ArrayList<>();
+        for (String k : DISCORD_TOKEN_ENV_KEYS) {
+            String v = System.getenv(k);
+            if (v != null && !v.isBlank()) {
+                present.add(k);
+            }
         }
-        for (Path p : candidates) {
+        String f = System.getenv("JB_BOT_TOKEN_FILE");
+        boolean secretHit = false;
+        for (String p : DISCORD_TOKEN_SECRET_FILES) {
+            try {
+                if (Files.isRegularFile(Path.of(p))) {
+                    secretHit = true;
+                    break;
+                }
+            } catch (Exception ignored) {
+                // continue
+            }
+        }
+        return "envKeysNonBlank=" + present + "; JB_BOT_TOKEN_FILE=" + (f == null || f.isBlank() ? "unset" : "set")
+                + "; knownSecretFileExists=" + secretHit;
+    }
+
+    private static String firstNonBlankEnv(String[] keys) {
+        for (String k : keys) {
+            String v = System.getenv(k);
+            if (v != null && !v.isBlank()) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Reads {@code KEY=value} from {@code JB_BOT_ENV_FILE} if set, else {@code .env} walking up from cwd (finds
+     * monorepo / JebaitedNetwork/.env when the JVM runs from a submodule directory).
+     */
+    private static String readDotEnvFirstMatch(String... keys) {
+        for (Path p : dotEnvCandidatePaths()) {
             if (!Files.isRegularFile(p)) {
                 continue;
             }
@@ -156,26 +207,62 @@ public final class ConfigLoader {
                     if (s.isEmpty() || s.startsWith("#")) {
                         continue;
                     }
+                    if (s.startsWith("export ")) {
+                        s = s.substring(7).trim();
+                    }
                     int eq = s.indexOf('=');
                     if (eq <= 0) {
                         continue;
                     }
                     String k = s.substring(0, eq).trim();
-                    if (!key.equals(k)) {
+                    boolean wanted = false;
+                    for (String want : keys) {
+                        if (want.equals(k)) {
+                            wanted = true;
+                            break;
+                        }
+                    }
+                    if (!wanted) {
                         continue;
                     }
-                    String v = s.substring(eq + 1).trim();
+                    String v = s.substring(eq + 1).trim().replace("\r", "");
                     if (v.length() >= 2
                             && ((v.startsWith("\"") && v.endsWith("\"")) || (v.startsWith("'") && v.endsWith("'")))) {
                         v = v.substring(1, v.length() - 1);
                     }
-                    return v;
+                    if (v != null && !v.isBlank()) {
+                        return v;
+                    }
                 }
             } catch (IOException ignored) {
                 // try next candidate
             }
         }
         return null;
+    }
+
+    private static List<Path> dotEnvCandidatePaths() {
+        String envPath = System.getenv("JB_BOT_ENV_FILE");
+        if (envPath != null && !envPath.isBlank()) {
+            return List.of(Path.of(envPath.trim()));
+        }
+        Path cwd = Path.of(System.getProperty("user.dir", ".")).normalize();
+        List<Path> out = new ArrayList<>();
+        /*
+         * Typical layout: .../Vibe Code/JebaitedNetwork/.env (Compose) while the IDE runs the bot JAR with
+         * user.dir under .../IdeaProjects/JebaitedCore/JebaitedCore. Walking only ./.env parents never reaches
+         * JebaitedNetwork/.env — so at each ancestor, check ./JebaitedNetwork/.env first, then ./.env.
+         */
+        Path dir = cwd;
+        for (int i = 0; i < 12 && dir != null; i++) {
+            Path networkSibling = dir.resolve("JebaitedNetwork").resolve(".env");
+            if (Files.isRegularFile(networkSibling)) {
+                out.add(networkSibling);
+            }
+            out.add(dir.resolve(".env"));
+            dir = dir.getParent();
+        }
+        return out;
     }
 
     /** Discord bot tokens never contain whitespace; strip accidental line breaks / spaces from copy-paste. */

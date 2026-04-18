@@ -6,22 +6,25 @@ import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
 import com.darkniightz.core.moderation.ModerationManager;
+import com.darkniightz.main.JebaitedCore;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
-
 public class StaffChatCommand implements CommandExecutor {
+    private final Plugin plugin;
     private final ProfileStore profiles;
     private final RankManager ranks;
     private final DevModeManager devMode;
     private final ModerationManager moderation;
 
-    public StaffChatCommand(ProfileStore profiles, RankManager ranks, DevModeManager devMode, ModerationManager moderation) {
+    public StaffChatCommand(
+            Plugin plugin, ProfileStore profiles, RankManager ranks, DevModeManager devMode, ModerationManager moderation) {
+        this.plugin = plugin;
         this.profiles = profiles;
         this.ranks = ranks;
         this.devMode = devMode;
@@ -55,6 +58,12 @@ public class StaffChatCommand implements CommandExecutor {
         }
 
         String msg = String.join(" ", args);
+        if (sender instanceof Player player && plugin instanceof JebaitedCore core) {
+            var discord = core.getDiscordIntegrationService();
+            if (discord != null) {
+                discord.notifyChatRelay(player.getUniqueId(), player.getName(), msg, "staff");
+            }
+        }
         String out = "§d[Staff] §7" + actorName + ": §f" + msg;
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             PlayerProfile vp = profiles.getOrCreate(viewer, ranks.getDefaultGroup());

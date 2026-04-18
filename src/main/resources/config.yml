@@ -92,10 +92,10 @@ integrations:
   discord:
     enabled: true
     guild_id: ""
-    # Bot HTTP base (plugin -> signed webhooks). Same host as bot container if using Docker.
+    # Bot HTTP base (plugin -> signed webhooks). Docker: http://discord-bot:8787 — or env JB_DISCORD_BOT_API_BASE_URL.
     bot_api_base_url: "http://127.0.0.1:8787"
-    # Must match bot JB_WEBHOOK_SECRET / bot-config security.webhook_hmac_secret
-    webhook_hmac_secret: "CHANGE_ME"
+    # Must match bot JB_WEBHOOK_SECRET. Docker: set JB_WEBHOOK_SECRET on mc-hub; leave empty or use secret here.
+    webhook_hmac_secret: ""
     link_code_ttl_seconds: 900
     relay_channel: "jebaited.discord.relay"
     # Mirror in-game chat → Discord (global / optionally staff / faction) per bot-config channels.
@@ -107,10 +107,10 @@ integrations:
     # Paper HTTP API for bot → server (bind localhost; reverse-proxy or docker publish as needed).
     inbound:
       enabled: true
-      # 0.0.0.0 so Discord bot / Stripe (Docker network) can reach Paper; firewall host as needed
+      # 0.0.0.0 so Docker bridge (discord-bot) can reach Paper; override with JB_DISCORD_INBOUND_BIND_HOST
       bind_host: "0.0.0.0"
       bind_port: 8789
-      # Shared secret: bot PluginBridgeClient sends Authorization: Bearer <token> (must match bot config)
+      # Shared secret: bot PluginBridgeClient sends Authorization: Bearer <token> (env JB_PLUGIN_API_TOKEN overrides)
       api_token: "CHANGE_ME"
     # Mirror Bukkit log lines to Discord (rate-limited). Off by default.
     console_mirror_enabled: false
@@ -623,6 +623,14 @@ hotbar:
     lore:
       - "§7Open your lounge"
       - "§8Preview, pin, and equip looks"
+  # Hotbar key 9 (rightmost / index 8) — your skin, opens network profile
+  profile:
+    enabled: true
+    slot: 8
+    name: "§f§lProfile"
+    lore:
+      - "§7Stats · rank · balance · milestones"
+      - "§8Synced across the network"
 
 # Servers menu
 menus:

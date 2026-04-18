@@ -38,6 +38,10 @@ public final class DiscordInboundHttpService {
         if (token != null && "CHANGE_ME".equalsIgnoreCase(token.trim())) {
             token = "";
         }
+        String tokenEnv = System.getenv("JB_PLUGIN_API_TOKEN");
+        if (tokenEnv != null && !tokenEnv.isBlank()) {
+            token = tokenEnv.trim();
+        }
         boolean needDiscord =
                 discordInboundEnabled && token != null && !token.isBlank();
         if (discordInboundEnabled && !needDiscord) {
@@ -53,6 +57,10 @@ public final class DiscordInboundHttpService {
         int port;
         if (needDiscord) {
             host = plugin.getConfig().getString("integrations.discord.inbound.bind_host", "127.0.0.1");
+            String hostEnv = System.getenv("JB_DISCORD_INBOUND_BIND_HOST");
+            if (hostEnv != null && !hostEnv.isBlank()) {
+                host = hostEnv.trim();
+            }
             port = plugin.getConfig().getInt("integrations.discord.inbound.bind_port", 8789);
         } else {
             host = plugin.getConfig().getString("store.http.bind_host", "127.0.0.1");

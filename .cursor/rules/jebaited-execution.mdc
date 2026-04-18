@@ -7,8 +7,14 @@ alwaysApply: true
 
 1. **Apply changes yourself.** If a fix needs `.env`, `docker-compose.yml`, `config.yml`, `plugin.yml`, or any tracked/ignored file in this workspace, **edit the file** with the tool. Do not tell the user to "add this line" or "put X in .env" unless the secret is genuinely unavailable (e.g. only in a password manager).
 
-2. **After changing Docker or env**, run the relevant `docker compose` / `mvn` command and confirm the service starts or health checks pass when that is practical in the environment.
+2. **Docker verification is mandatory when Docker is involved.** If you touch `docker-compose.yml`, `Dockerfile`, `include:` / `env_file:` wiring, or the Discord bot image under `bot-service/`, you **must** run Docker commands yourself and fix failures before answering:
+   - `docker compose config` (or `config --quiet`) from **each** entrypoint that changed: canonical `JebaitedNetwork/`, and any thin wrapper (`JebaitedCore/`, `MC Server/`) so include paths and `env_file` resolve.
+   - `docker compose build <service>` for images you changed (e.g. `discord-bot` when `bot-service` changed).
+   - If the user needs runtime proof and the machine can run containers, bring up the minimal deps and check logs/health (e.g. `docker compose up -d postgres redis` then the dependent service, or the full stack if already used).
+   Do not rely on “should work” or only local `mvn compile` for Compose/Docker changes.
 
 3. **No chore dumps.** Do not close with a checklist of manual steps that duplicate what you could do in one edit + one command.
 
 4. **Secrets.** Never paste live tokens or passwords into chat. Editing `.env` on disk is fine; do not echo those values back in the reply.
+
+5. **Roadmap/plugin continuity** (non-Docker): see [`jebaited-plugin-standards.mdc`](jebaited-plugin-standards.mdc) — `ROADMAP.md`, `SESSION_HANDOFF.md`, Grafter.

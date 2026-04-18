@@ -61,6 +61,9 @@ public final class PermissionConstants {
     public static final String CMD_MCTOP          = "jebaited.mcmmo.mctop";
     public static final String CMD_MCINSPECT      = "jebaited.mcmmo.inspect";
     public static final String CMD_MCRANK         = "jebaited.mcmmo.mcrank";
+    public static final String CMD_MCABILITY      = "jebaited.mcmmo.mcability";
+    public static final String CMD_MCCOOLDOWN     = "jebaited.mcmmo.mccooldown";
+    public static final String CMD_PTP            = "jebaited.mcmmo.ptp";
 
     // ── Achievements ─────────────────────────────────────
     public static final String CMD_ACHIEVEMENTS = "jebaited.achievements.use";

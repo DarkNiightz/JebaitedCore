@@ -2,6 +2,7 @@ package com.darkniightz.core.eventmode;
 
 import com.darkniightz.core.eventmode.handler.*;
 import com.darkniightz.core.eventmode.team.TeamEngine;
+import com.darkniightz.core.party.PartyManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.system.BossBarManager;
@@ -68,6 +69,7 @@ public final class EventEngine {
     private final Plugin plugin;
     private final BroadcasterManager broadcasterManager;
     private final BossBarManager bossBarManager;
+    private final PartyManager partyManager;
 
     // ── Live session ─────────────────────────────────────────────────────────
     private volatile EventSession session;
@@ -96,10 +98,11 @@ public final class EventEngine {
 
     private final EventArenaRegistry arenaRegistry = new EventArenaRegistry();
 
-    public EventEngine(Plugin plugin, BroadcasterManager broadcasterManager, BossBarManager bossBarManager) {
+    public EventEngine(Plugin plugin, BroadcasterManager broadcasterManager, BossBarManager bossBarManager, PartyManager partyManager) {
         this.plugin              = plugin;
         this.broadcasterManager  = broadcasterManager;
         this.bossBarManager      = bossBarManager;
+        this.partyManager        = partyManager;
         initHandlers();
     }
 
@@ -1012,7 +1015,7 @@ public final class EventEngine {
             session.endsAtMs = System.currentTimeMillis() + durationSeconds * 1000L;
             String eventWorldName = plugin.getConfig().getString("event_mode.world", "events");
             ensureEventWorld(eventWorldName);
-            TeamEngine.assignCtfTeams(session);
+            TeamEngine.assignCtfTeams(session, partyManager);
             for (UUID id : session.active) {
                 Player p = Bukkit.getPlayer(id);
                 if (p == null) continue;

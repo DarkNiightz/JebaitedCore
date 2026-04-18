@@ -1,6 +1,6 @@
 package com.darkniightz.core.hub;
 
-import com.darkniightz.core.gui.MenuService;
+import com.darkniightz.core.gui.StatsMenu;
 import com.darkniightz.core.system.MaterialCompat;
 import com.darkniightz.core.world.WorldManager;
 import com.darkniightz.main.JebaitedCore;
@@ -27,6 +27,7 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -197,6 +198,7 @@ public class HotbarNavigatorListener implements Listener {
         placeItem(player, getSlot("hotbar.navigator.slot", 4), "hotbar.navigator", Material.COMPASS, "§b§lNavigator", plugin.getConfig().getStringList("hotbar.navigator.lore"));
         placeItem(player, getSlot("hotbar.toybox.slot", 3), "hotbar.toybox", MaterialCompat.resolve(Material.PAPER, "FIREWORK_ROCKET", "FIREWORK", "PAPER"), "§d§lToybox", plugin.getConfig().getStringList("hotbar.toybox.lore"));
         placeItem(player, getSlot("hotbar.cosmetics.slot", 7), "hotbar.cosmetics", Material.BOOK, "§5§lCosmetics", plugin.getConfig().getStringList("hotbar.cosmetics.lore"));
+        placeProfileHead(player, getSlot("hotbar.profile.slot", 8), "hotbar.profile");
     }
 
     public void clearHubHotbar(Player player) {
@@ -228,9 +230,45 @@ public class HotbarNavigatorListener implements Listener {
         player.getInventory().setItem(slot, stack);
     }
 
+    /**
+     * Player skull — opens the same profile GUI as {@code /stats}. Slot defaults to index 8 (hotbar “9”).
+     */
+    private void placeProfileHead(Player player, int slot, String path) {
+        if (!isHotbarSectionEnabled(path)) {
+            clearProtectedSlot(player, slot);
+            return;
+        }
+        ItemStack existing = player.getInventory().getItem(slot);
+        if (isProtected(existing) && readType(existing) != null) {
+            return;
+        }
+        ItemStack stack = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) stack.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.setOwningPlayer(player);
+        meta.setDisplayName(plugin.getConfig().getString(path + ".name", "§f§lProfile"));
+        List<String> lore = plugin.getConfig().getStringList(path + ".lore");
+        if (lore == null || lore.isEmpty()) {
+            lore = List.of(
+                    "§7Your stats, rank, and activity",
+                    "§8Across this network"
+            );
+        }
+        meta.setLore(lore);
+        markProtected(meta, path.substring("hotbar.".length()));
+        stack.setItemMeta(meta);
+        player.getInventory().setItem(slot, stack);
+    }
+
     private boolean isHotbarSectionEnabled(String path) {
         ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
-        return section != null && section.getBoolean("enabled", true);
+        if (section == null) {
+            // Older config.yml files may omit `hotbar.profile`; treat as enabled so upgrades get the head without a merge.
+            return "hotbar.profile".equals(path);
+        }
+        return section.getBoolean("enabled", true);
     }
 
     private void clearProtectedSlot(Player player, int slot) {
@@ -281,6 +319,17 @@ public class HotbarNavigatorListener implements Listener {
         switch (type) {
             case NAVIGATOR -> new ServersMenu(plugin).open(player);
             case COSMETICS -> player.performCommand("cosmetics");
+            case PROFILE -> {
+                if (plugin instanceof JebaitedCore core) {
+                    new StatsMenu(
+                            core,
+                            core.getProfileStore(),
+                            core.getRankManager(),
+                            core.getAchievementManager(),
+                            player
+                    ).open(player);
+                }
+            }
             case TOYBOX -> {
                 if (plugin instanceof JebaitedCore core && core.getToyboxManager() != null) {
                     core.getToyboxManager().trigger(player);
@@ -316,7 +365,8 @@ public class HotbarNavigatorListener implements Listener {
     private boolean isProtectedSlot(int slot) {
         return slot == getSlot("hotbar.navigator.slot", 4)
                 || slot == getSlot("hotbar.toybox.slot", 3)
-                || slot == getSlot("hotbar.cosmetics.slot", 7);
+                || slot == getSlot("hotbar.cosmetics.slot", 7)
+                || slot == getSlot("hotbar.profile.slot", 8);
     }
 
     private boolean isReservedSlot(int slot) {
@@ -327,7 +377,8 @@ public class HotbarNavigatorListener implements Listener {
         return new int[] {
                 getSlot("hotbar.navigator.slot", 4),
                 getSlot("hotbar.toybox.slot", 3),
-                getSlot("hotbar.cosmetics.slot", 7)
+                getSlot("hotbar.cosmetics.slot", 7),
+                getSlot("hotbar.profile.slot", 8)
         };
     }
 
@@ -364,6 +415,7 @@ public class HotbarNavigatorListener implements Listener {
     private enum HotbarType {
         NAVIGATOR,
         TOYBOX,
-        COSMETICS
+        COSMETICS,
+        PROFILE
     }
 }

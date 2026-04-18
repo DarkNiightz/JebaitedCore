@@ -226,7 +226,19 @@ public final class DiscordIntegrationDispatchService {
     }
 
     private TextChannel resolveTextChannel(JDA jda, String channelId) {
-        Guild g = jda.getGuildById(discord.guildId());
+        if (channelId == null || channelId.isBlank()) {
+            return null;
+        }
+        // Prefer global channel lookup so relay works when guild_id is unset (single-guild bots).
+        TextChannel direct = jda.getTextChannelById(channelId);
+        if (direct != null) {
+            return direct;
+        }
+        String gid = discord.guildId();
+        if (gid == null || gid.isBlank() || "PUT_GUILD_ID_HERE".equalsIgnoreCase(gid.trim())) {
+            return null;
+        }
+        Guild g = jda.getGuildById(gid);
         if (g == null) {
             return null;
         }

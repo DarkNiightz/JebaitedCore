@@ -148,27 +148,122 @@ public final class MonitoringSlashCommandListener extends ListenerAdapter {
             return;
         }
         PlayerLookupDao.PlayerRow p = row.get();
-        long hours = p.playtimeMs() / 3_600_000L;
-        String skin = "https://crafatar.com/avatars/" + p.uuid() + "?size=128&overlay";
+        String skin = "https://crafatar.com/renders/body/" + p.uuid() + "?scale=4&overlay";
+        String thumb = "https://crafatar.com/avatars/" + p.uuid() + "?size=128&overlay";
+        String donorLine = p.donorRank() == null || p.donorRank().isBlank() ? "—" : p.donorRank();
+        String kdr = formatKdr(p.kills(), p.deaths());
         EmbedBuilder eb =
                 new EmbedBuilder()
                         .setTitle(p.username())
                         .setColor(new Color(0x1ABC9C))
-                        .setThumbnail(skin)
-                        .addField("UUID", "`" + p.uuid() + "`", false)
-                        .addField("Rank", p.rank(), true)
-                        .addField("Playtime (approx)", hours + "h", true)
-                        .addField("K / D / Msg", p.kills() + " / " + p.deaths() + " / " + p.messagesSent(), true)
+                        .setThumbnail(thumb)
+                        .setDescription("Full profile from `players` + `player_stats`.")
                         .addField(
-                                "First joined",
-                                LocalDateTime.ofInstant(
-                                                Instant.ofEpochMilli(p.firstJoinedMs()),
-                                                ZoneId.systemDefault())
-                                        .format(DateTimeFormatter.ISO_LOCAL_DATE),
+                                "Ranks",
+                                "Primary: **"
+                                        + p.rank()
+                                        + "**\nDonor: **"
+                                        + donorLine
+                                        + "**\n`"
+                                        + p.uuid()
+                                        + "`",
                                 false)
-                        .addField("Past names", "Not stored (single username row per UUID)", false)
+                        .addField(
+                                "Economy",
+                                "Balance: **"
+                                        + String.format(Locale.US, "%,.2f", p.balance())
+                                        + "**\nCosmetic coins: **"
+                                        + String.format(Locale.US, "%,d", p.cosmeticCoins())
+                                        + "**",
+                                true)
+                        .addField(
+                                "Activity",
+                                "Playtime: **"
+                                        + formatDurationShort(p.playtimeMs())
+                                        + "**\nMessages: **"
+                                        + String.format(Locale.US, "%,d", p.messagesSent())
+                                        + "** · Commands: **"
+                                        + String.format(Locale.US, "%,d", p.commandsSent())
+                                        + "**",
+                                true)
+                        .addField(
+                                "Join dates",
+                                "First: **"
+                                        + formatDay(p.firstJoinedMs())
+                                        + "**\nLast: **"
+                                        + formatDay(p.lastJoinedMs())
+                                        + "**",
+                                false)
+                        .addField(
+                                "Combat",
+                                "K/D: **"
+                                        + kdr
+                                        + "** ("
+                                        + p.kills()
+                                        + " kills · "
+                                        + p.deaths()
+                                        + " deaths)\nMobs: **"
+                                        + String.format(Locale.US, "%,d", p.mobsKilled())
+                                        + "** · Bosses: **"
+                                        + String.format(Locale.US, "%,d", p.bossesKilled())
+                                        + "**",
+                                false)
+                        .addField(
+                                "Gathering",
+                                "Blocks: **"
+                                        + String.format(Locale.US, "%,d", p.blocksBroken())
+                                        + "** · Crops: **"
+                                        + String.format(Locale.US, "%,d", p.cropsBroken())
+                                        + "** · Fish: **"
+                                        + String.format(Locale.US, "%,d", p.fishCaught())
+                                        + "**",
+                                false)
+                        .addField(
+                                "Events (wins)",
+                                "Combat: **"
+                                        + p.eventWinsCombat()
+                                        + "** · Chat games: **"
+                                        + p.eventWinsChat()
+                                        + "** · Hardcore: **"
+                                        + p.eventWinsHardcore()
+                                        + "**",
+                                true)
+                        .addField("mcMMO (stored)", "Power level: **" + p.mcmmoLevel() + "**", true)
+                        .setImage(skin)
                         .setTimestamp(Instant.now());
         event.getHook().sendMessageEmbeds(eb.build()).queue();
+    }
+
+    private static String formatKdr(int kills, int deaths) {
+        if (deaths <= 0) {
+            return kills + ".00";
+        }
+        return String.format(Locale.US, "%.2f", kills / (double) deaths);
+    }
+
+    private static String formatDay(long epochMs) {
+        if (epochMs <= 0L) {
+            return "—";
+        }
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMs), ZoneId.systemDefault())
+                .format(DateTimeFormatter.ISO_LOCAL_DATE);
+    }
+
+    private static String formatDurationShort(long ms) {
+        if (ms <= 0L) {
+            return "0m";
+        }
+        long s = ms / 1000L;
+        long d = s / 86400L;
+        long h = (s % 86400L) / 3600L;
+        long m = (s % 3600L) / 60L;
+        if (d > 0L) {
+            return d + "d " + h + "h";
+        }
+        if (h > 0L) {
+            return h + "h " + m + "m";
+        }
+        return m + "m";
     }
 
     private void handleActivity(SlashCommandInteractionEvent event) {

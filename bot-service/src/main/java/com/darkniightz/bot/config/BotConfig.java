@@ -28,7 +28,13 @@ public record BotConfig(
             String pluginInboundBaseUrl,
             String pluginApiToken,
             String statusEmbedChannelId
-    ) {}
+    ) {
+        /** Non-blank token from env/YAML that is not the shipped placeholder. */
+        public boolean hasDiscordToken() {
+            String t = token == null ? "" : token.trim();
+            return !t.isEmpty() && !"PUT_TOKEN_HERE".equalsIgnoreCase(t);
+        }
+    }
 
     public record Database(String jdbcUrl, String username, String password, int maxPoolSize) {}
 

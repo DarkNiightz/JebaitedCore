@@ -4,28 +4,18 @@ Copy the block below into the first message when starting a **new** chat so cont
 
 ```
 ## Handoff
-- **Repo:** JebaitedCore (Paper 1.21 plugin). ROADMAP.md is source of truth for intent.
-- **Branch:** `cursor/next-steps-2026-04-18`
-- **Last commit / PR:** `8fa4f15` (server-side parity + persistence hardening). PR open link: https://github.com/DarkNiightz/JebaitedCore/compare/main...cursor/next-steps-2026-04-18?expand=1
-- **Handoff saved:** 2026-04-18 — panel/server parity tranche shipped, plus Docker restart hardening notes captured.
-- **Shipped this session (server-side only):**
-  - Command parity: `setrank` console/RCON path, `/unfreeze` label, `maintenance allow` alias, cosmetics admin RCON commands (`give|take|wipe`).
-  - Hardcore flow: no join wipe, death-to-pool, winner claim via `/loot` GUI.
-  - DB migrations: `V011` moderation lifecycle, `V012` server id columns, `V013` booster/quest tables.
-  - Write-path hardening: moderation status transitions + server stamping, audit log server stamping, immediate rank DB persist fallback logging.
-- **Docker/ops learnings (critical):**
-  - Keep one compose project name: `name: jebaitednetwork` (avoid duplicate stacks/port collisions).
-  - Canonical stack path: `Vibe Code/JebaitedNetwork/docker-compose.yml` and `.env` there.
-  - Windows path with spaces: use `JebaitedNetwork/up-build.ps1` (BuildKit off).
-  - mcMMO MySQL host in `MC Server/plugins/mcMMO/config.yml` must be `mysql` (not `jebaited-mysql`).
-- **Quick restart verify:**
-  - `docker restart jnet-mc-hub jnet-mc-smp`
-  - `docker ps --format "table {{.Names}}\t{{.Status}}"` (hub/smp should become healthy)
-  - `docker logs jnet-mc-hub --since 90s` + `docker logs jnet-mc-smp --since 90s` (look for Paper done + JebaitedCore startup report)
-- **Working on next:** §21 KOTH polish / party-aware TeamEngine + HC-CTF; then I2 Player Shops; parallel mcMMO wrappers.
-- **Next 1–3 steps:** 1) Finish §21 event architecture cleanup (KOTH/CTF flow). 2) Start I2 schema + minimal write paths. 3) Continue mcMMO wrapper parity (`/mcability`, `/mccooldown`, `/ptp`).
-- **Files to open first:** [ROADMAP.md](ROADMAP.md), `src/main/java/com/darkniightz/core/eventmode/`, [docs/DOCKER.md](docs/DOCKER.md), [PlayerProfileDAO](src/main/java/com/darkniightz/main/PlayerProfileDAO.java), [AuditLogService](src/main/java/com/darkniightz/core/system/AuditLogService.java).
-- **Verify:** `.\mvnw.cmd -DskipTests compile`; `docker compose -f docker-compose.ci.yml config`; runtime container health checks above.
+- **Repo:** JebaitedCore (Paper 1.21 plugin + `bot-service`). ROADMAP.md is source of truth.
+- **Branch:** (current workspace)
+- **Handoff saved:** 2026-04-18 — §F StatsMenu UX pass (7 tabs + cosmetics fractions + SMP economy gate).
+- **Shipped this session:**
+  - **`StatsMenu`:** Seven tabs (**Profile · Hub · SMP · Hardcore · Arena · Chat games · Achievements**); **Hub** cosmetics show **unlocked/enabled totals** per `CosmeticsManager` category + active particle/gadget; **SMP** economy ingot only when **`WorldManager.isSmp(viewer)`**; **events** merged map filtered into three buckets (**`ChatGameKeys`** / `hardcore` / arena rest); **Achievements** tab fills **`ACH_GRID`** with per-definition progress + summary on **28**, book **`AchievementsMenu`** still slot **43** (handler **`tab == 6`**); skull chat transcript — balance line only when viewer on SMP worlds.
+  - **§F v2 (prior):** **`plugin.yml`** aliases **`profile`**, **`pp`**; **`StatsCommand`** public **`/stats <player>`**; **`CommandSecurityListener`** throttle for `profile`/`pp`.
+  - **§F v1 (prior):** Tabbed `StatsMenu` + Discord `/player` rich embed (`PlayerLookupDao`, `MonitoringSlashCommandListener`, `BotApplication`).
+  - **`ROADMAP.md` hygiene (rule: `jebaited-plugin-standards.mdc`):** top blurb + **Feature Showcase** (`/stats`, Economy rows) + **Upcoming F** + **Feature Index §6** aligned with the above — not only §6 body text.
+- **Working on next:** §F remainder per ROADMAP §6 — Adventure/`profile.labels.*`, bottom row (friend / party / settings / refresh), optional per-bucket event overflow polish **or** §21 / I2 per focus.
+- **Next 1–3 steps:** 1) **`.\mvnw.cmd -DskipTests package`** → copy **`target/JebaitedCore.jar`** → **`MC Server/plugins/`** (or `build-jebaitedcore-docker.ps1`). 2) **`docker compose restart mc-hub mc-smp`** from this repo root (`name: jebaitednetwork` include). 3) In-game: all **seven tabs**, skull transcript from **hub vs SMP**, cosmetics fractions, event buckets.
+- **Files to open first:** `StatsMenu.java`, `StatsCommand.java`, `AchievementManager.java`, ROADMAP §6.
+- **Verify:** `.\mvnw.cmd -DskipTests compile` + `.\mvnw.cmd -f bot-service\pom.xml compile`; `docker compose build discord-bot` from `JebaitedNetwork` after pulling.
 ```
 
 Erase or overwrite the bullets each session so the next run does not inherit stale tasks.

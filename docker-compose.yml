@@ -21,5 +21,9 @@
 # Force the same Compose project name as when you run from JebaitedNetwork/
 # (avoids a second parallel stack named after this folder).
 name: jebaitednetwork
+# Load the stack .env for Compose interpolation when invoking `docker compose` from this repo (tokens live next
+# to the real compose file, not necessarily in IdeaProjects/JebaitedCore).
 include:
   - path: "../../../JebaitedNetwork/docker-compose.yml"
+    env_file:
+      - "../../../JebaitedNetwork/.env"

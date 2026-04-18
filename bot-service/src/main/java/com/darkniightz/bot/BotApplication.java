@@ -58,8 +58,7 @@ public final class BotApplication {
         ScheduledExecutorService statusEmbedScheduler = null;
         PluginBridgeClient pluginBridge =
                 new PluginBridgeClient(config.discord().pluginInboundBaseUrl(), config.discord().pluginApiToken());
-        String token = config.discord().token();
-        if (token != null && !token.isBlank() && !"PUT_TOKEN_HERE".equalsIgnoreCase(token)) {
+        if (config.discord().hasDiscordToken()) {
             jda = new JdaFactory().createOrNull(config.discord());
             if (jda != null) {
                 jdaRef.set(jda);
@@ -102,7 +101,14 @@ public final class BotApplication {
                 statusEmbedScheduler.scheduleAtFixedRate(updater, 30, 90, TimeUnit.SECONDS);
             }
         } else {
-            AuditLogger.info("bot.discord.disabled", CorrelationId.next(), "No token configured; Discord gateway not started.");
+            AuditLogger.info(
+                    "bot.discord.diagnostic",
+                    CorrelationId.next(),
+                    ConfigLoader.discordTokenMissingSummary() + " classpathHint=" + classpathTokenHint(config.discord().token()));
+            AuditLogger.info(
+                    "bot.discord.disabled",
+                    CorrelationId.next(),
+                    discordDisabledReason(config.discord().token()));
         }
 
         Metrics metrics = new Metrics();
@@ -160,7 +166,7 @@ public final class BotApplication {
         CommandData ping = Commands.slash("ping", "Live TPS, players, and MOTD from the Paper server");
         CommandData serverCmd = Commands.slash("server", "Same as /ping — live Paper status");
         CommandData player =
-                Commands.slash("player", "Look up a player (UUID, skin, stats, playtime)")
+                Commands.slash("player", "Detailed player profile from DB (ranks, economy, combat, events, mcMMO)")
                         .addOption(OptionType.STRING, "name", "Minecraft username", true);
         CommandData activity =
                 Commands.slash("activity", "24h online-count chart (requires DB samples from the plugin)");
@@ -182,6 +188,33 @@ public final class BotApplication {
         } catch (Exception e) {
             AuditLogger.info("bot.slash.failed", CorrelationId.next(), e.getMessage() == null ? e.getClass().getName() : e.getMessage());
         }
+    }
+
+    private static String classpathTokenHint(String raw) {
+        if (raw == null) {
+            return "null";
+        }
+        String t = raw.trim();
+        if (t.isEmpty() || "null".equalsIgnoreCase(t)) {
+            return "empty";
+        }
+        if ("PUT_TOKEN_HERE".equalsIgnoreCase(t)) {
+            return "placeholder_PUT_TOKEN_HERE";
+        }
+        return "nonEmptyLen=" + t.length();
+    }
+
+    private static String discordDisabledReason(String rawToken) {
+        String t = rawToken == null ? "" : rawToken.trim();
+        if (t.isEmpty() || "null".equalsIgnoreCase(t)) {
+            return "No Discord bot token resolved (set JB_BOT_TOKEN, DISCORD_BOT_TOKEN, or DISCORD_TOKEN; or use "
+                    + "JB_BOT_TOKEN_FILE / JebaitedNetwork .env; classpath default is a placeholder). "
+                    + "HTTP still listens; only the gateway is off.";
+        }
+        if ("PUT_TOKEN_HERE".equalsIgnoreCase(t)) {
+            return "Discord token is still the bundled placeholder; set a real token via env or JB_BOT_TOKEN_FILE.";
+        }
+        return "Discord gateway not started.";
     }
 
     private static Guild resolveGuild(JDA jda, String guildId) {

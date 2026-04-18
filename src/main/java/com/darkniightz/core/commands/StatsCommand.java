@@ -1,32 +1,42 @@
 package com.darkniightz.core.commands;
 
 import com.darkniightz.core.Messages;
+import com.darkniightz.core.achievements.AchievementManager;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.gui.StatsMenu;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
+import com.darkniightz.main.JebaitedCore;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public class StatsCommand implements CommandExecutor {
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 
-    private final Plugin plugin;
+public class StatsCommand implements CommandExecutor, TabCompleter {
+
+    private final JebaitedCore plugin;
     private final ProfileStore profiles;
     private final RankManager ranks;
     private final DevModeManager devMode;
+    private final AchievementManager achievements;
 
-    public StatsCommand(Plugin plugin, ProfileStore profiles, RankManager ranks, DevModeManager devMode) {
+    public StatsCommand(JebaitedCore plugin, ProfileStore profiles, RankManager ranks, DevModeManager devMode, AchievementManager achievements) {
         this.plugin = plugin;
         this.profiles = profiles;
         this.ranks = ranks;
         this.devMode = devMode;
+        this.achievements = achievements;
     }
 
     @Override
@@ -47,12 +57,6 @@ public class StatsCommand implements CommandExecutor {
 
         OfflinePlayer target = viewer;
         if (args.length >= 1) {
-            PlayerProfile viewerProfile = profiles.getOrCreate(viewer, ranks.getDefaultGroup());
-            boolean bypass = devMode != null && devMode.isActive(viewer.getUniqueId());
-            if (!bypass && !ranks.isAtLeast(viewerProfile.getPrimaryRank(), "admin")) {
-                viewer.sendMessage(Messages.noPerm());
-                return true;
-            }
             target = Bukkit.getOfflinePlayer(args[0]);
             if (target.getUniqueId() == null) {
                 viewer.sendMessage(Messages.prefixed("§cPlayer not found: §e" + args[0]));
@@ -60,8 +64,34 @@ public class StatsCommand implements CommandExecutor {
             }
         }
 
-        new StatsMenu(plugin, profiles, ranks, target).open(viewer);
+        new StatsMenu(plugin, profiles, ranks, achievements, target).open(viewer);
         return true;
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        if (args.length != 1 || !(sender instanceof Player viewer)) {
+            return List.of();
+        }
+        PlayerProfile viewerProfile = profiles.getOrCreate(viewer, ranks.getDefaultGroup());
+        boolean bypass = devMode != null && devMode.isActive(viewer.getUniqueId());
+        boolean staffTier = bypass || ranks.isAtLeast(viewerProfile.getPrimaryRank(), "helper");
+        String partial = args[0].toLowerCase(Locale.ROOT);
+        List<String> out = new ArrayList<>();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (!staffTier && !viewer.canSee(p)) {
+                continue;
+            }
+            String name = p.getName();
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            if (partial.isEmpty() || name.toLowerCase(Locale.ROOT).startsWith(partial)) {
+                out.add(name);
+            }
+        }
+        Collections.sort(out);
+        return out;
     }
 
     private void printQuickConsoleStats(CommandSender sender, OfflinePlayer target) {

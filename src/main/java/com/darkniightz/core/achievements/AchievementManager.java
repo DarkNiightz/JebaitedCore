@@ -94,6 +94,22 @@ public final class AchievementManager {
         });
     }
 
+    /**
+     * Ensures the player's achievement rows are present in the cache before read APIs are used.
+     * Intended for UIs (e.g. profile menu) where we need data for an arbitrary UUID on demand.
+     */
+    public void ensureLoadedSync(UUID uuid) {
+        if (cache.containsKey(uuid)) {
+            return;
+        }
+        synchronized (this) {
+            if (cache.containsKey(uuid)) {
+                return;
+            }
+            cache.put(uuid, dao.loadAll(uuid));
+        }
+    }
+
     /** Flush any dirty rows then evict from cache. */
     public void unloadPlayer(UUID uuid) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {

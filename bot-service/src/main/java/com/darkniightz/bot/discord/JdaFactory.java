@@ -20,14 +20,26 @@ public final class JdaFactory {
             return null;
         }
         try {
-            JDA jda = JDABuilder.createDefault(tok)
-                    .enableIntents(
-                            GatewayIntent.GUILD_MEMBERS,
-                            GatewayIntent.GUILD_MESSAGES,
-                            GatewayIntent.MESSAGE_CONTENT)
+            /*
+             * Privileged gateway intents (Server Members + Message Content) require toggles in the Discord
+             * Developer Portal. If JDA requests them without portal approval, login fails with 4014.
+             * Opt-in via JB_DISCORD_PRIVILEGED_INTENTS=true after enabling intents for the application.
+             */
+            JDABuilder b = JDABuilder.createDefault(tok)
                     .setStatus(OnlineStatus.ONLINE)
-                    .setActivity(Activity.customStatus(cfg.statusText()))
-                    .build();
+                    .setActivity(Activity.customStatus(cfg.statusText()));
+            boolean privileged = privilegedIntentsEnabled();
+            AuditLogger.info(
+                    "bot.discord.intent_mode",
+                    CorrelationId.next(),
+                    privileged ? "privileged (MEMBERS+MESSAGES+CONTENT — enable in Portal)" : "default (no extra privileged intents)");
+            if (privileged) {
+                b.enableIntents(
+                        GatewayIntent.GUILD_MEMBERS,
+                        GatewayIntent.GUILD_MESSAGES,
+                        GatewayIntent.MESSAGE_CONTENT);
+            }
+            JDA jda = b.build();
             jda.awaitReady();
             return jda;
         } catch (InvalidTokenException e) {
@@ -47,5 +59,10 @@ public final class JdaFactory {
                     e.getClass().getSimpleName() + ": " + (e.getMessage() == null ? "" : e.getMessage()));
             return null;
         }
+    }
+
+    private static boolean privilegedIntentsEnabled() {
+        String v = System.getenv("JB_DISCORD_PRIVILEGED_INTENTS");
+        return v != null && ("1".equals(v) || "true".equalsIgnoreCase(v.trim()));
     }
 }

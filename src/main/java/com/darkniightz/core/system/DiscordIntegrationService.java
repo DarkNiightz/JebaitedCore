@@ -52,12 +52,32 @@ public final class DiscordIntegrationService {
             base = "http://127.0.0.1:8787";
         }
         base = base.trim();
+        String baseEnv = System.getenv("JB_DISCORD_BOT_API_BASE_URL");
+        if (baseEnv != null && !baseEnv.isBlank()) {
+            base = baseEnv.trim();
+        }
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
         this.webhookUrl = base + "/webhooks/panel";
-        this.secret = cfg.getString("integrations.discord.webhook_hmac_secret", "");
+        String sec = cfg.getString("integrations.discord.webhook_hmac_secret", "");
+        String secEnv = System.getenv("JB_WEBHOOK_SECRET");
+        if (secEnv != null && !secEnv.isBlank()) {
+            sec = secEnv.trim();
+        }
+        this.secret = sec == null ? "" : sec;
         this.timeoutMs = Math.max(500, Math.min(30000, cfg.getInt("integrations.webhooks.request_timeout_ms", 3000)));
+        if (enabled) {
+            if (isEnabled()) {
+                plugin.getLogger().info("[Discord] Paper→bot webhooks ACTIVE → " + webhookUrl);
+            } else {
+                plugin.getLogger()
+                        .warning(
+                                "[Discord] integrations.discord.enabled=true but signing secret is invalid: set "
+                                        + "integrations.discord.webhook_hmac_secret or env JB_WEBHOOK_SECRET to match the bot. "
+                                        + "Relay, mod-log, and event announcements will not be sent.");
+            }
+        }
     }
 
     public boolean isEnabled() {
