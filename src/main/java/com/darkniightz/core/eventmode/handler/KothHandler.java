@@ -151,6 +151,13 @@ public final class KothHandler implements EventHandler {
 
         List<String> lines = new ArrayList<>();
         lines.add("§7Hill: " + holder);
+        if (!sorted.isEmpty()) {
+            UUID leadId = sorted.get(0).getKey();
+            int leadSecs = sorted.get(0).getValue();
+            Player lp = Bukkit.getPlayer(leadId);
+            String leadName = lp != null ? lp.getName() : leadId.toString().substring(0, Math.min(8, leadId.toString().length()));
+            lines.add("§7Unc. leader: §f" + leadName + " §8— §a" + leadSecs + "s");
+        }
         lines.add("§7Match ends: §f" + remain + "s");
         for (int i = 0; i < Math.min(3, sorted.size()); i++) {
             UUID id = sorted.get(i).getKey();

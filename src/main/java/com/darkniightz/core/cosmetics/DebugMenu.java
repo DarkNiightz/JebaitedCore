@@ -1,11 +1,14 @@
 package com.darkniightz.core.cosmetics;
 
+import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DebugStateManager;
 import com.darkniightz.core.dev.DebugFeedManager;
 import com.darkniightz.core.dev.DeployStatusManager;
 import com.darkniightz.core.dev.DevModeManager;
 import com.darkniightz.core.gui.BaseMenu;
 import com.darkniightz.core.gui.ItemBuilder;
+import com.darkniightz.core.gui.ShopMenu;
+import com.darkniightz.core.shop.ShopManager;
 import com.darkniightz.core.moderation.ModerationManager;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
@@ -704,6 +707,16 @@ public class DebugMenu extends BaseMenu {
         entries.add(entry(Material.GOLD_INGOT, "/pay", List.of("§7Send money to an online player.", "§8Right click runs it. Shift-right pastes the command."), commandInfo("/pay", "Transfer money to another player.", "/pay <player> <amount>"), null, runCommand("/pay"), suggestCommand("/pay <player> <amount>", "§7Click to paste: /pay <player> <amount>")));
         entries.add(entry(Material.CHEST, "/balancetop", List.of("§7Show richest players.", "§8Right click runs it. Shift-right pastes the command."), commandInfo("/balancetop", "Show top balances.", "/balancetop [limit]"), null, runCommand("/balancetop"), suggestCommand("/balancetop [limit]", "§7Click to paste: /balancetop [limit]")));
         entries.add(entry(Material.BEACON, "/eco", List.of("§7Admin balance controls.", "§8Right click runs it. Shift-right pastes the command."), commandInfo("/eco", "Admin give/take/set money.", "/eco <give|take|set> <player> <amount>"), null, runCommand("/eco"), suggestCommand("/eco <give|take|set> <player> <amount>", "§7Click to paste: /eco <give|take|set> <player> <amount>")));
+        entries.add(entry(Material.BARREL, "/shop", List.of("§7Open the server shop (alias §f/market§7).", "§8Right click opens it now. Shift-right pastes the command."), commandInfo("/shop", "Server buy/sell GUI (ROADMAP §17).", "/shop"), null, p -> {
+            ShopManager shop = plugin.getShopManager();
+            if (shop == null || !shop.isAvailable()) {
+                p.sendMessage(Messages.prefixed("§cThe shop is unavailable right now."));
+                return;
+            }
+            if (!shop.canUseShop(p)) return;
+            new ShopMenu(plugin, shop, plugin.getEconomyManager(), plugin.getProfileStore(), plugin.getRankManager(),
+                    ShopManager.categoryIds().get(0), 0, null).open(p);
+        }, suggestCommand("/shop", "§7Click to paste: /shop")));
         entries.add(entry(Material.RED_BED, "/sethome /home /homes", List.of("§7Manage personal homes.", "§8Right click runs /homes. Shift-right pastes /sethome <name>."), commandInfo("/homes", "List and use player homes.", "/sethome [name] | /home [name] | /delhome <name>"), null, runCommand("/homes"), suggestCommand("/sethome <name>", "§7Click to paste: /sethome <name>")));
         entries.add(entry(Material.NAME_TAG, "/nick /whois", List.of("§7Nickname and profile diagnostics.", "§8Right click runs /nick. Shift-right pastes /whois."), commandInfo("/nick", "Set nickname or inspect player diagnostics.", "/nick <name|off> | /whois <player>"), null, runCommand("/nick"), suggestCommand("/whois <player>", "§7Click to paste: /whois <player>")));
         entries.add(entry(MaterialCompat.resolve(Material.COMPASS, "SPYGLASS", "COMPASS"), "/near", List.of("§7List nearby players in your world.", "§8Right click runs it. Shift-right pastes the command."), commandInfo("/near", "Scan nearby players by radius.", "/near [radius]"), null, runCommand("/near"), suggestCommand("/near [radius]", "§7Click to paste: /near [radius]")));

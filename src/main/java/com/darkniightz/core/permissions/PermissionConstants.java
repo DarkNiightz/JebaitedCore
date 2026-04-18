@@ -65,6 +65,9 @@ public final class PermissionConstants {
     // ── Achievements ─────────────────────────────────────
     public static final String CMD_ACHIEVEMENTS = "jebaited.achievements.use";
 
+    /** Server balance shop GUI ({@code /shop}). */
+    public static final String CMD_SHOP = "jebaited.shop.use";
+
     /** Optional extra gate for /chatgame staff actions (primary gate is srmod+ in {@link com.darkniightz.core.commands.ChatGameCommand}). */
     public static final String CMD_CHATGAME = "jebaited.chatgame.use";
 

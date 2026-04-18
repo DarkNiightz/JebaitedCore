@@ -1,10 +1,15 @@
 package com.darkniightz.core.eventmode;
 
+import com.darkniightz.core.system.MaterialCompat;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -205,7 +210,63 @@ public final class EventArenaRegistry {
                 ? parseLocation(castMap(bf), log) : null;
         int win = ctfMap.get("win_score") instanceof Number n ? Math.max(1, n.intValue()) : 3;
         int ret = ctfMap.get("flag_return_seconds") instanceof Number n2 ? Math.max(5, n2.intValue()) : 30;
-        return new ArenaConfig.CtfLayout(redSpawn, blueSpawn, redFlag, blueFlag, win, ret);
+        List<ArenaConfig.CtfKitEntry> redKit = parseCtfKit(ctfMap.get("red_kit"), log);
+        List<ArenaConfig.CtfKitEntry> blueKit = parseCtfKit(ctfMap.get("blue_kit"), log);
+        return new ArenaConfig.CtfLayout(redSpawn, blueSpawn, redFlag, blueFlag, win, ret, redKit, blueKit);
+    }
+
+    private List<ArenaConfig.CtfKitEntry> parseCtfKit(Object kitObj, Logger log) {
+        if (!(kitObj instanceof List<?> list) || list.isEmpty()) {
+            return List.of();
+        }
+        List<ArenaConfig.CtfKitEntry> out = new ArrayList<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> mm)) continue;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> row = (Map<String, Object>) mm;
+            ArenaConfig.CtfKitEntry entry = parseCtfKitRow(row, log);
+            if (entry != null) out.add(entry);
+        }
+        return List.copyOf(out);
+    }
+
+    private ArenaConfig.CtfKitEntry parseCtfKitRow(Map<String, Object> row, Logger log) {
+        Object matObj = row.get("material");
+        if (matObj == null) {
+            log.warning("[EventArenaRegistry] CTF kit row missing material — skipped.");
+            return null;
+        }
+        String matName = String.valueOf(matObj).trim();
+        Material mat = MaterialCompat.resolveConfigured(matName, Material.STONE);
+        if (mat == Material.STONE && !matName.equalsIgnoreCase("STONE") && !MaterialCompat.isSupported(matName)) {
+            log.warning("[EventArenaRegistry] Unknown CTF kit material '" + matName + "' — using STONE fallback.");
+        }
+        int amt = row.get("amount") instanceof Number n ? Math.max(1, Math.min(64, n.intValue())) : 1;
+        ItemStack stack = new ItemStack(mat, amt);
+        EquipmentSlot equip = parseKitEquipSlot(row.get("equip"));
+        return new ArenaConfig.CtfKitEntry(stack, equip);
+    }
+
+    /** null = main inventory order; or HEAD/CHEST/LEGS/FEET/HAND/OFF_HAND (aliases allowed). */
+    private static EquipmentSlot parseKitEquipSlot(Object equipObj) {
+        if (equipObj == null) return null;
+        String s = String.valueOf(equipObj).trim().toUpperCase(Locale.ROOT);
+        if (s.isEmpty()) return null;
+        return switch (s) {
+            case "HELMET", "HAT", "HEAD" -> EquipmentSlot.HEAD;
+            case "CHEST", "CHESTPLATE", "BODY" -> EquipmentSlot.CHEST;
+            case "LEGS", "LEGGINGS" -> EquipmentSlot.LEGS;
+            case "FEET", "BOOTS", "SHOES" -> EquipmentSlot.FEET;
+            case "HAND", "MAIN", "MAIN_HAND" -> EquipmentSlot.HAND;
+            case "OFF_HAND", "OFFHAND", "SHIELD" -> EquipmentSlot.OFF_HAND;
+            default -> {
+                try {
+                    yield EquipmentSlot.valueOf(s);
+                } catch (IllegalArgumentException e) {
+                    yield null;
+                }
+            }
+        };
     }
 
     @SuppressWarnings("unchecked")

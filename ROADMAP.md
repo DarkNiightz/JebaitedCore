@@ -1,8 +1,10 @@
 ﻿# JebaitedCore — Feature Roadmap
 
-> Last updated: April 2026 — Chat games parallel runtime: [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + `/chatgame`, config `chat_games`, panel `POST /api/server/chat-game-event`  
+> Last updated: April 2026 — **§17 Server shop:** MVP **shipped** in-plugin (layout, DB `V007`, settings, rate-limit validation + loaded-row logging, tx-log failure → debug feed, [`ShopManager`](src/main/java/com/darkniightz/core/shop/ShopManager.java) refresh on `/jreload`). **Debug:** `/shop` quick-open in [`DebugMenu`](src/main/java/com/darkniightz/core/cosmetics/DebugMenu.java) command list. **Staging:** [checklist](#staging-verification-checklist) + [Jamie handoff](#jamie-handoff-web-panel) + [PANEL_SERVER_SHOP_HANDOFF.md](docs/PANEL_SERVER_SHOP_HANDOFF.md). **§21:** KOTH **unc. leader**; CTF **YAML kits** + **ground flag** item pickup (`CtfGroundFlagListener`). **Current focus:** staging **I2** Player Shops when economy is ready; web panel shop editor optional. **Versioning:** [§18](#18-version-labelling). Chat games: [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + `/chatgame`.  
 > Package root: `com.darkniightz`  
-> All DB changes go through SchemaManager migrations (`src/main/resources/db/`).
+> All DB changes go through SchemaManager migrations (`src/main/resources/db/`).  
+> **Web admin (Node `web-admin`):** not edited from this repo — document DB/API contracts here; Jamie implements panel routes and UI.  
+> **Next session:** Paste the copy-paste block from [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) into a new chat; pick §17 staging, panel handoff, §21 `TeamEngine` party-aware CTF, or I2 per **Current focus** below.
 
 ---
 
@@ -31,6 +33,7 @@
 | **Stats Menu (/stats)** | 45-slot GUI showing all player stats, rank, balance, and achievements. Staff can view other players. | ✅ Shipped |
 | **Leaderboards** | Hologram leaderboards placeable anywhere in-world for any stat (kills, playtime, blocks, etc.). Top 10 with rank-colored names. Auto-refresh. | ✅ Shipped |
 | **Economy** | In-game balance with `/balance`, `/pay`, and staff eco commands. Displayed in stats menu. | ✅ Shipped |
+| **Server Shop** | `/shop` (alias `/market`) — 9-category buy/sell GUI, PostgreSQL prices (`server_shop_prices`) + audit trail (`shop_transactions`), per-player rate limits and donor cadence, optional stack-buy confirm (`SettingKey` Gameplay). **SMP only.** Reload: `/jreload` rebuilds `ShopManager` from DB. | ✅ Shipped |
 | **Homes** | Save and teleport to named home locations. Rank-based limits (pleb=1 up to grandmaster=unlimited). | ✅ Shipped |
 | **Warps** | Public server warps with optional entry fee. Listable via `/warps`. | ✅ Shipped |
 | **Random Teleport (RTP)** | Teleport to a safe random SMP location. Configurable radius. | ✅ Shipped |
@@ -86,7 +89,7 @@
 | **Audit Logging** | System | All admin actions (rank changes, bans, eco, cosmetics) logged async to DB. | ✅ Shipped |
 | **Command Log** | System | Individual player command history stored in `player_command_log`. | ✅ Shipped |
 | **Compat Report** | Developer | DB status, migration state, world loading times. | ✅ Shipped |
-| **Debug Cockpit** | Developer | Full dev GUI — system health, cosmetics, events, DB controls, live feed. | ✅ Shipped |
+| **Debug Cockpit** | Developer | Full dev GUI — system health, cosmetics, events, DB controls, live feed, command cheat-sheet (opens GUIs where applicable, including **`/shop`**). | ✅ Shipped |
 | **Web Panel Auth** | Player | `/generatepassword` creates a one-time panel login token. | ✅ Shipped |
 | **Version Monitor** | System | Alerts staff when a new Paper version is available. | ✅ Shipped |
 
@@ -96,7 +99,6 @@
 
 | # | Feature | Who Benefits | Priority | Status |
 |---|---------|-------------|----------|--------|
-| A | Donor Perk Commands (`/repair`, `/feed`, `/kit`, `/deathtp`) | Donor players | Shipped | ✅ Shipped |
 | B | MOTD / Login Summary | All players | Soon | Planned |
 | C | Server Boosters | All players | Soon | Planned |
 | D | Personal Boosters | Donor players | Soon | Planned |
@@ -105,7 +107,7 @@
 | G | Graves Overhaul (nametag ArmorStand, donor auto-equip) | All players | Soon | Planned |
 | H | **Events System Overhaul** — full rewrite: per-event-type arenas, auto-countdown lobby, team auto-balance (party-aware), CTF, live sidebar + boss bar, coins+XP+item rewards, spectator mode polish | All players | **Next** | 🔧 In Progress (death arch shipped P21) |
 | H2 | Exclusive Event Skins + Blood Champion Banner | Hardcore event winners | Soon | Planned |
-| I | **Server Shop** (`/shop`) — 9-category GUI, buy/sell, DB-backed prices | All players | Soon | Planned |
+| I | **Server Shop — follow-ups** — web panel `/admin/shop/prices` + `/admin/shop/log`, staging burn-in on economy + transactions | Staff / economy ready | Next | Planned |
 | I2 | Player Shops — player-to-player storefronts | All players | Later | Planned |
 | I3 | **Version Tagging** — label v0.1 through v1.0. Starts after Economy Store + Player Shops ship. Each milestone tag captures full feature state. | All | After I2 | Milestone |
 | J | Jebaited Wrapped (year-end stats showcase) | All players | Soon | Planned |
@@ -116,6 +118,18 @@
 | O | [Multi-Server Network (Velocity)](#22-network-overhaul-full-velocity-network) | All players | Deferred | 🧱 Scaffold done (ServerType + NetworkManager stub) |
 | P | **Pre-Production Audit** — full codebase security pass (OWASP Top 10), messy code cleanup, dead code removal, SQL injection/XSS review, permission audit. Hard gate before v1.0 public release. | Dev | Before v1.0 | Planned |
 
+### Current focus (Jamie — ordering)
+
+| Order | Track | Notes |
+|-------|--------|------|
+| **1** | **Economy + `/shop`** ([§17](#17-server-shop-shop)) | **MVP shipped in plugin** (buy/sell GUI, DB, seed, settings). **Next:** operator-run [staging checklist](#staging-verification-checklist) + Jamie panel via [PANEL_SERVER_SHOP_HANDOFF.md](docs/PANEL_SERVER_SHOP_HANDOFF.md), then **I2** (Player Shops) / [§18 Version labelling](#18-version-labelling). |
+| **2** | **§21 KOTH polish** | Small iteration surface; uncontested scoring + UX already evolving in code. |
+| **3** | **CTF team mode** | Same-team PvP blocked ([`CtfTeamDamageListener`](src/main/java/com/darkniightz/core/eventmode/CtfTeamDamageListener.java)). **Shipped:** kits + strip/reapply; ground-flag `Item` pickup ([`CtfGroundFlagListener`](src/main/java/com/darkniightz/core/eventmode/CtfGroundFlagListener.java)). **Next:** party-aware `TeamEngine`, HC-CTF. |
+| — | Web panel hooks | Ship after shop + stabilised events APIs. |
+| — | Parkour `EventKind` | After KOTH/CTF kit pipeline feels solid (do not reuse KOTH hill cuboid). |
+
+End a Cursor session with a short copy-paste block in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) so the next chat starts cheap.
+
 ### Active P1 implementation backlog (tracked in repo plan)
 
 **Ongoing (process)** — not a one-time checkbox:
@@ -123,7 +137,7 @@
 | Item | Notes |
 |------|--------|
 | **Grafter: Settings + Debug** | On every feature/fix pass, review player **Settings** (`SettingKey`, category menus, persistence) and dev **Debug** (`DebugMenu`, `DebugFeedManager`, `DebugStateManager`)—see [`.cursor/skills/grafter/SKILL.md`](.cursor/skills/grafter/SKILL.md), section **Player and developer surfaces**. |
-| **Next theme pick (default)** | Continue **mcMMO wrapper parity** (`/mcability`, `/mccooldown`, `/ptp` when party TP is defined) in parallel with roadmap pillars: **events overhaul** ([§21](#21-events-system-overhaul)), **profile GUI** ([§6](#6-player-profile-overhaul-stats)), **shop** ([§17](#17-server-shop-shop)). |
+| **Next theme pick (default)** | Continue **mcMMO wrapper parity** (`/mcability`, `/mccooldown`, `/ptp` when party TP is defined) in parallel with roadmap pillars: **events overhaul** ([§21](#21-events-system-overhaul)), **profile GUI** ([§6](#6-player-profile-overhaul-stats)), **shop follow-ups** ([§17](#17-server-shop-shop) — panel + staging, MVP already shipped). |
 
 **Baseline shipped in code** — spot-check in staging when convenient (paths are authoritative):
 
@@ -136,6 +150,7 @@
 | **Scoreboard compact economy** | [`ServerScoreboardManager.compactNumber`](src/main/java/com/darkniightz/core/system/ServerScoreboardManager.java) for hub coins + SMP balance. |
 | **Private vault instant save** | [`PrivateVaultListener`](src/main/java/com/darkniightz/core/gui/PrivateVaultListener.java) `onInventoryClickSave` / `onInventoryDragSave` (monitor), not only on close. |
 | **mcMMO command ownership** | [`JebaitedCore.registerCommands`](src/main/java/com/darkniightz/main/JebaitedCore.java) → `reassertMcMMOCommandOwnership()` (`party`, `pa`, `p`, `inspect`, `mcinspect`, `mmoinspect`, `mcrank`, `mcstats`, `mctop`). |
+| **Server shop + reload** | [`ShopManager`](src/main/java/com/darkniightz/core/shop/ShopManager.java) + [`reloadCore()`](src/main/java/com/darkniightz/main/JebaitedCore.java) — `/jreload` reconstructs shop manager and `start()` so DB price edits apply without restart. |
 
 ### Resolved quick wins (staging verification only)
 
@@ -162,7 +177,7 @@ Replace inline-only staff commands with optional GUI: action picker, duration pr
 
 **3. Events overhaul + chat games separation (large — 3–4 sessions)**  
 **Shipped:** [`ChatGameManager`](src/main/java/com/darkniightz/core/eventmode/ChatGameManager.java) + [`ChatGameEngine`](src/main/java/com/darkniightz/core/eventmode/ChatGameEngine.java) — chat rounds run **in parallel** with combat [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java) (`/chatgame` / `cg`; config `chat_games.games` + `chat_games.automation`; word/quiz lists remain `event_mode.chat`). DB: `event_sessions.event_type` uses config keys `chat_math` / `chat_scrabble` / `chat_quiz`; [`ChatGamePanelNotifier`](src/main/java/com/darkniightz/core/eventmode/ChatGamePanelNotifier.java) → `{webpanel}/api/server/chat-game-event` (JSON: `type`, `serverId`, `configKey`, `displayName`, `sessionId`, `winnerUuid`, `rewardCoins`, `startedAt`, `endedAt`; header `X-Provision-Secret`).  
-**Still open:** **KOTH v2** — uncontested hill time + HC tie → split loot ([§21](#21-events-system-overhaul)); **Parkour race** — separate `EventKind`/handler (not hill reuse); plugin disable persist ([`EventParticipantDAO`](src/main/java/com/darkniightz/core/eventmode/EventParticipantDAO.java)); hardcore loot pool GUI, `/loot`, `LootPoolManager` — see `eventmode` package and §21.
+**Still open:** **KOTH v2** — uncontested hill time + HC tie → split loot ([§21](#21-events-system-overhaul)); **CTF** — teammate damage off (listener shipped); uniform kit + inventory strip/restores per arena row; **Parkour race** — separate `EventKind`/handler (not hill reuse); plugin disable persist ([`EventParticipantDAO`](src/main/java/com/darkniightz/core/eventmode/EventParticipantDAO.java)); hardcore loot pool GUI, `/loot`, `LootPoolManager` — see `eventmode` package and §21.
 
 ---
 
@@ -186,7 +201,7 @@ Replace inline-only staff commands with optional GUI: action picker, duration pr
 | 14 | [Plugin Command Wrappers](#14-plugin-command-wrappers) | Ongoing | Planned |
 | 15 | [Achievement / Milestone System (The Grind Bible)](#15-achievement--milestone-system-the-grind-bible) | XL | ✅ Shipped (P18) |
 | 16 | [Jebaited Wrapped](#16-jebaited-wrapped) | Medium | Planned |
-| 17 | [Server Shop (`/shop`)](#17-server-shop-shop) | Large | Planned |
+| 17 | [Server Shop (`/shop`)](#17-server-shop-shop) | Large | ✅ Shipped (MVP in-plugin; panel editor optional) |
 | 21 | [Events System Overhaul](#21-events-system-overhaul) | XL | 🔧 In Progress — death arch shipped P21 |
 | 22 | [Network Overhaul (Full Velocity Network)](#22-network-overhaul-full-velocity-network) | XL | 🧱 Scaffold done — full overhaul deferred until Velocity ready |
 
@@ -1737,6 +1752,27 @@ Data shape:
 
 ## 17. Server Shop (`/shop`)
 
+### Implementation status *(keep in sync with code)*
+- **Shipped (plugin):** `V007__server_shop.sql`, `ShopManager` / `ShopCatalog` / `ShopPriceRow`, `ShopCommand` + alias `market`, `ShopMenu`, `ShopStackConfirmMenu`, `SettingKey` stack-buy confirm, `PermissionConstants.CMD_SHOP`, `CommandSecurityListener` cooldown bucket, config `server_shop:` (rate limits, menu title, etc.). **`ShopManager`:** startup warnings for bad `rate_limit_ms` / `donor_rate_limit_ms`; INFO log of loaded price row count after each `reload()`; on `shop_transactions` insert failure, warning log + one **Live feed** line via `DebugFeedManager` when available.
+- **Shipped (Debug):** [`DebugMenu.commandEntries()`](src/main/java/com/darkniightz/core/cosmetics/DebugMenu.java) — **`/shop`** row opens the same GUI path as the command (availability + `canUseShop` guards).
+- **Not shipped:** Web panel price editor + transaction views (see [Panel Surface](#panel-surface) below); economy staging burn-in is operational, not a code checkbox.
+
+### Staging verification checklist
+
+Run on a **staging** server with PostgreSQL enabled before treating `/shop` as production-ready. **Execution** is manual on a real Paper staging instance (this repo has no automated staging job for these checks).
+
+| Check | Pass criteria |
+|-------|----------------|
+| **DB seed** | After first start with empty `server_shop_prices`, table has rows (or `seed_on_empty: false` and you inserted prices manually). |
+| **DB transactions** | After a BUY and a SELL, `shop_transactions` has rows with correct `action`, `quantity`, `unit_price`, `total`, `transacted_at`. |
+| **SMP only** | In hub/non-SMP world, `/shop` shows “only in SMP”; in SMP, menu opens. |
+| **Creative / spectator** | Shop refuses creative and spectator with the configured message. |
+| **Insufficient balance** | Buy with balance &lt; cost: error, no debit, no item. |
+| **Inventory full** | Buy with full inventory: refund full price, error message (no partial debit). |
+| **Rate limit** | Non-donor: rapid clicks eventually show “too fast”; donor uses `donor_rate_limit_ms` (0 = no gap). |
+| **`/jreload`** | Change a price in DB → `/jreload` → reopen shop shows new price without server restart. Startup log includes loaded row count (see `ShopManager`). |
+| **Panel handoff doc** | Staff-facing price/log UI is implemented in `web-admin` using the same DB — use the copy-paste bundle [docs/PANEL_SERVER_SHOP_HANDOFF.md](docs/PANEL_SERVER_SHOP_HANDOFF.md) (operator check: doc present in repo; implementation lives in panel repo). |
+
 ### Goal
 A convenient server-run bulk buy/sell GUI covering 9 item categories. Priced deliberately worse than what a smart player shop can offer — the shop is a floor, not the ceiling. Drives player trade by design. DB-backed prices mean live tweaks from the web panel with zero restarts.
 
@@ -1747,28 +1783,30 @@ A convenient server-run bulk buy/sell GUI covering 9 item categories. Priced del
 - **No inflation loop:** selling to the server is never more profitable than farming events or using player shops.
 - **Adjustable:** prices stored in `server_shop_prices` table — admin can edit via panel page without a server restart.
 
-### GUI Layout (54 slots)
+### GUI Layout (54 slots) — **as implemented**
 
 ```
-Row 0 (slots 0–8):   [Player Head] [spacer] [Category tabs ×9]
-Row 1 (slots 9–17):  [Category tabs continued / search bar]
-Rows 2–4 (18–44):    Item grid — 21 slots per page (7×3)
-Row 5 (45–53):       [Prev Page] [spacer×3] [Search] [spacer×3] [Next Page]
+Row 0 (slots 0–8):   [Category tabs ×9] — Blocks … Redstone
+Row 1 (slots 9–17):  [spacer strip]
+Rows 2–4 (18–44):    Item grid — 21 slots per page (7×3 centred)
+Row 5 (45–53):       [Head + balance] [Prev] … [Search] … [Next] — head bottom-left (45), search centre (49)
 ```
 
-- **Player Head** (slot 0): async-loaded skull with player's own skin. Lore shows display name + balance only (e.g. `$12,345.67`). Nothing else. - Jamie (make sure it's updated if something is sold / bought)
-- **9 category tabs** across rows 0–1: Blocks, Farming, Mobs, Ores, Dyes, Music, Food, Decoration, Redstone. Clicking a tab reloads the item grid instantly for that category. Active tab has glowing border (enchant effect).
+- **Player Head** (slot **45**, bottom-left): skull with player's skin; lore = display name + **balance** (refreshes when menu reopens after buy/sell).
+- **9 category tabs** on **row 0 only**: Blocks, Farming, Mobs, Ores, Dyes, Music, Food, Decoration, Redstone. Active tab uses enchant glint.
 - **Item grid**: 21 items per page. Clicking an item buys/sells. Hover lore shows buy price, sell price, and shift-click stack price in yellow.
-- **Search**: opens a chat input (via existing `ChatInputService`) — filters items by name within the current category. No Anvil GUI.
+- **Search** (bottom row): **left-click** → `ChatInputService` filter by name within category; **right-click** → clear filter (no typing “cancel”). No Anvil GUI.
 - **Pagination**: prev/next arrows only shown when needed.
 
 ### Interaction Model
 | Action | Result |
 |--------|--------|
 | Left-click item | Buy 1 |
-| Shift + Left-click | Buy 64 (stack) |
+| Shift + Left-click | Buy stack (up to item max stack) — if **Gameplay → Shop stack confirm** is on, opens a **confirm GUI** first; if off, buys immediately |
 | Right-click item | Sell 1 (scans inventory for exact material) |
 | Shift + Right-click | Sell all of that material from inventory |
+
+**Rate limit:** configurable `server_shop.rate_limit_ms` (default ~120 ms); players with a **donor rank** use `server_shop.donor_rate_limit_ms` (default **0** = no gap). Prevents macro abuse while allowing normal fast clicking.
 
 All actions are instant with sound feedback via `SoundCompat`. Insufficient balance → `Messages.prefix()` error in chat, no GUI close.
 
@@ -1904,7 +1942,7 @@ Redstone Dust, Redstone Torch, Repeater, Comparator, Piston, Sticky Piston, Obse
 
 > ⚠️ Music disc sell price is intentionally capped at $18 (not 40–60% of buy) to prevent disc-farming loops via cat/jukebox. Totem sell capped at $95 for the same reason.
 
-### DB Schema — `V007__server_shop.sql` *(assign exact V-number at implementation; currently V007 per implementation order)*
+### DB Schema — `V007__server_shop.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS server_shop_prices (
     item_key      VARCHAR(64)    PRIMARY KEY,   -- e.g. "minecraft:oak_log"
@@ -1931,26 +1969,30 @@ CREATE INDEX IF NOT EXISTS idx_shop_tx_player ON shop_transactions(player_uuid);
 CREATE INDEX IF NOT EXISTS idx_shop_tx_time   ON shop_transactions(transacted_at);
 ```
 
-### Java — Files to create
+### Java — Files (shipped)
 
 | File | Purpose |
 |------|---------|
-| `core/system/ShopManager.java` | Singleton. Loads all `server_shop_prices` rows into memory on startup. Provides `buyItem`, `sellItem`, `getPrice`, `getCategory` methods. Seeds prices from config on first run if table is empty. |
-| `core/commands/ShopCommand.java` | `/shop` — opens `ShopMenu`. No subcommands. Implements `CommandExecutor + TabCompleter` (empty). |
-| `core/gui/ShopMenu.java` | Main 54-slot GUI. Player head slot 0, category tabs, item grid, pagination, search trigger. Extends `BaseMenu`. |
-| `core/gui/ShopCategoryMenu.java` | Renders a single category page. Called by `ShopMenu` on tab click or page change. Handles left/right/shift-left/shift-right click logic. |
+| `core/shop/ShopManager.java` | Loads `server_shop_prices`, seeds via `ShopCatalog` if empty, buy/sell, rate limits, async `shop_transactions` + audit. |
+| `core/shop/ShopCatalog.java` | Default seed rows (categories + pricing reference). |
+| `core/shop/ShopPriceRow.java` | Cached price row. |
+| `core/commands/ShopCommand.java` | `/shop` + alias `market`; `TabCompleter` returns empty list. |
+| `core/gui/ShopMenu.java` | Main 54-slot GUI. |
+| `core/gui/ShopStackConfirmMenu.java` | Optional shift-stack confirmation (27 slots). |
+| `SettingKey.GAMEPLAY_SHOP_STACK_CONFIRM` | Gameplay toggle (`PlayerProfile.PREF_SHOP_STACK_CONFIRM`). |
+| `core/cosmetics/DebugMenu.java` | Dev cockpit → command list → **`/shop`** (opens `ShopMenu` when shop is available). |
 
 ### Wiring checklist (all 5 required)
-- [ ] `ShopCommand.java` — executor + tab completer
-- [ ] `plugin.yml` — command entry for `shop` with alias `market`
-- [ ] `JebaitedCore.java` — `bindCommand("shop", new ShopCommand(...))` + `ShopManager` init in `onEnable`
-- [ ] `PermissionConstants.java` — `CMD_SHOP = "jebaited.shop.use"` (default true, no rank gate)
-- [ ] `CommandSecurityListener.java` — add `"shop"` to switch with 600ms cooldown bucket (no rank gate)
+- [x] `ShopCommand.java` — executor + tab completer
+- [x] `plugin.yml` — command entry for `shop` with alias `market`
+- [x] `JebaitedCore.java` — `bindCommand("shop", …)` + `ShopManager` in `finishEnable`
+- [x] `PermissionConstants.java` — `CMD_SHOP = "jebaited.shop.use"` (default true, no rank gate)
+- [x] `CommandSecurityListener.java` — `shop` / `market` on 600ms cooldown bucket (no rank gate)
 
 ### Security & Dupe Protection
 1. **Atomic transactions:** check balance → deduct/add money via `EconomyManager` → modify inventory → `ProfileStore.saveDeferred`. If inventory give fails (full), refund balance before returning.
 2. **Sell validation:** scan player inventory for exact `Material` match before accepting sell. Quantity capped at what player actually holds.
-3. **Rate limit:** 2 transactions per second per player (tracked in `ShopManager` via `ConcurrentHashMap<UUID, Long> lastTx`).
+3. **Rate limit:** `server_shop.rate_limit_ms` + optional donor bypass via `server_shop.donor_rate_limit_ms` (see Interaction Model above).
 4. **Survival/Adventure only:** block shop use in creative mode.
 5. **Audit log:** every buy/sell written to `shop_transactions` and `AuditLogService` (wrapped in try/catch — failure never crashes).
 6. **Hub block:** shop unavailable in hub world — SMP only.
@@ -1976,6 +2018,31 @@ Data shape (transaction row):
   "transacted_at": "2026-04-16T20:00:00Z"
 }
 ```
+
+### Jamie handoff (web panel)
+
+**Pasteable bundle for the web-admin AI:** [`docs/PANEL_SERVER_SHOP_HANDOFF.md`](docs/PANEL_SERVER_SHOP_HANDOFF.md) (schema, example queries, suggested routes, copy-paste prompt).
+
+The plugin does **not** expose HTTP APIs for shop admin in MVP. The panel and plugin share **PostgreSQL**; implement routes in `web-admin` against the same DB the server uses.
+
+| Concern | Approach |
+|---------|----------|
+| **Price editor** | `SELECT`/`UPDATE` `server_shop_prices` (`item_key` PK, `buy_price`, `sell_price`, `enabled`, `sort_order`, `category`, `display_name`, `max_stack`). After edits, ops run `/jreload` on the MC server (or wait for next restart) so [`ShopManager.reload()`](src/main/java/com/darkniightz/core/shop/ShopManager.java) picks up changes. |
+| **Transaction log** | `SELECT` from `shop_transactions` — filter by `player_uuid`, date range on `transacted_at`, optional `action IN ('BUY','SELL')`. Join to `players` for display names if needed. |
+| **Auth** | Use the panel’s existing staff/auth; no new plugin endpoints. |
+| **Failure visibility** | If `shop_transactions` insert fails, the plugin logs a warning and (when dev feed exists) records one line in `/debug` → Live feed — check server logs if players report missing ledger rows. |
+
+### I2 Player Shops — design contract (pre-implementation)
+
+Ship **after** §17 is stable in production and the panel can maintain server prices. **Web-admin** listing UI is optional for v1; core loop is in-plugin.
+
+| Piece | Direction |
+|-------|-----------|
+| **DB** | New migration (next V after current [`migrations.index`](src/main/resources/db/migrations.index)): e.g. `player_shop_listings` with `seller_uuid` → `players(uuid)`, price, quantity, serialized item (bytes or JSON), location or chest reference, `created_at`, `expires_at`, `active`. Exact columns when implementing. |
+| **Economy** | Buyer debit / seller credit via existing economy APIs; optional listing fee or tax to sink. |
+| **Plugin** | Seller: create listing from inventory block or command; buyer: browse GUI (nearby or warp); concurrency + dupes guarded in `ShopManager`-style transactions. |
+| **Panel** | Optional staff dashboard for listings — document JSON routes in ROADMAP when added. |
+| **§18** | v0.1 tag remains gated on §17 + I2 per [Version labelling](#18-version-labelling). |
 
 ### Notes
 - Player shops (P2P storefronts) are a separate feature (I2 in the roadmap) — deferred until the server economy has been live long enough to understand real supply/demand.
@@ -2005,7 +2072,7 @@ v1.0       — after Pre-Production Audit passes (§19), full public release
 - No version tag is cut from a branch — only from main.
 
 ### Checklist before v0.1
-- [ ] Economy Store (`/shop`) — buy/sell GUI fully functional
+- [x] Economy Store (`/shop`) — buy/sell GUI fully functional *(plugin; panel editor still optional)*
 - [ ] Player Shops — P2P storefronts working
 - [ ] All V-numbered migrations from V001–V007 verified idempotent + clean on fresh install
 - [ ] No P1 bugs in the live changelog
@@ -2180,7 +2247,7 @@ The v1.0 tag is only cut after:
 - **Shipped (V006):** `event_sessions` / `event_participants` via [`EventParticipantDAO`](src/main/java/com/darkniightz/core/eventmode/EventParticipantDAO.java) + [`EventEngine`](src/main/java/com/darkniightz/core/eventmode/EventEngine.java); `friendship_stats.party_time_ms` via [`FriendDAO.addPartyTimeTogether`](src/main/java/com/darkniightz/core/system/FriendDAO.java) + [`PartyManager`](src/main/java/com/darkniightz/core/party/PartyManager.java).
 - **Shipped (arena + UX slice):** [`EventArenaRegistry`](src/main/java/com/darkniightz/core/eventmode/EventArenaRegistry.java) + [`ArenaConfig`](src/main/java/com/darkniightz/core/eventmode/ArenaConfig.java) (`event_mode.arena_registry` in `config.yml`); KOTH hill + duration from registry; DB spawns still override YAML when present; [`TeamEngine`](src/main/java/com/darkniightz/core/eventmode/team/TeamEngine.java) / [`Team`](src/main/java/com/darkniightz/core/eventmode/team/Team.java) (even split; party cohesion still TODO); [`CtfHandler`](src/main/java/com/darkniightz/core/eventmode/handler/CtfHandler.java) + [`CtfFlagListener`](src/main/java/com/darkniightz/core/eventmode/CtfFlagListener.java); live event lines in [`ServerScoreboardManager`](src/main/java/com/darkniightz/core/system/ServerScoreboardManager.java); `/event spectate` (helper+), `info`, `setreward`, `arenas`, `start <event> [arena]`.
 - Lobby countdown polish (boss bar tuning, `/event leave` during lobby edge cases)
-- **CTF follow-ups:** dropped-flag ground pickup, party-aware `TeamEngine`, HC-CTF rules, nametag colours
+- **CTF follow-ups:** **Shipped:** ground-flag pickup (`Item` + PDC `ctf_ground_flag`, [`CtfGroundFlagListener`](src/main/java/com/darkniightz/core/eventmode/CtfGroundFlagListener.java)). **Next:** party-aware `TeamEngine`, HC-CTF rules, nametag colours *(kits + strip/restore: `ctf.red_kit` / `ctf.blue_kit`, [`CtfKitUtil`](src/main/java/com/darkniightz/core/eventmode/CtfKitUtil.java); KOTH unc. leader in [`KothHandler`](src/main/java/com/darkniightz/core/eventmode/handler/KothHandler.java))*
 - Blood Champion banner + exclusive HC win cosmetics (§H2)
 
 ### Parkour vs KOTH — separate modes (design)

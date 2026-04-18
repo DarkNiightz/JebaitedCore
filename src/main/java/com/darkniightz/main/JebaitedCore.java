@@ -161,6 +161,7 @@ public final class JebaitedCore extends JavaPlugin {
     private com.darkniightz.core.system.KitManager kitManager;
     private com.darkniightz.core.achievements.AchievementDAO achievementDAO;
     private com.darkniightz.core.achievements.AchievementManager achievementManager;
+    private com.darkniightz.core.shop.ShopManager shopManager;
     private final java.util.List<String> startupMessages = new java.util.concurrent.CopyOnWriteArrayList<>();
     private com.darkniightz.main.database.SchemaManager.MigrationResult migrationResult;
     private int commandCount = 0;
@@ -329,6 +330,7 @@ public final class JebaitedCore extends JavaPlugin {
     public com.darkniightz.core.party.PartyStatDAO getPartyStatDAO() { return partyStatDAO; }
     public com.darkniightz.core.eventmode.EventParticipantDAO getEventParticipantDAO() { return eventParticipantDAO; }
     public com.darkniightz.core.achievements.AchievementManager getAchievementManager() { return achievementManager; }
+    public com.darkniightz.core.shop.ShopManager getShopManager() { return shopManager; }
 
     private void initializeDatabaseTables() {
         migrationResult = new com.darkniightz.main.database.SchemaManager(databaseManager, getLogger()).runMigrations();
@@ -337,6 +339,8 @@ public final class JebaitedCore extends JavaPlugin {
     private void finishEnable() {
         registerListeners();
         startRuntimeServices();
+        this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
+        this.shopManager.start();
         registerCommands();
         com.darkniightz.core.system.McMMOIntegration.runBridgeSelfTest(this);
         scheduleMcMMOCommandReassert();
@@ -380,6 +384,8 @@ public final class JebaitedCore extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new EventModeCombatListener(eventModeManager, this), this);
         Bukkit.getPluginManager().registerEvents(new EventWorldProtectionListener(this, eventModeManager), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfFlagListener(eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfGroundFlagListener(eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfTeamDamageListener(eventModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CommandSecurityListener(this, profileStore, rankManager, devModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CombatTagListener(this, combatTagManager), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.system.PartyCommandOwnershipListener(this), this);
@@ -471,6 +477,7 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("near", new NearCommand(this));
         bindCommand("rules", new RulesCommand(this));
         bindCommand("rtp", new RtpCommand(this, worldManager));
+        bindCommand("shop", new com.darkniightz.core.commands.ShopCommand(this));
         MessageCommand messageCommand = new MessageCommand(profileStore, rankManager, messageManager);
         bindCommand("message", messageCommand);
         ReplyCommand replyCommand = new ReplyCommand(profileStore, rankManager, messageManager);
@@ -819,6 +826,8 @@ public final class JebaitedCore extends JavaPlugin {
         this.overallStatsManager = new OverallStatsManager(databaseManager, getLogger());
         this.warpsManager = new WarpsManager(this);
         this.scoreboardManager = new ServerScoreboardManager(this, profileStore, rankManager, worldManager);
+        this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
+        this.shopManager.start();
         this.dbDependentServicesStarted = false;
         // Keep existing moderation state; no need to recreate moderationManager
         stopRuntimeServices();

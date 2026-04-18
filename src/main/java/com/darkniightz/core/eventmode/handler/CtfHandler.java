@@ -1,14 +1,21 @@
 package com.darkniightz.core.eventmode.handler;
 
 import com.darkniightz.core.eventmode.ArenaConfig;
+import com.darkniightz.core.eventmode.CtfKitUtil;
 import com.darkniightz.core.eventmode.EventSession;
 import com.darkniightz.core.eventmode.team.Team;
 import com.darkniightz.core.eventmode.team.TeamEngine;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +30,77 @@ public final class CtfHandler implements EventHandler {
     private static final double CAPTURE_RADIUS = 5.0;
 
     private final Plugin plugin;
+    private final NamespacedKey groundFlagKey;
 
     public CtfHandler(Plugin plugin) {
         this.plugin = plugin;
+        this.groundFlagKey = new NamespacedKey(plugin, "ctf_ground_flag");
+    }
+
+    /** @return true if the pickup event should be cancelled (our ground-flag item). */
+    public boolean handleGroundFlagPickup(Player player, Item item, EventSession session) {
+        if (session == null || item == null) return false;
+        if (!item.getPersistentDataContainer().has(groundFlagKey, PersistentDataType.STRING)) {
+            return false;
+        }
+        String tag = item.getPersistentDataContainer().get(groundFlagKey, PersistentDataType.STRING);
+        Team team = TeamEngine.teamOf(session, player.getUniqueId());
+        if (team == null) {
+            return true;
+        }
+        if ("red".equals(tag)) {
+            if (team != Team.BLUE) return true;
+            if (session.ctfRedFlagCarrier != null || session.ctfRedFlagAtBase) {
+                return true;
+            }
+            removeGroundFlagItem(session, true);
+            session.ctfRedFlagCarrier = player.getUniqueId();
+            session.ctfRedFlagDropLocation = null;
+            session.ctfRedFlagReturnAtMs = 0L;
+            return true;
+        }
+        if ("blue".equals(tag)) {
+            if (team != Team.RED) return true;
+            if (session.ctfBlueFlagCarrier != null || session.ctfBlueFlagAtBase) {
+                return true;
+            }
+            removeGroundFlagItem(session, false);
+            session.ctfBlueFlagCarrier = player.getUniqueId();
+            session.ctfBlueFlagDropLocation = null;
+            session.ctfBlueFlagReturnAtMs = 0L;
+            return true;
+        }
+        return true;
+    }
+
+    private void removeGroundFlagItem(EventSession session, boolean redFlag) {
+        UUID id = redFlag ? session.ctfRedGroundItemEntity : session.ctfBlueGroundItemEntity;
+        if (id != null) {
+            org.bukkit.entity.Entity e = Bukkit.getEntity(id);
+            if (e != null) e.remove();
+            if (redFlag) session.ctfRedGroundItemEntity = null;
+            else session.ctfBlueGroundItemEntity = null;
+        }
+    }
+
+    private void spawnGroundFlagItem(EventSession session, boolean redFlag, Location drop) {
+        removeGroundFlagItem(session, redFlag);
+        if (drop == null || drop.getWorld() == null) return;
+        World w = drop.getWorld();
+        Location at = drop.clone();
+        at.setX(at.getBlockX() + 0.5);
+        at.setZ(at.getBlockZ() + 0.5);
+        at.setY(at.getY() + 0.2);
+        Material mat = redFlag ? Material.RED_WOOL : Material.BLUE_WOOL;
+        String tag = redFlag ? "red" : "blue";
+        Item ent = w.spawn(at, Item.class);
+        ent.setItemStack(new ItemStack(mat, 1));
+        ent.setVelocity(new Vector(0, 0.08, 0));
+        ent.getPersistentDataContainer().set(groundFlagKey, PersistentDataType.STRING, tag);
+        ent.setPickupDelay(0);
+        ent.setPersistent(true);
+        if (redFlag) session.ctfRedGroundItemEntity = ent.getUniqueId();
+        else session.ctfBlueGroundItemEntity = ent.getUniqueId();
     }
 
     @Override
@@ -44,6 +119,8 @@ public final class CtfHandler implements EventHandler {
         session.ctfBlueFlagDropLocation = null;
         session.ctfRedFlagReturnAtMs = 0L;
         session.ctfBlueFlagReturnAtMs = 0L;
+        session.ctfRedGroundItemEntity = null;
+        session.ctfBlueGroundItemEntity = null;
         placeWool(layout.redFlagBlock(), Material.RED_WOOL);
         placeWool(layout.blueFlagBlock(), Material.BLUE_WOOL);
     }
@@ -77,12 +154,14 @@ public final class CtfHandler implements EventHandler {
             session.ctfRedFlagAtBase = false;
             session.ctfRedFlagDropLocation = player.getLocation().clone();
             session.ctfRedFlagReturnAtMs = System.currentTimeMillis() + retSec * 1000L;
+            spawnGroundFlagItem(session, true, session.ctfRedFlagDropLocation);
         }
         if (id.equals(session.ctfBlueFlagCarrier)) {
             session.ctfBlueFlagCarrier = null;
             session.ctfBlueFlagAtBase = false;
             session.ctfBlueFlagDropLocation = player.getLocation().clone();
             session.ctfBlueFlagReturnAtMs = System.currentTimeMillis() + retSec * 1000L;
+            spawnGroundFlagItem(session, false, session.ctfBlueFlagDropLocation);
         }
 
         Bukkit.getScheduler().runTask(plugin, () -> {
@@ -91,6 +170,11 @@ public final class CtfHandler implements EventHandler {
             player.setFoodLevel(20);
             Location spawn = teamSpawn(session, TeamEngine.teamOf(session, id));
             if (spawn != null) player.teleport(spawn);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(new ItemStack[4]);
+            player.getInventory().setItemInOffHand(null);
+            boolean red = session.ctfTeamRed.contains(id);
+            CtfKitUtil.apply(player, red ? lay.redKit() : lay.blueKit());
         });
     }
 
@@ -146,11 +230,13 @@ public final class CtfHandler implements EventHandler {
 
     private void returnFlag(EventSession session, boolean redFlag, ArenaConfig.CtfLayout lay) {
         if (redFlag) {
+            removeGroundFlagItem(session, true);
             session.ctfRedFlagReturnAtMs = 0L;
             session.ctfRedFlagAtBase = true;
             session.ctfRedFlagDropLocation = null;
             placeWool(lay.redFlagBlock(), Material.RED_WOOL);
         } else {
+            removeGroundFlagItem(session, false);
             session.ctfBlueFlagReturnAtMs = 0L;
             session.ctfBlueFlagAtBase = true;
             session.ctfBlueFlagDropLocation = null;
@@ -196,6 +282,8 @@ public final class CtfHandler implements EventHandler {
 
     @Override
     public void onEnd(EventSession session) {
+        removeGroundFlagItem(session, true);
+        removeGroundFlagItem(session, false);
         ArenaConfig.CtfLayout lay = layout(session);
         if (lay.redFlagBlock() != null && lay.redFlagBlock().getWorld() != null) {
             lay.redFlagBlock().getBlock().setType(Material.AIR, false);

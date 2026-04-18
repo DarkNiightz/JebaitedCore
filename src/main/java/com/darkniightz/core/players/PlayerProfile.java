@@ -31,6 +31,8 @@ public class PlayerProfile {
     public static final String PREF_EVENT_PREFIX = "event_";
     /** full | some | none — boss bars + titles intensity (see PresentationPreference). */
     public static final String PREF_SCREEN_EFFECTS = "screen_effects";
+    /** Server shop: confirm GUI before shift-buying a full stack (Gameplay settings). */
+    public static final String PREF_SHOP_STACK_CONFIRM = "shop_stack_buy_confirm";
 
     private final UUID uuid;
     private final String name;

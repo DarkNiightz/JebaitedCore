@@ -10,9 +10,15 @@ Grafter is the project skill for building and maintaining `JebaitedCore` end-to-
 ## Source of truth
 
 - Treat `ROADMAP.md` as the authoritative project state and intent.
+- **ROADMAP hygiene (same session as the code change):** When you ship or materially change a feature, update `ROADMAP.md` in the same pass — at minimum: the **top blurb** if focus or shipped surface changes, **Feature Showcase** (player/staff tables), **Upcoming Features** (remove or rewrite rows that are no longer “planned” the same way), **Feature Index** status column for the relevant §, and the **detailed §** (files, wiring, implementation status). Ending a multi-file session: refresh the copy-paste block in [`SESSION_HANDOFF.md`](../../../SESSION_HANDOFF.md) (repo root).
 - **mcMMO upgrades:** On each new mcMMO release, re-run the staging checklist in ROADMAP §14 (`/compat` bridge line + `mcmmo_level` + optional `integrations.mcmmo.bridge_self_test`), diff upstream `plugin.yml` commands against the inventory table, and extend `MCMMO_OWNED_COMMANDS` / wrappers only when adding newly overlapping labels (today: `party`, `pa`, `p`, `inspect` + aliases, `mcrank`, `mcstats`, `mctop`).
 - If docs conflict with `ROADMAP.md`, follow `ROADMAP.md` and update stale docs.
 - Verify reality from code before making roadmap claims.
+
+## Web admin panel — out of scope
+
+- **Do not edit the web-panel codebase** (Node/Express `web-admin` or any repo outside **this** plugin). Grafter work is **JebaitedCore only**.
+- When a feature needs panel UI, HTTP APIs, auth, or live relay beyond what the plugin already does (`PanelConnectorService`, shared DB, etc.), **document the contract** in `ROADMAP.md` (tables, JSON shape, suggested routes) and **tell Jamie** to implement or wire the web side — do not open or patch the panel project yourself.
 
 ## Core operating rules
 
@@ -93,3 +99,4 @@ Each finding must include concrete file paths.
 - Keep changes focused on requested outcomes.
 - Do not rewrite large systems unless explicitly requested.
 - After edits, run available lint/build checks relevant to touched files.
+- **Web panel:** never in scope unless Jamie explicitly pastes panel files into the chat or asks for a panel change in this workspace — default is plugin + DB migrations + `ROADMAP.md` handoff notes only.

@@ -224,7 +224,7 @@ public class CommandSecurityListener implements Listener {
         return switch (label.toLowerCase(Locale.ROOT)) {
             case "worldstatus", "compat", "history", "whois", "balancetop", "leaderboard", "mctop", "mcrank", "debug", "devdebug", "jreload" -> heavyMs;
             case "generatepassword" -> externalMs;
-            case "trade", "coins", "balance", "stats", "mcstats", "inspect", "mcinspect", "mmoinspect", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay", "party", "pa", "p", "event", "chatgame", "cg", "achievements", "ach", "achieve", "back", "feed", "repair", "deathtp", "dtp", "enderchest", "ec", "craft", "anvil", "kit", "combatlogs", "combatlog", "ctag" -> Math.max(defaultMs, 600L);
+            case "trade", "coins", "balance", "stats", "mcstats", "inspect", "mcinspect", "mmoinspect", "near", "home", "homes", "warp", "warps", "spawn", "hub", "smp", "menu", "servers", "navigator", "cosmetics", "preview", "help", "jebaited", "message", "msg", "reply", "r", "pay", "party", "pa", "p", "event", "chatgame", "cg", "achievements", "ach", "achieve", "back", "feed", "repair", "deathtp", "dtp", "enderchest", "ec", "craft", "anvil", "kit", "combatlogs", "combatlog", "ctag", "shop", "market" -> Math.max(defaultMs, 600L);
             default -> defaultMs;
         };
     }

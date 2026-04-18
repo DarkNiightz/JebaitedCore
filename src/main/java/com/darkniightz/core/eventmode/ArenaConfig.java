@@ -1,6 +1,9 @@
 package com.darkniightz.core.eventmode;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Collections;
 import java.util.List;
@@ -75,16 +78,28 @@ public final class ArenaConfig {
         }
     }
 
+    /**
+     * One stack for CTF loadout. {@code equipSlot} null = next main-inventory slot (0+);
+     * non-null = helmet/chest/legs/feet/hand/offhand.
+     */
+    public record CtfKitEntry(ItemStack stack, EquipmentSlot equipSlot) {
+        public CtfKitEntry {
+            stack = stack == null ? new ItemStack(Material.AIR) : stack.clone();
+        }
+    }
+
     public record CtfLayout(
             Location redSpawn,
             Location blueSpawn,
             Location redFlagBlock,
             Location blueFlagBlock,
             int winScore,
-            int flagReturnSeconds
+            int flagReturnSeconds,
+            List<CtfKitEntry> redKit,
+            List<CtfKitEntry> blueKit
     ) {
         public static CtfLayout empty() {
-            return new CtfLayout(null, null, null, null, 3, 30);
+            return new CtfLayout(null, null, null, null, 3, 30, List.of(), List.of());
         }
 
         public boolean isComplete() {

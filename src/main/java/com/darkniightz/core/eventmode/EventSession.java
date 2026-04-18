@@ -50,6 +50,9 @@ public final class EventSession {
     public volatile Location ctfBlueFlagDropLocation;
     public volatile long ctfRedFlagReturnAtMs;
     public volatile long ctfBlueFlagReturnAtMs;
+    /** Ground-drop item entities (when carrier is downed); removed on pickup or auto-return. */
+    public volatile UUID ctfRedGroundItemEntity;
+    public volatile UUID ctfBlueGroundItemEntity;
     /** Set by {@link com.darkniightz.core.eventmode.handler.CtfHandler} when win score reached; engine finalises. */
     public volatile java.util.UUID ctfPendingWinnerUuid;
 

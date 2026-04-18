@@ -237,6 +237,9 @@ chat_games:
 event_mode:
   # Optional structured arenas (spawns + KOTH hill + CTF layout). DB spawns from /event setup still override YAML when present.
   # See ROADMAP §21 for full schema. Keys under each list must be unique per kind.
+  # CTF example (per-arena row): ctf: { red_spawn, blue_spawn, red_flag, blue_flag, win_score, flag_return_seconds,
+  #   red_kit: [ { material: IRON_SWORD, amount: 1 }, { material: LEATHER_HELMET, amount: 1, equip: HEAD } ]
+  #   blue_kit: [ ... ] }
   arena_registry:
     ffa: []
     duels: []
@@ -421,6 +424,15 @@ economy:
   pay:
     enabled: true
     min_amount: 0.01
+
+# Server balance shop (ROADMAP §17) — prices in DB; seed rows when table is empty
+server_shop:
+  seed_on_empty: true
+  menu_title: "§8Server Shop"
+  confirm_title: "§8Confirm stack purchase"
+  # Min ms between buy/sell actions (spam guard). Donors get donor_rate_limit_ms (rank store / any donor rank).
+  rate_limit_ms: 120
+  donor_rate_limit_ms: 0
 
 homes:
   teleport_delay_seconds: 0

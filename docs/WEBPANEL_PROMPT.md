@@ -3,6 +3,8 @@
 > Shared PostgreSQL DB with the JebaitedCore Paper plugin.
 > This document is the source of truth for what the plugin has shipped, what's changing in the DB, and what bugs need fixing now.
 
+**Server shop (§17)** — dedicated handoff for `web-admin` (schema, SQL examples, copy-paste AI prompt): [PANEL_SERVER_SHOP_HANDOFF.md](PANEL_SERVER_SHOP_HANDOFF.md)
+
 ---
 
 ## 1. Bug Fixes (do these first)

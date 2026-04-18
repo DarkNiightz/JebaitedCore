@@ -403,6 +403,26 @@ public final class EventEngine {
         return session.active.contains(uuid) || session.queued.contains(uuid);
     }
 
+    /** Active combatants in a {@link EventState#RUNNING} session (excludes lobby queue). */
+    public synchronized boolean isActiveEventParticipant(Player player) {
+        if (player == null || session == null || session.state != EventState.RUNNING) return false;
+        return session.active.contains(player.getUniqueId());
+    }
+
+    /**
+     * True when both are on the same CTF team. Used so party friendly-fire rules can still
+     * block damage between party members on the same side (until dedicated team FF exists).
+     */
+    public synchronized boolean areCtfTeammates(Player a, Player b) {
+        if (a == null || b == null || session == null || session.state != EventState.RUNNING) return false;
+        if (session.spec.kind != EventKind.CTF) return false;
+        UUID ua = a.getUniqueId(), ub = b.getUniqueId();
+        if (!session.active.contains(ua) || !session.active.contains(ub)) return false;
+        var ta = TeamEngine.teamOf(session, ua);
+        var tb = TeamEngine.teamOf(session, ub);
+        return ta != null && ta == tb;
+    }
+
     public synchronized boolean isParticipantInHardcore(Player player) {
         if (player == null || session == null || session.state != EventState.RUNNING) return false;
         return session.spec.kind.isHardcore() && session.active.contains(player.getUniqueId());
@@ -716,6 +736,15 @@ public final class EventEngine {
         ctfHandler.handleInteract(player, block, session);
     }
 
+    /** @return true if the pickup should be cancelled (CTF ground flag item). */
+    public synchronized boolean handleCtfGroundFlagPickup(Player player, org.bukkit.entity.Item item) {
+        if (session == null || session.state != EventState.RUNNING || session.spec.kind != EventKind.CTF) {
+            return false;
+        }
+        if (!session.active.contains(player.getUniqueId())) return false;
+        return ctfHandler.handleGroundFlagPickup(player, item, session);
+    }
+
     private Location getSpectatorDestination() {
         if (session == null) return getEventWorldSpawn();
         List<Location> sp = getArenaSpawnsForSession(session);
@@ -987,7 +1016,12 @@ public final class EventEngine {
                 if (!session.snapshots.containsKey(id)) {
                     session.snapshots.put(id, InventorySnapshot.capture(p));
                 }
-                Location dest = session.ctfTeamRed.contains(id) ? lay.redSpawn() : lay.blueSpawn();
+                p.getInventory().clear();
+                p.getInventory().setArmorContents(new ItemStack[4]);
+                p.getInventory().setItemInOffHand(null);
+                boolean red = session.ctfTeamRed.contains(id);
+                CtfKitUtil.apply(p, red ? lay.redKit() : lay.blueKit());
+                Location dest = red ? lay.redSpawn() : lay.blueSpawn();
                 if (dest != null) p.teleport(dest.clone());
             }
             getHandler(kind).onStart(session);

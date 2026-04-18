@@ -95,6 +95,7 @@ Commands are declared in plugin.yml and registered in the main class. Highlights
 - Ranks & stats: /rank, /setrank, /stats
 - Moderation: /kick, /warn, /mute, /tempmute, /unmute, /ban, /tempban, /unban, /freeze, /vanish, /staffchat, /clearchat, /slowmode, /history
 - Hub menus: /menu, /servers, /navigator
+- Economy & shop: /balance, /pay, /balancetop, /eco (staff), /shop (alias /market; SMP)
 - Cosmetics: /cosmetics, /wardrobe
 
 Permissions (from plugin.yml):
@@ -122,6 +123,7 @@ Project structure
 Roadmap and Cursor Grafter skill
 - [ROADMAP.md](ROADMAP.md) — feature index, upcoming work, and P1 backlog (source of truth for intent).
 - [`.cursor/skills/grafter/SKILL.md`](.cursor/skills/grafter/SKILL.md) — agent checklist: command wiring, migrations, and **Settings + Debug** surfaces on every change.
+- [docs/PANEL_SERVER_SHOP_HANDOFF.md](docs/PANEL_SERVER_SHOP_HANDOFF.md) — **web panel only:** §17 server shop DB contract + copy-paste prompt for `web-admin` (not edited from this repo per Grafter skill).
 
 Tests
 - There are currently no automated tests in this repository.
