@@ -116,11 +116,15 @@ public class CompatReportCommand implements CommandExecutor {
         sender.sendMessage(Messages.prefixed("§7ViaVersion: " + pluginMark("ViaVersion")
             + " §8| §7ProtocolLib: " + pluginMark("ProtocolLib")
             + " §8| §7mcMMO: " + mcMmoStatus()));
+        sender.sendMessage(Messages.prefixed("§7mcMMO bridge (getPowerLevel): " + McMMOIntegration.compatPowerLevelBridgeSummary()));
+        boolean selfTest = plugin.getConfig().getBoolean("integrations.mcmmo.bridge_self_test", false);
+        sender.sendMessage(Messages.prefixed("§7integrations.mcmmo.bridge_self_test: " + (selfTest ? "§aON §8(logs at enable)" : "§7off")));
         sender.sendMessage(Messages.prefixed("§7EconomyShopGUI: " + pluginMark("EconomyShopGUI")
                 + " §8| §7AuctionHouse: " + pluginMark("AuctionHouse")
                 + " §8| §7Essentials: " + pluginMark("Essentials")));
 
         sender.sendMessage(Messages.prefixed("§8Tip: Use this after startup or reload to verify SMP readiness quickly."));
+        sender.sendMessage(Messages.prefixed("§8mcMMO: Confirm hologram/profile §7mcmmo_level§8, §7/party§8 + §7/p§8 tabs, §7/mcstats§8, §7/mctop§8, §7/inspect§8, §7/mcrank§8 on staging."));
         return true;
     }
 

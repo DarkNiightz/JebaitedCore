@@ -11,6 +11,7 @@ Contents
 - Commands and permissions
 - Database schema (auto-created)
 - Project structure
+- Roadmap and Cursor Grafter skill
 - Tests
 - License
 
@@ -32,6 +33,7 @@ Requirements
 - PaperMC server for Minecraft 1.21.x (plugin.yml api-version: 1.21)
 - Optional: PostgreSQL (recommended 13+; tested with modern 14/15) when database.enabled = true
   - Note: The PostgreSQL driver is declared as a runtime dependency. If not shaded, ensure the driver is available to the server at runtime. TODO: Decide whether to shade the driver into the plugin JAR.
+- Optional: [mcMMO](https://www.mcmmo.org) — JebaitedCore lists mcMMO as a soft dependency and evicts/rebinds overlapping commands (`/party`, `/p`, `/mcstats`, `/mctop`) so players see Jebaited formatting. Upgrade mcMMO on a staging server first; use `/compat` to confirm the detected mcMMO version, and set `integrations.mcmmo.bridge_self_test: true` in `config.yml` if you want a one-line startup log that probes `ExperienceAPI.getPowerLevel` after enable.
 
 Stack and entry point
 - Language: Java
@@ -44,11 +46,16 @@ Setup and build
    git clone <this-repo-url>
    cd JebaitedCore
 
-2) Build the plugin JAR
-   mvn clean package
+2) Build the plugin JAR (Maven Wrapper — **no global `mvn` needed** on Windows):
+   From the inner module folder (the one containing `pom.xml` and `src/`):
+   ```
+   ..\mvnw.cmd clean package
+   ```
+   Full step-by-step (deploy path, restart, env vars): [docs/BUILD_AND_RUN_WINDOWS.md](docs/BUILD_AND_RUN_WINDOWS.md)
 
 3) The artifact will be produced at
    target/JebaitedCore.jar
+   Optional: set `JEBAITED_PLUGINS_DIR` or `jebaited-deploy.properties` so `package` also copies the JAR to your Paper `plugins` folder (see Ant echo in build log).
 
 Install and run on a Paper server
 1) Copy target/JebaitedCore.jar into your Paper server's plugins directory.
@@ -90,9 +97,10 @@ Environment variables
 Commands and permissions
 Commands are declared in plugin.yml and registered in the main class. Highlights:
 - Core/help: /jebaited, /devmode
-- Ranks & stats: /rank, /setrank, /stats, /tickets
+- Ranks & stats: /rank, /setrank, /stats
 - Moderation: /kick, /warn, /mute, /tempmute, /unmute, /ban, /tempban, /unban, /freeze, /vanish, /staffchat, /clearchat, /slowmode, /history
 - Hub menus: /menu, /servers, /navigator
+- Economy & shop: /balance, /pay, /balancetop, /eco (staff), /shop (alias /market; SMP)
 - Cosmetics: /cosmetics, /wardrobe
 
 Permissions (from plugin.yml):
@@ -116,6 +124,11 @@ Project structure
 - src/main/java/com/darkniightz/core/... — Chat, commands, moderation, cosmetics, hub GUI, players/ranks
 - src/main/resources/plugin.yml — Bukkit/Paper plugin descriptor (name, main, api-version, commands)
 - src/main/resources/config.yml — Default configuration populated on first run
+
+Roadmap and Cursor Grafter skill
+- [ROADMAP.md](ROADMAP.md) — feature index, upcoming work, and P1 backlog (source of truth for intent).
+- [`.cursor/skills/grafter/SKILL.md`](.cursor/skills/grafter/SKILL.md) — agent checklist: command wiring, migrations, and **Settings + Debug** surfaces on every change.
+- [docs/PANEL_SERVER_SHOP_HANDOFF.md](docs/PANEL_SERVER_SHOP_HANDOFF.md) — **web panel only:** §17 server shop DB contract + copy-paste prompt for `web-admin` (not edited from this repo per Grafter skill).
 
 Tests
 - There are currently no automated tests in this repository.

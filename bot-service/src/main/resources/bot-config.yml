@@ -1,0 +1,52 @@
+# Defaults for local runs. In Docker, use environment variables (see repo .env.example).
+discord:
+  token: "PUT_TOKEN_HERE"
+  guild_id: "PUT_GUILD_ID_HERE"
+  status_text: "Watching Jebaited Network"
+  mod_logs_channel_id: ""
+  announcements_channel_id: ""
+  events_ping_role_id: ""
+  relay_out_channel_id: ""
+  relay_staff_out_channel_id: ""
+  relay_faction_out_channel_id: ""
+  relay_global_in_channel_id: ""
+  relay_staff_in_channel_id: ""
+  relay_faction_in_channel_id: ""
+  console_channel_id: ""
+  console_developer_role_id: ""
+  # Bot → Paper plugin (same token as integrations.discord.inbound.api_token in plugin config.yml)
+  plugin_inbound_base_url: "http://127.0.0.1:8789"
+  plugin_api_token: ""
+  status_embed_channel_id: ""
+  role_ids:
+    pleb: ""
+    vip: ""
+    builder: ""
+    gold: ""
+    diamond: ""
+    legend: ""
+    grandmaster: ""
+    helper: ""
+    moderator: ""
+    srmod: ""
+    admin: ""
+    developer: ""
+    owner: ""
+
+database:
+  jdbc_url: "jdbc:postgresql://localhost:5432/jebaited"
+  username: "user"
+  password: "mqJVcJrukDRC7eiH3pMykLEM"
+  max_pool_size: 8
+
+redis:
+  uri: "redis://localhost:6379"
+  pubsub_channel: "jebaited.events"
+
+http:
+  host: "0.0.0.0"
+  port: 8787
+
+security:
+  webhook_hmac_secret: "CHANGE_ME"
+  max_skew_seconds: 120

@@ -1,6 +1,8 @@
 package com.darkniightz.core.gui;
 
 import com.darkniightz.core.system.PrivateVaultManager;
+import com.darkniightz.main.JebaitedCore;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -13,9 +15,11 @@ import java.util.UUID;
 
 public class PrivateVaultListener implements Listener {
 
+    private final JebaitedCore plugin;
     private final PrivateVaultManager vaultManager;
 
-    public PrivateVaultListener(PrivateVaultManager vaultManager) {
+    public PrivateVaultListener(JebaitedCore plugin, PrivateVaultManager vaultManager) {
+        this.plugin = plugin;
         this.vaultManager = vaultManager;
     }
 
@@ -93,6 +97,37 @@ public class PrivateVaultListener implements Listener {
                 return;
             }
         }
+    }
+
+    /** Persist immediately when contents change (not only on close). */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryClickSave(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getInventory().getHolder() instanceof PrivateVaultHolder holder)) return;
+        if (holder.isReadOnly()) return;
+        int raw = event.getRawSlot();
+        if (raw >= 45 && raw <= 53) return;
+        scheduleVaultSave(player, holder);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryDragSave(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getInventory().getHolder() instanceof PrivateVaultHolder holder)) return;
+        if (holder.isReadOnly()) return;
+        scheduleVaultSave(player, holder);
+    }
+
+    private void scheduleVaultSave(Player player, PrivateVaultHolder holder) {
+        UUID saveTarget = holder.getTargetUUID() != null ? holder.getTargetUUID() : player.getUniqueId();
+        int page = holder.getPage();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof PrivateVaultHolder h)
+                    || h.getPage() != page) {
+                return;
+            }
+            vaultManager.saveVaultPage(saveTarget, page, player.getOpenInventory().getTopInventory());
+        });
     }
 }
 

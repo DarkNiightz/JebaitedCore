@@ -79,6 +79,8 @@ public enum SettingKey {
             "Show your coloured rank name above your head",       Material.NAME_TAG,         true),
     GAMEPLAY_TAG_EXTRA  (GAMEPLAY,      PlayerProfile.PREF_NAMETAG_EXTRA,       "Extra Nametag Info",
             "Add rank label and extra detail to your nametag",    Material.WRITABLE_BOOK,    false),
+    GAMEPLAY_SHOP_STACK_CONFIRM(GAMEPLAY, PlayerProfile.PREF_SHOP_STACK_CONFIRM, "Shop stack confirm",
+            "Ask before buying a full stack (shift-click) in /shop", Material.CHEST, true),
     ;
 
     // ──────────────────────────────────────────────────────────────────────

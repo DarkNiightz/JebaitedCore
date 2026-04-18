@@ -41,7 +41,7 @@ public class UnmuteCommand implements CommandExecutor, TabCompleter {
             Player p = (Player) sender;
             PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
             boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) {
+            if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "srmod")) {
                 sender.sendMessage(Messages.noPerm());
                 return true;
             }
@@ -80,7 +80,7 @@ public class UnmuteCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player p)) return List.of();
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")) return List.of();
+        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "srmod")) return List.of();
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return Bukkit.getOnlinePlayers().stream()

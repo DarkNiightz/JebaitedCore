@@ -201,6 +201,39 @@ public class FriendDAO {
         }
     }
 
+    /**
+     * Adds co-present party time for a friend pair (V006 {@code friendship_stats.party_time_ms}).
+     * No-op if the pair is not in {@code friendships}. Call from an async task only.
+     */
+    public void addPartyTimeTogether(UUID a, UUID b, long deltaMs) {
+        if (deltaMs <= 0) return;
+        String ua = a.toString();
+        String ub = b.toString();
+        if (ua.compareTo(ub) > 0) {
+            String t = ua;
+            ua = ub;
+            ub = t;
+        }
+        String sql = """
+                INSERT INTO friendship_stats (player_a, player_b, xp_together, kills_together, party_time_ms)
+                SELECT ?, ?, 0, 0, ?
+                WHERE EXISTS (SELECT 1 FROM friendships f WHERE f.player_a = ? AND f.player_b = ?)
+                ON CONFLICT (player_a, player_b)
+                DO UPDATE SET party_time_ms = friendship_stats.party_time_ms + EXCLUDED.party_time_ms
+                """;
+        try (Connection c = db.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, ua);
+            ps.setString(2, ub);
+            ps.setLong(3, deltaMs);
+            ps.setString(4, ua);
+            ps.setString(5, ub);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.warning("[FriendDAO] addPartyTimeTogether failed: " + e.getMessage());
+        }
+    }
+
     /** Increments kills_together (one player killed the other). */
     public void addKillTogether(UUID a, UUID b) {
         String ua = a.toString();

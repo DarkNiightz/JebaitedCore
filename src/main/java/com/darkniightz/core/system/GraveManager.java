@@ -127,16 +127,18 @@ public class GraveManager {
         return grave;
     }
 
-    /** Returns true if the player has Legend or higher as primary or donor rank. */
+    /**
+     * Grave insurance (never expires + auto-vault): donor track only, Legend or Grandmaster donor.
+     * Staff without a donor rank never receives insurance; primary Legend alone does not qualify.
+     */
     public boolean isInsuredRank(Player player) {
         if (player == null) return false;
         com.darkniightz.core.players.PlayerProfile profile = plugin.getProfileStore().get(player.getUniqueId());
         if (profile == null) return false;
         com.darkniightz.core.ranks.RankManager ranks = plugin.getRankManager();
-        String primary = profile.getPrimaryRank();
         String donor = profile.getDonorRank();
-        return (primary != null && ranks.isAtLeast(primary, "legend"))
-                || (donor != null && ranks.isAtLeast(donor, "legend"));
+        if (donor == null) return false;
+        return ranks.isAtLeast(donor, "legend");
     }
 
     /** Returns the donor/effective rank string used for vault page limits. */
@@ -411,11 +413,15 @@ public class GraveManager {
     private void startTracker(Player owner, Grave grave) {
         stopTracker(owner.getUniqueId());
 
-        BossBar bar = Bukkit.createBossBar("§dGrave Tracker", BarColor.PURPLE, BarStyle.SOLID);
-        bar.addPlayer(owner);
-        bar.setVisible(true);
-        trackerBars.put(owner.getUniqueId(), bar);
+        BossBar bar = null;
+        if (PresentationPreference.showGraveTrackerBossBar(owner)) {
+            bar = Bukkit.createBossBar("§dGrave Tracker", BarColor.PURPLE, BarStyle.SOLID);
+            bar.addPlayer(owner);
+            bar.setVisible(true);
+            trackerBars.put(owner.getUniqueId(), bar);
+        }
 
+        final BossBar barRef = bar;
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!owner.isOnline()) {
                 stopTracker(owner.getUniqueId());
@@ -427,7 +433,7 @@ public class GraveManager {
                 return;
             }
 
-            BossBar activeBar = trackerBars.get(owner.getUniqueId());
+            BossBar activeBar = barRef != null ? barRef : trackerBars.get(owner.getUniqueId());
             String coords = current.location().getBlockX() + " " + current.location().getBlockY() + " " + current.location().getBlockZ();
             if (current.expiresAt() == TTL_INSURED) {
                 if (activeBar != null) {

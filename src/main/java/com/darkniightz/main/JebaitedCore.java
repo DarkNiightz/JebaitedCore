@@ -12,6 +12,8 @@ import com.darkniightz.core.commands.DevModeCommand;
 import com.darkniightz.core.commands.DelHomeCommand;
 import com.darkniightz.core.commands.SetWarpCommand;
 import com.darkniightz.core.commands.DelWarpCommand;
+import com.darkniightz.core.commands.DiscordLinkCommand;
+import com.darkniightz.core.commands.DonateCommand;
 import com.darkniightz.core.commands.EcoCommand;
 import com.darkniightz.core.commands.GeneratePasswordCommand;
 import com.darkniightz.core.commands.HomeCommand;
@@ -156,10 +158,18 @@ public final class JebaitedCore extends JavaPlugin {
     private com.darkniightz.core.system.FriendManager friendManager;
     private com.darkniightz.core.party.PartyManager partyManager;
     private com.darkniightz.core.party.PartyStatDAO partyStatDAO;
+    private com.darkniightz.core.eventmode.EventParticipantDAO eventParticipantDAO;
     private com.darkniightz.core.system.BackManager backManager;
     private com.darkniightz.core.system.KitManager kitManager;
     private com.darkniightz.core.achievements.AchievementDAO achievementDAO;
     private com.darkniightz.core.achievements.AchievementManager achievementManager;
+    private com.darkniightz.core.shop.ShopManager shopManager;
+    private com.darkniightz.core.store.StoreService storeService;
+    private com.darkniightz.core.system.DiscordLinkService discordLinkService;
+    private com.darkniightz.core.system.DiscordIntegrationService discordIntegrationService;
+    private com.darkniightz.core.system.DiscordInboundHttpService discordInboundHttpService;
+    private com.darkniightz.core.system.DiscordActivitySampler discordActivitySampler;
+    private com.darkniightz.core.system.DiscordConsoleLogHandler discordConsoleLogHandler;
     private final java.util.List<String> startupMessages = new java.util.concurrent.CopyOnWriteArrayList<>();
     private com.darkniightz.main.database.SchemaManager.MigrationResult migrationResult;
     private int commandCount = 0;
@@ -215,6 +225,7 @@ public final class JebaitedCore extends JavaPlugin {
         this.cosmeticPreviewService = new CosmeticPreviewService(this, profileStore, cosmeticsManager, cosmeticsEngine, toyboxManager);
         this.broadcasterManager = new BroadcasterManager(this);
         this.bossBarManager = new BossBarManager(this);
+        this.eventParticipantDAO = new com.darkniightz.core.eventmode.EventParticipantDAO(databaseManager, getLogger());
         this.eventModeManager = new EventModeManager(this, broadcasterManager, bossBarManager);
         this.spawnManager = new SpawnManager(this, worldManager, worldConfigManager);
         this.economyManager = new EconomyManager(this, profileStore, rankManager);
@@ -238,6 +249,7 @@ public final class JebaitedCore extends JavaPlugin {
         this.partyManager = new com.darkniightz.core.party.PartyManager(this, profileStore, rankManager);
         this.achievementDAO = new com.darkniightz.core.achievements.AchievementDAO(databaseManager, getLogger());
         this.achievementManager = new com.darkniightz.core.achievements.AchievementManager(this, achievementDAO, profileStore, rankManager);
+        this.discordLinkService = new com.darkniightz.core.system.DiscordLinkService(databaseManager, getLogger());
 
         if (databaseManager.isEnabled()) {
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
@@ -325,7 +337,18 @@ public final class JebaitedCore extends JavaPlugin {
     public com.darkniightz.core.system.FriendManager getFriendManager() { return friendManager; }
     public com.darkniightz.core.party.PartyManager getPartyManager() { return partyManager; }
     public com.darkniightz.core.party.PartyStatDAO getPartyStatDAO() { return partyStatDAO; }
+    public com.darkniightz.core.eventmode.EventParticipantDAO getEventParticipantDAO() { return eventParticipantDAO; }
     public com.darkniightz.core.achievements.AchievementManager getAchievementManager() { return achievementManager; }
+    public com.darkniightz.core.shop.ShopManager getShopManager() { return shopManager; }
+
+    public com.darkniightz.core.store.StoreService getStoreService() {
+        return storeService;
+    }
+    public com.darkniightz.core.system.DiscordLinkService getDiscordLinkService() { return discordLinkService; }
+
+    public com.darkniightz.core.system.DiscordIntegrationService getDiscordIntegrationService() {
+        return discordIntegrationService;
+    }
 
     private void initializeDatabaseTables() {
         migrationResult = new com.darkniightz.main.database.SchemaManager(databaseManager, getLogger()).runMigrations();
@@ -333,10 +356,28 @@ public final class JebaitedCore extends JavaPlugin {
 
     private void finishEnable() {
         registerListeners();
+        this.storeService = new com.darkniightz.core.store.StoreService(this);
+        this.storeService.reload();
         startRuntimeServices();
+        this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
+        this.shopManager.start();
         registerCommands();
+        com.darkniightz.core.system.McMMOIntegration.runBridgeSelfTest(this);
+        scheduleMcMMOCommandReassert();
         startBackgroundFlushTask();
         printStartupBlock();
+    }
+
+    /** mcMMO often enables after us; re-run eviction and map registration after load settles. */
+    private void scheduleMcMMOCommandReassert() {
+        long[] delays = {0L, 1L, 2L, 5L, 10L, 20L, 40L, 100L, 200L};
+        for (long d : delays) {
+            if (d == 0L) {
+                Bukkit.getScheduler().runTask(this, this::reassertMcMMOCommandOwnership);
+            } else {
+                Bukkit.getScheduler().runTaskLater(this, this::reassertMcMMOCommandOwnership, d);
+            }
+        }
     }
 
     // ----- Internal helpers for registration -----
@@ -362,15 +403,19 @@ public final class JebaitedCore extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new EventModeChatListener(this, eventModeManager), this);
         Bukkit.getPluginManager().registerEvents(new EventModeCombatListener(eventModeManager, this), this);
         Bukkit.getPluginManager().registerEvents(new EventWorldProtectionListener(this, eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfFlagListener(eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfGroundFlagListener(eventModeManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.eventmode.CtfTeamDamageListener(eventModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CommandSecurityListener(this, profileStore, rankManager, devModeManager), this);
         Bukkit.getPluginManager().registerEvents(new CombatTagListener(this, combatTagManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.system.PartyCommandOwnershipListener(this), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.playerjoin.PriorityJoinListener(this, joinPriorityManager), this);
         Bukkit.getPluginManager().registerEvents(new GraveListener(this, graveManager), this);
         Bukkit.getPluginManager().registerEvents(new PlayerSettingsListener(this), this);
         com.darkniightz.core.world.NightSkipListener nightSkipListener = new com.darkniightz.core.world.NightSkipListener(this);
         Bukkit.getPluginManager().registerEvents(nightSkipListener, this);
         nightSkipListener.start();
-        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.gui.PrivateVaultListener(privateVaultManager), this);
+        Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.gui.PrivateVaultListener(this, privateVaultManager), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.system.FriendListener(friendManager, this), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.party.PartyListener(partyManager, this), this);
         Bukkit.getPluginManager().registerEvents(new com.darkniightz.core.achievements.AchievementListener(this, achievementManager, profileStore, rankManager), this);
@@ -395,6 +440,26 @@ public final class JebaitedCore extends JavaPlugin {
         if (achievementManager != null) achievementManager.start();
         if (toyboxManager != null) refreshToyboxesForOnline();
         applyStyledTabForOnline();
+
+        this.discordIntegrationService = new com.darkniightz.core.system.DiscordIntegrationService(this);
+        if (discordInboundHttpService != null) {
+            discordInboundHttpService.stop();
+        }
+        discordInboundHttpService = new com.darkniightz.core.system.DiscordInboundHttpService(this);
+        discordInboundHttpService.start();
+        if (discordActivitySampler != null) {
+            discordActivitySampler.stop();
+        }
+        discordActivitySampler = new com.darkniightz.core.system.DiscordActivitySampler(this, databaseManager);
+        discordActivitySampler.start();
+        if (discordConsoleLogHandler != null) {
+            org.bukkit.Bukkit.getLogger().removeHandler(discordConsoleLogHandler);
+            discordConsoleLogHandler = null;
+        }
+        if (discordIntegrationService != null && discordIntegrationService.isConsoleMirrorEnabled()) {
+            discordConsoleLogHandler = new com.darkniightz.core.system.DiscordConsoleLogHandler(this);
+            org.bukkit.Bukkit.getLogger().addHandler(discordConsoleLogHandler);
+        }
     }
 
     private void stopRuntimeServices() {
@@ -412,6 +477,16 @@ public final class JebaitedCore extends JavaPlugin {
         if (minecraftVersionMonitor != null) minecraftVersionMonitor.stop();
         if (graveManager != null) graveManager.stop();
         if (restartManager != null) restartManager.shutdown();
+        if (discordInboundHttpService != null) {
+            discordInboundHttpService.stop();
+        }
+        if (discordActivitySampler != null) {
+            discordActivitySampler.stop();
+        }
+        if (discordConsoleLogHandler != null) {
+            org.bukkit.Bukkit.getLogger().removeHandler(discordConsoleLogHandler);
+            discordConsoleLogHandler = null;
+        }
         if (dbRetryTaskId != -1) {
             Bukkit.getScheduler().cancelTask(dbRetryTaskId);
             dbRetryTaskId = -1;
@@ -452,6 +527,9 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("near", new NearCommand(this));
         bindCommand("rules", new RulesCommand(this));
         bindCommand("rtp", new RtpCommand(this, worldManager));
+        bindCommand("link", new DiscordLinkCommand(this));
+        bindCommand("shop", new com.darkniightz.core.commands.ShopCommand(this));
+        bindCommand("donate", new DonateCommand(this));
         MessageCommand messageCommand = new MessageCommand(profileStore, rankManager, messageManager);
         bindCommand("message", messageCommand);
         ReplyCommand replyCommand = new ReplyCommand(profileStore, rankManager, messageManager);
@@ -465,8 +543,6 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("stats", new StatsCommand(this, profileStore, rankManager, devModeManager));
         bindCommand("achievements", new com.darkniightz.core.commands.AchievementsCommand(this, achievementManager, profileStore, rankManager));
         bindCommand("settings", new SettingsCommand(this));
-        // Backwards-compatible alias: coin -> coins
-        bindCommand("coin", new CoinsCommand(profileStore, rankManager, devModeManager));
         bindCommand("devmode", new DevModeCommand(devModeManager));
         JebaitedCommand helpCmd = new JebaitedCommand(profileStore, rankManager, devModeManager, worldManager);
         bindCommand("jebaited", helpCmd);
@@ -483,7 +559,9 @@ public final class JebaitedCore extends JavaPlugin {
         com.darkniightz.core.commands.EventModeCommand eventCommand =
             new com.darkniightz.core.commands.EventModeCommand(this, eventModeManager, profileStore, rankManager, devModeManager);
         bindCommand("event", eventCommand);
-        bindCommand("eventmode", eventCommand);
+        com.darkniightz.core.commands.ChatGameCommand chatGameCommand =
+                new com.darkniightz.core.commands.ChatGameCommand(this, eventModeManager, profileStore, rankManager, devModeManager);
+        bindCommand("chatgame", chatGameCommand);
         // Reload
         bindCommand("jreload", new com.darkniightz.core.commands.ReloadCommand(this, profileStore, rankManager, devModeManager));
         // Hub menu commands (aliases share executor)
@@ -496,7 +574,6 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("cosmetics", cosCmd);
         bindCommand("wardrobe", cosCmd);
         bindCommand("debug", new com.darkniightz.core.commands.DebugCommand(this));
-        bindCommand("devdebug", new com.darkniightz.core.commands.DebugCommand(this));
         // Moderation
         bindCommand("generatepassword", new GeneratePasswordCommand(profileStore, rankManager, devModeManager));
         // Paper's built-in /restart lives in the CommandMap at a higher priority than plugin commands.
@@ -517,12 +594,22 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("clearchat", new ClearChatCommand(profileStore, rankManager, devModeManager));
         bindCommand("slowmode", new SlowmodeCommand(profileStore, rankManager, devModeManager, moderationManager));
         bindCommand("history", new HistoryCommand(profileStore, rankManager, devModeManager));
+        // mcMMO-facing wrappers (soft-depend; eviction + rebind so we own labels after mcMMO loads)
+        com.darkniightz.core.commands.McInspectCommand mcInspectCommand = new com.darkniightz.core.commands.McInspectCommand();
+        bindCommand("inspect", mcInspectCommand);
+        com.darkniightz.core.commands.McRankCommand mcRankCommand = new com.darkniightz.core.commands.McRankCommand();
+        bindCommand("mcrank", mcRankCommand);
+        com.darkniightz.core.commands.McStatsCommand mcStatsCommand = new com.darkniightz.core.commands.McStatsCommand();
+        bindCommand("mcstats", mcStatsCommand);
+        com.darkniightz.core.commands.McTopCommand mcTopCommand = new com.darkniightz.core.commands.McTopCommand();
+        bindCommand("mctop", mcTopCommand);
         // Party
         com.darkniightz.core.commands.PartyCommand partyCmd =
             new com.darkniightz.core.commands.PartyCommand(this, partyManager, profileStore);
         bindCommand("party", partyCmd);
         bindCommand("pa", partyCmd);
         bindCommand("p", partyCmd);
+        reassertMcMMOCommandOwnership();
         // Donor perks
         bindCommand("back", new com.darkniightz.core.commands.BackCommand(this));
         bindCommand("deathtp", new com.darkniightz.core.commands.DeathTpCommand(this));
@@ -532,6 +619,64 @@ public final class JebaitedCore extends JavaPlugin {
         bindCommand("craft", new com.darkniightz.core.commands.CraftCommand(this));
         bindCommand("anvil", new com.darkniightz.core.commands.AnvilCommand(this));
         bindCommand("kit", new com.darkniightz.core.commands.KitCommand(this));
+        bindCommand("combatlogs", new com.darkniightz.core.commands.CombatLogsCommand(this));
+    }
+
+    private static final String[] MCMMO_OWNED_COMMANDS = {
+            "party", "pa", "p",
+            "inspect", "mcinspect", "mmoinspect",
+            "mcrank", "mcstats", "mctop"
+    };
+
+    /**
+     * Evicts mcMMO (and other plugins) from the simple command map for labels we own, then re-registers
+     * our {@link PluginCommand}s — same pattern as the legacy party-only reassert.
+     */
+    public void reassertMcMMOCommandOwnership() {
+        evictMcMMoOwnedLabelsFromMap();
+        for (String name : MCMMO_OWNED_COMMANDS) {
+            rebindPluginCommand(name);
+        }
+        syncCommandsAfterMapMutation();
+    }
+
+    /**
+     * Paper keeps a Brigadier tree in sync with the {@link org.bukkit.command.CommandMap}; mutating
+     * {@code knownCommands} alone is not enough for {@code /party} to dispatch to our executor.
+     */
+    private void syncCommandsAfterMapMutation() {
+        Object server = Bukkit.getServer();
+        for (Class<?> c = server.getClass(); c != null; c = c.getSuperclass()) {
+            try {
+                java.lang.reflect.Method m = c.getDeclaredMethod("syncCommands");
+                m.setAccessible(true);
+                m.invoke(server);
+                return;
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                getLogger().fine("syncCommands after mcMMO eviction: " + e.getMessage());
+                return;
+            }
+        }
+    }
+
+    private void rebindPluginCommand(String name) {
+        PluginCommand cmd = getCommand(name);
+        if (cmd != null) {
+            try {
+                Bukkit.getServer().getCommandMap().register(getName(), cmd);
+            } catch (Exception e) {
+                getLogger().warning("Could not re-register /" + name + " after eviction: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * mcMMO may register {@code /party} (and related labels) after this plugin's {@link #onEnable()},
+     * overwriting our command map entries. Prefer {@link #reassertMcMMOCommandOwnership()}.
+     */
+    public void reassertPartyCommandOwnership() {
+        reassertMcMMOCommandOwnership();
     }
 
     private void bindCommand(String name, CommandExecutor executor) {
@@ -546,27 +691,133 @@ public final class JebaitedCore extends JavaPlugin {
     }
 
     /**
+     * Removes non-Jebaited registrations for {@link #MCMMO_OWNED_COMMANDS} in one pass (Paper wraps
+     * {@code knownCommands} in {@link java.util.Collections#unmodifiableMap}, so mutating the view throws).
+     */
+    private void evictMcMMoOwnedLabelsFromMap() {
+        try {
+            org.bukkit.command.CommandMap commandMap = Bukkit.getServer().getCommandMap();
+            java.util.Map<String, org.bukkit.command.Command> known = resolveMutableKnownCommandsMap(commandMap);
+            if (known == null) {
+                getLogger().warning("CommandMap has no knownCommands field; cannot evict mcMMO overlaps.");
+                return;
+            }
+            java.util.ArrayList<String> toRemove = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, org.bukkit.command.Command> e : known.entrySet()) {
+                String key = e.getKey();
+                org.bukkit.command.Command cmd = e.getValue();
+                if (cmd instanceof PluginCommand pc && pc.getPlugin() == this) {
+                    continue;
+                }
+                for (String name : MCMMO_OWNED_COMMANDS) {
+                    if (key.equals(name) || key.endsWith(":" + name)) {
+                        toRemove.add(key);
+                        break;
+                    }
+                }
+            }
+            runWithCommandMapLock(commandMap, () -> {
+                for (String key : toRemove) {
+                    known.remove(key);
+                }
+            });
+        } catch (Exception e) {
+            getLogger().warning("Could not evict mcMMO overlap commands: " + e.getMessage());
+        }
+    }
+
+    /**
      * Removes Paper's built-in command from the SimpleCommandMap so our plugin
      * command wins when players type /{name} without a namespace prefix.
      */
-    @SuppressWarnings("unchecked")
     private void evictBuiltInCommand(String name) {
         try {
             org.bukkit.command.CommandMap commandMap = Bukkit.getServer().getCommandMap();
-            java.lang.reflect.Field knownField = commandMap.getClass().getDeclaredField("knownCommands");
-            knownField.setAccessible(true);
-            java.util.Map<String, org.bukkit.command.Command> known =
-                    (java.util.Map<String, org.bukkit.command.Command>) knownField.get(commandMap);
-            // Remove all namespaced variants that aren't our plugin command
-            known.entrySet().removeIf(e -> {
+            java.util.Map<String, org.bukkit.command.Command> known = resolveMutableKnownCommandsMap(commandMap);
+            if (known == null) {
+                getLogger().warning("CommandMap has no knownCommands field; cannot evict /" + name);
+                return;
+            }
+            java.util.ArrayList<String> toRemove = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, org.bukkit.command.Command> e : known.entrySet()) {
                 String key = e.getKey();
                 org.bukkit.command.Command cmd = e.getValue();
-                return (key.equals(name) || key.endsWith(":" + name))
-                        && !(cmd instanceof PluginCommand pc && pc.getPlugin() == this);
+                if ((key.equals(name) || key.endsWith(":" + name))
+                        && !(cmd instanceof PluginCommand pc && pc.getPlugin() == this)) {
+                    toRemove.add(key);
+                }
+            }
+            runWithCommandMapLock(commandMap, () -> {
+                for (String key : toRemove) {
+                    known.remove(key);
+                }
             });
         } catch (Exception e) {
             getLogger().warning("Could not evict built-in command '" + name + "': " + e.getMessage());
         }
+    }
+
+    private void runWithCommandMapLock(org.bukkit.command.CommandMap commandMap, Runnable action) {
+        if (commandMap instanceof org.bukkit.command.SimpleCommandMap scm) {
+            synchronized (scm) {
+                action.run();
+            }
+        } else {
+            action.run();
+        }
+    }
+
+    /**
+     * Paper may store {@code knownCommands} as {@link java.util.Collections#unmodifiableMap}; peel that
+     * wrapper so removals hit the backing map.
+     */
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, org.bukkit.command.Command> resolveMutableKnownCommandsMap(
+            org.bukkit.command.CommandMap commandMap) throws Exception {
+        java.lang.reflect.Field knownField = null;
+        for (Class<?> c = commandMap.getClass(); c != null && knownField == null; c = c.getSuperclass()) {
+            try {
+                knownField = c.getDeclaredField("knownCommands");
+            } catch (NoSuchFieldException ignored) {
+            }
+        }
+        if (knownField == null) {
+            return null;
+        }
+        knownField.setAccessible(true);
+        java.util.Map<String, org.bukkit.command.Command> raw =
+                (java.util.Map<String, org.bukkit.command.Command>) knownField.get(commandMap);
+        return unwrapCollectionsUnmodifiableCommandMap(raw);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, org.bukkit.command.Command> unwrapCollectionsUnmodifiableCommandMap(
+            java.util.Map<String, org.bukkit.command.Command> root) throws Exception {
+        java.util.Map<String, org.bukkit.command.Command> cur = root;
+        for (int depth = 0; depth < 8 && cur != null; depth++) {
+            String n = cur.getClass().getName();
+            if (!n.startsWith("java.util.Collections$") || !n.contains("Unmodifiable")) {
+                break;
+            }
+            java.lang.reflect.Field mf = null;
+            for (Class<?> c = cur.getClass(); c != null; c = c.getSuperclass()) {
+                try {
+                    mf = c.getDeclaredField("m");
+                    break;
+                } catch (NoSuchFieldException ignored) {
+                }
+            }
+            if (mf == null) {
+                break;
+            }
+            mf.setAccessible(true);
+            Object next = mf.get(cur);
+            if (!(next instanceof java.util.Map<?, ?>)) {
+                break;
+            }
+            cur = (java.util.Map<String, org.bukkit.command.Command>) next;
+        }
+        return cur;
     }
 
     private void startBackgroundFlushTask() {
@@ -596,6 +847,10 @@ public final class JebaitedCore extends JavaPlugin {
 
         // Reload config from disk
         reloadConfig();
+        if (eventModeManager != null) {
+            eventModeManager.reloadArenasFromConfig();
+            eventModeManager.reloadChatGamesFromConfig();
+        }
 
         // Re-create config-driven managers
         this.rankManager = new RankManager(this);
@@ -623,6 +878,10 @@ public final class JebaitedCore extends JavaPlugin {
         this.overallStatsManager = new OverallStatsManager(databaseManager, getLogger());
         this.warpsManager = new WarpsManager(this);
         this.scoreboardManager = new ServerScoreboardManager(this, profileStore, rankManager, worldManager);
+        this.shopManager = new com.darkniightz.core.shop.ShopManager(this, economyManager, worldManager, profileStore, rankManager);
+        this.shopManager.start();
+        this.storeService = new com.darkniightz.core.store.StoreService(this);
+        this.storeService.reload();
         this.dbDependentServicesStarted = false;
         // Keep existing moderation state; no need to recreate moderationManager
         stopRuntimeServices();

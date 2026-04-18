@@ -18,7 +18,9 @@ import java.util.List;
  * <p>This menu renders every {@link SettingKey} that belongs to a given
  * {@link SettingCategory} as a green/red toggle item.  When a new setting is
  * added to the {@code SettingKey} enum it automatically appears here with no
- * further code changes.
+ * further code changes. {@link SettingCategory#GAMEPLAY} also gets a
+ * non-boolean "Screen effects" cycle (full / some / none) in the next free
+ * content slot.
  *
  * <p>Content slots (avoiding borders and navigation):
  * <pre>
@@ -80,6 +82,10 @@ public class SettingsCategoryMenu extends BaseMenu {
             inventory.setItem(CONTENT_SLOTS[i], toggleItem(k, state));
         }
 
+        if (category == SettingCategory.GAMEPLAY && keys.size() < CONTENT_SLOTS.length) {
+            inventory.setItem(CONTENT_SLOTS[keys.size()], screenEffectsItem(profile));
+        }
+
         // Navigation
         inventory.setItem(SLOT_BACK, new ItemBuilder(Material.ARROW)
                 .name("§7§lBack")
@@ -100,6 +106,22 @@ public class SettingsCategoryMenu extends BaseMenu {
         if (slot == SLOT_CLOSE) {
             MenuService.get().close(who);
             return true;
+        }
+
+        if (category == SettingCategory.GAMEPLAY && keys.size() < CONTENT_SLOTS.length) {
+            int screenIdx = keys.size();
+            if (CONTENT_SLOTS[screenIdx] == slot) {
+                PlayerProfile profile = plugin.getProfileStore()
+                        .getOrCreate(who, plugin.getRankManager().getDefaultGroup());
+                if (profile != null) {
+                    profile.cycleScreenEffectsMode();
+                    plugin.getProfileStore().save(who.getUniqueId());
+                    who.sendMessage(Messages.prefixed(
+                            "§7Screen effects: §f" + labelScreenEffects(profile.getScreenEffectsMode())));
+                    saveAndRefresh(who, profile);
+                }
+                return true;
+            }
         }
 
         // Determine which SettingKey was clicked, if any
@@ -131,6 +153,29 @@ public class SettingsCategoryMenu extends BaseMenu {
                         "",
                         "§7Status: " + (enabled ? "§aEnabled" : "§cDisabled"),
                         "§eClick to toggle"))
+                .build();
+    }
+
+    private static String labelScreenEffects(String mode) {
+        if (mode == null) return "Full";
+        return switch (mode.toLowerCase()) {
+            case "some" -> "Some (high-signal only)";
+            case "none" -> "None";
+            default -> "Full";
+        };
+    }
+
+    private static ItemStack screenEffectsItem(PlayerProfile profile) {
+        String mode = profile.getScreenEffectsMode();
+        return new ItemBuilder(Material.DRAGON_HEAD)
+                .name("§5§lScreen effects")
+                .lore(List.of(
+                        "§7Boss bars and full-screen titles (events, grave tracker, etc.).",
+                        "",
+                        "§7Current: §f" + labelScreenEffects(mode),
+                        "§8Full §7— all · §8Some §7— important only · §8None §7— off",
+                        "",
+                        "§eClick to cycle"))
                 .build();
     }
 

@@ -14,6 +14,9 @@
     <paper.api.version>1.21.11-R0.1-SNAPSHOT</paper.api.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Optional: overridden by jebaited-deploy.properties (read in initialize). -->
+    <jebaited.deploy.plugins.dir></jebaited.deploy.plugins.dir>
+    <jebaited.copy.jar.path>${project.build.directory}/${project.build.finalName}.jar</jebaited.copy.jar.path>
   </properties>
 
   <repositories>
@@ -57,6 +60,12 @@
       <version>5.1.0</version>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>com.stripe</groupId>
+      <artifactId>stripe-java</artifactId>
+      <version>28.0.0</version>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -84,6 +93,46 @@
             </manifest>
           </archive>
         </configuration>
+      </plugin>
+      <!-- Load optional jebaited-deploy.plugins.dir from jebaited-deploy.properties (gitignored). -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>1.2.1</version>
+        <executions>
+          <execution>
+            <phase>initialize</phase>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
+            <configuration>
+              <files>
+                <file>${basedir}/jebaited-deploy.properties</file>
+              </files>
+              <quiet>true</quiet>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- After package: copy JebaitedCore.jar if JEBAITED_PLUGINS_DIR (env) or jebaited.deploy.plugins.dir is set. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>copy-jar-to-plugins</id>
+            <phase>package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <ant antfile="${basedir}/antrun-copy-jar.xml" target="run" inheritRefs="true"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

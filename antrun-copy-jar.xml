@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Invoked by maven-antrun-plugin after package. Maven project properties are passed into Ant. -->
+<project name="jebaited-copy-jar" default="run">
+  <target name="run">
+    <property environment="env"/>
+    <condition property="deploy.dir" value="${env.JEBAITED_PLUGINS_DIR}">
+      <isset property="env.JEBAITED_PLUGINS_DIR"/>
+    </condition>
+    <property name="deploy.dir" value="${jebaited.deploy.plugins.dir}"/>
+    <condition property="deploy.dir.nonempty" value="true">
+      <and>
+        <isset property="deploy.dir"/>
+        <not>
+          <equals arg1="${deploy.dir}" arg2=""/>
+        </not>
+      </and>
+    </condition>
+    <condition property="deploy.status" value="Copying ${jebaited.copy.jar.path} -> ${deploy.dir}/JebaitedCore.jar">
+      <isset property="deploy.dir.nonempty"/>
+    </condition>
+    <condition property="deploy.status" value="Post-build copy skipped (set env JEBAITED_PLUGINS_DIR or create jebaited-deploy.properties from jebaited-deploy.properties.example).">
+      <not>
+        <isset property="deploy.dir.nonempty"/>
+      </not>
+    </condition>
+    <echo message="[JebaitedCore] ${deploy.status}"/>
+    <antcall target="do-copy"/>
+  </target>
+  <target name="do-copy" if="deploy.dir.nonempty">
+    <copy file="${jebaited.copy.jar.path}" tofile="${deploy.dir}/JebaitedCore.jar" overwrite="true"/>
+  </target>
+</project>

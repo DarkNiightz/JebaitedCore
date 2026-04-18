@@ -52,8 +52,31 @@ public final class PermissionConstants {
     public static final String CMD_PARTY      = "jebaited.party.use";
     public static final String CMD_PARTY_CHAT = "jebaited.party.chat";
 
+    /** View own combat tag status (/combatlogs). */
+    public static final String CMD_COMBATLOG    = "jebaited.combatlog.use";
+
+    // ── mcMMO wrappers (optional soft-depend) ────────────
+    public static final String CMD_MCSTATS        = "jebaited.mcmmo.mcstats";
+    public static final String CMD_MCSTATS_OTHERS = "jebaited.mcmmo.mcstats.others";
+    public static final String CMD_MCTOP          = "jebaited.mcmmo.mctop";
+    public static final String CMD_MCINSPECT      = "jebaited.mcmmo.inspect";
+    public static final String CMD_MCRANK         = "jebaited.mcmmo.mcrank";
+
     // ── Achievements ─────────────────────────────────────
     public static final String CMD_ACHIEVEMENTS = "jebaited.achievements.use";
+
+    /** Server balance shop GUI ({@code /shop}). */
+    public static final String CMD_SHOP = "jebaited.shop.use";
+    /** Stripe store / donate GUI ({@code /donate}). */
+    public static final String CMD_DONATE = "jebaited.donate.use";
+    /** Discord account linking ({@code /link}). */
+    public static final String CMD_DISCORD_LINK = "jebaited.discord.link";
+
+    /** Receives Discord → in-game messages on the faction bridge channel (optional). */
+    public static final String DISCORD_BRIDGE_FACTION = "jebaited.discord.bridge.faction";
+
+    /** Optional extra gate for /chatgame staff actions (primary gate is srmod+ in {@link com.darkniightz.core.commands.ChatGameCommand}). */
+    public static final String CMD_CHATGAME = "jebaited.chatgame.use";
 
     // ── Donor Perks ──────────────────────────────────────
     public static final String CMD_BACK         = "jebaited.back.use";

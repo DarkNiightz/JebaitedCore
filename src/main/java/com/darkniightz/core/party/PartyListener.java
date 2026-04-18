@@ -156,6 +156,16 @@ public final class PartyListener implements Listener {
         if (!party.isMember(victim.getUniqueId())) return;
         if (party.isFriendlyFire()) return; // FF enabled  allow
 
+        // Running event combat: party FF must not block Duels/FFA/KOTH/etc. CTF same-team keeps
+        // party/team safety (until a dedicated team friendly-fire toggle exists).
+        var em = core.getEventModeManager();
+        if (em != null
+                && em.isActiveEventParticipant(attacker)
+                && em.isActiveEventParticipant(victim)
+                && !em.areCtfTeammates(attacker, victim)) {
+            return;
+        }
+
         event.setCancelled(true);
         attacker.sendMessage(partyManager.partyMsg("\u00a7cFriendly fire is disabled."));
     }

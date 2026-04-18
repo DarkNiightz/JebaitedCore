@@ -6,9 +6,13 @@ api-version: 1.21
 author: DarkNiightz
 description: Jebaited Core Plugin for Paper 1.21.9-1.21.11.
 
+# Load after mcMMO so our /party registration and eviction run last (native party + tab completions).
+softdepend: [mcMMO]
+
 libraries:
   - com.zaxxer:HikariCP:5.1.0
   - org.postgresql:postgresql:42.7.3
+  - com.stripe:stripe-java:28.0.0
 
 commands:
   # Core/help
@@ -87,9 +91,20 @@ commands:
   rules:
     description: Show server rules
     usage: /rules
+  link:
+    description: Generate a one-time Discord account link code
+    usage: /link
   rtp:
     description: Teleport to a random location in SMP
     usage: /rtp
+  shop:
+    description: Open the server economy shop (SMP)
+    usage: /shop
+    aliases: [market]
+  donate:
+    description: Open the supporter store (Stripe Checkout)
+    usage: /donate
+    aliases: [store]
   message:
     description: Send a private message to another player
     usage: /message <player> <message>
@@ -253,8 +268,12 @@ commands:
     usage: /preview [featured|cosmeticKey]
   event:
     description: Full event control panel command
-    usage: /event <status|list|start|stop|complete|setup>
+    usage: /event <status|info|list|join|leave|spectate|start|stop|complete|setreward|arenas|setup>
     aliases: [eventmode]
+  chatgame:
+    description: Chat mini-games (math, scramble, quiz) parallel to combat events
+    usage: /chatgame <status|list|start|stop>
+    aliases: [cg]
   generatepassword:
     description: Generate a web panel password for yourself
     usage: /generatepassword
@@ -270,6 +289,27 @@ commands:
     description: Open the developer debug cockpit
     usage: /debug [menu|system|commands|listeners|cosmetics|preview|actions|events]
     aliases: [devdebug]
+  combatlogs:
+    description: Show whether you are combat tagged and time remaining
+    usage: /combatlogs
+    aliases: [combatlog, ctag]
+  inspect:
+    description: Inspect another player's mcMMO skills (Jebaited wrapper)
+    usage: /inspect <player>
+    permission: jebaited.mcmmo.inspect
+    aliases: [mcinspect, mmoinspect]
+  mcrank:
+    description: Show mcMMO leaderboard ranks per skill (Jebaited wrapper)
+    usage: /mcrank [player]
+    permission: jebaited.mcmmo.mcrank
+  mcstats:
+    description: Show mcMMO skill levels and power (Jebaited wrapper; does not use the mcstats stats alias)
+    usage: /mcstats [player]
+    permission: jebaited.mcmmo.mcstats
+  mctop:
+    description: Show mcMMO leaderboards (Jebaited wrapper)
+    usage: /mctop [skill|page] [page]
+    permission: jebaited.mcmmo.mctop
   party:
     description: Party management
     usage: /party <create|invite|join|accept|deny|kick|leave|disband|transfer|chat|list|warp|setwarp|clearwarp|open|ff|gui>
@@ -302,6 +342,39 @@ permissions:
   jebaited.achievements.use:
     description: View own achievements
     default: true
+  jebaited.chatgame.use:
+    description: Optional permission for chat game staff actions (rank gate is primary)
+    default: false
+  jebaited.combatlog.use:
+    description: View own combat tag status
+    default: true
+  jebaited.mcmmo.mcstats:
+    description: Use /mcstats (mcMMO stats wrapper)
+    default: true
+  jebaited.mcmmo.mcstats.others:
+    description: View another player's mcMMO stats via /mcstats
+    default: false
+  jebaited.mcmmo.mctop:
+    description: Use /mctop (mcMMO leaderboard wrapper)
+    default: true
+  jebaited.mcmmo.inspect:
+    description: Use /inspect (mcMMO inspect wrapper)
+    default: true
+  jebaited.mcmmo.mcrank:
+    description: Use /mcrank (mcMMO rank wrapper)
+    default: true
+  jebaited.shop.use:
+    description: Open the server economy shop GUI
+    default: true
+  jebaited.donate.use:
+    description: Open the Stripe supporter store (/donate)
+    default: true
+  jebaited.discord.link:
+    description: Generate one-time Discord linking codes
+    default: true
+  jebaited.discord.bridge.faction:
+    description: Use faction Discord↔MC chat relay when enabled in config
+    default: false
   jebaited.menu.use:
     description: Open the Servers Navigator GUI
     default: true

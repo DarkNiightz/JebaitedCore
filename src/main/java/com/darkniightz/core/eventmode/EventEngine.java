@@ -1,6 +1,7 @@
 package com.darkniightz.core.eventmode;
 
 import com.darkniightz.core.eventmode.handler.*;
+import com.darkniightz.core.eventmode.team.TeamEngine;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.system.BossBarManager;
@@ -28,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Core events brain. Owns the full lifecycle:
@@ -35,12 +37,32 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * EventModeManager is a thin façade that delegates every call here.
  * External callers (commands, listeners) should always go through EventModeManager.
+ * Combat / signup events only. Chat mini-games use {@link ChatGameManager}.
  */
 @SuppressWarnings({"deprecation", "removal"})
 public final class EventEngine {
 
     /** Result type returned by every engine action. */
     public record ActionResult(boolean ok, String message) {}
+
+    /** Immutable snapshot for V006 async DB writes after an event ends or is stopped. */
+    /**
+     * @param coWinners empty for a single winner ({@code winnerOrNull} only); non-empty means
+     *                  cosmetic coin reward is split evenly across this set (KOTH ties).
+     */
+    private record EventPersistenceSnap(
+            int sessionId,
+            String eventType,
+            String arenaKey,
+            Set<UUID> active,
+            Set<UUID> eliminated,
+            Set<UUID> spectating,
+            UUID winnerOrNull,
+            Set<UUID> coWinners,
+            int rewardCoins,
+            Map<UUID, Integer> kills,
+            Map<UUID, Integer> deaths
+    ) {}
 
     // ── Dependencies ──────────────────────────────────────────────────────────
     private final Plugin plugin;
@@ -54,7 +76,7 @@ public final class EventEngine {
     private FfaHandler  ffaHandler;
     private KothHandler kothHandler;
     private DuelsHandler duelsHandler;
-    private CtfHandler  ctfHandler;
+    private CtfHandler   ctfHandler;
 
     // ── Bukkit tasks ──────────────────────────────────────────────────────────
     private BukkitTask autoTask;
@@ -70,6 +92,8 @@ public final class EventEngine {
     // ── Lobby countdown config ─────────────────────────────────────────────────
     private BossBar countdownBar;
 
+    private final EventArenaRegistry arenaRegistry = new EventArenaRegistry();
+
     public EventEngine(Plugin plugin, BroadcasterManager broadcasterManager, BossBarManager bossBarManager) {
         this.plugin              = plugin;
         this.broadcasterManager  = broadcasterManager;
@@ -79,7 +103,16 @@ public final class EventEngine {
 
     // ── Public lifecycle ──────────────────────────────────────────────────────
 
+    public void reloadArenasFromConfig() {
+        arenaRegistry.reload(plugin.getConfig(), plugin.getLogger());
+    }
+
+    public List<String> listArenaKeysForKind(String eventKindKey) {
+        return arenaRegistry.listArenaKeysForKind(eventKindKey);
+    }
+
     public synchronized void start() {
+        arenaRegistry.reload(plugin.getConfig(), plugin.getLogger());
         stopAutoTask();
         long everyTicks = Math.max(20L, plugin.getConfig().getLong("event_mode.interval-seconds", 300L) * 20L);
         autoTask = Bukkit.getScheduler().runTaskTimer(plugin, this::autoTick, everyTicks, everyTicks);
@@ -122,14 +155,28 @@ public final class EventEngine {
     // ── Command actions ───────────────────────────────────────────────────────
 
     public synchronized ActionResult startEvent(String requestedKey) {
+        return startEvent(requestedKey, null);
+    }
+
+    public synchronized ActionResult startEvent(String requestedKey, String arenaKeyOrNull) {
         if (session != null && session.state != EventState.IDLE) {
             return new ActionResult(false, "§cAn event is already active: §f" + session.spec.displayName);
+        }
+        String norm = normalizeEventKey(requestedKey);
+        if (ChatGameKeys.isChatGameConfigKey(norm)) {
+            return new ActionResult(false, "§cChat games use §f/chatgame start " + norm + " §c(not /event).");
         }
         EventSpec spec = loadSpec(requestedKey);
         if (spec == null || !spec.enabled) {
             return new ActionResult(false, "§cUnknown or disabled event: §e" + requestedKey);
         }
-        beginEvent(spec, false);
+        if (arenaKeyOrNull != null && !arenaKeyOrNull.isBlank()) {
+            String ak = arenaKeyOrNull.toLowerCase(Locale.ROOT).trim();
+            if (arenaRegistry.get(spec.key, ak) == null) {
+                return new ActionResult(false, "§cUnknown arena key §e" + ak + " §cfor §e" + spec.key);
+            }
+        }
+        beginEvent(spec, false, arenaKeyOrNull);
         return new ActionResult(true, "§aStarted event: §f" + spec.displayName);
     }
 
@@ -138,8 +185,9 @@ public final class EventEngine {
             return new ActionResult(false, "§7No active event to stop.");
         }
         String ended = session.spec.displayName;
+        String catKey = session.spec.key;
         doStopEvent(actorReason);
-        broadcast("§7Event stopped: §f" + ended + " §7(" + actorReason + ")");
+        EventNotifications.broadcastCategoryOptional(plugin, catKey, "§7Event stopped: §f" + ended + " §7(" + actorReason + ")");
         return new ActionResult(true, "§7Event stopped.");
     }
 
@@ -158,7 +206,7 @@ public final class EventEngine {
         }
         if (winner == null) return new ActionResult(false, "§cWinner is required.");
         session.active.add(winner.getUniqueId());
-        int reward = rewardOverride != null ? Math.max(0, rewardOverride) : session.spec.coinReward;
+        int reward = rewardOverride != null ? Math.max(0, rewardOverride) : session.runtimeCoinReward;
         finalizeEvent(winner.getUniqueId(), reward, reason == null ? "completed" : reason);
         return new ActionResult(true, "§aEvent completed. Winner: §f" + winner.getName());
     }
@@ -222,33 +270,26 @@ public final class EventEngine {
         return new ActionResult(true, "§7You left the event queue.");
     }
 
-    // ── Chat events ───────────────────────────────────────────────────────────
-
-    public synchronized boolean submitChatAnswer(Player player, String rawAnswer) {
-        if (player == null || session == null || session.state != EventState.RUNNING) return false;
-        if (!session.spec.kind.isChat()) return false;
-        String answer = rawAnswer == null ? "" : rawAnswer.trim();
-        if (answer.isBlank() || session.chatAnswer == null) return false;
-        String guess = normalizeAnswer(answer);
-        String expected = normalizeAnswer(session.chatAnswer);
-        if (!matchesAnswer(guess, expected)) return false;
-        session.active.add(player.getUniqueId());
-        finalizeEvent(player.getUniqueId(), session.spec.coinReward, "answered correctly");
-        return true;
-    }
-
     // ── Participant lifecycle (called by EventModeCombatListener) ─────────────
 
     /**
      * Called when a participant receives damage that would be fatal.
      * The damage event has already been cancelled — the player is alive.
      * For FFA/Duels: mark eliminated, switch to SPECTATOR, schedule 5s end if last alive.
-     * For KOTH: strip HC loot if applicable, teleport to world spawn, player stays active.
+     * For KOTH: strip HC loot if applicable, teleport to arena spawns or SMP world spawn, stays active.
      */
-    public synchronized void handleParticipantFatalDamage(Player player) {
+    public synchronized void handleParticipantFatalDamage(Player player, Player killerOrNull) {
         if (player == null || session == null || session.state != EventState.RUNNING) return;
         UUID id = player.getUniqueId();
         if (!session.active.contains(id)) return;
+
+        session.eventDeaths.computeIfAbsent(id, u -> new AtomicInteger()).incrementAndGet();
+        if (killerOrNull != null) {
+            UUID kid = killerOrNull.getUniqueId();
+            if (!kid.equals(id) && session.active.contains(kid)) {
+                session.eventKills.computeIfAbsent(kid, u -> new AtomicInteger()).incrementAndGet();
+            }
+        }
 
         EventKind kind   = session.spec.kind;
         boolean isHC     = kind.isHardcore();
@@ -263,15 +304,29 @@ public final class EventEngine {
             player.updateInventory();
         }
 
+        if (kind == EventKind.CTF) {
+            session.eventDeaths.computeIfAbsent(id, u -> new AtomicInteger()).incrementAndGet();
+            if (killerOrNull != null) {
+                UUID kid = killerOrNull.getUniqueId();
+                if (!kid.equals(id) && session.active.contains(kid)) {
+                    session.eventKills.computeIfAbsent(kid, u -> new AtomicInteger()).incrementAndGet();
+                }
+            }
+            ctfHandler.onParticipantDowned(session, player);
+            return;
+        }
+
         if (isKoth) {
-            // KOTH: not elimination — player respawns at world spawn and can still hold the hill
+            boolean haveSpawns = !getArenaSpawnsForSession(session).isEmpty();
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) return;
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
-                Location spawn = getWorldSpawn();
+                Location spawn = pickKothRespawnLocation(session);
                 if (spawn != null) player.teleport(spawn);
-                player.sendMessage(Component.text("☠ Eliminated from the hill! Respawning at world spawn.",
+                String dest = haveSpawns ? "a ring spawn." : "world spawn.";
+                player.sendMessage(Component.text(
+                        "☠ Knocked down! Respawning at " + dest,
                         NamedTextColor.RED));
             });
         } else {
@@ -329,7 +384,7 @@ public final class EventEngine {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 synchronized (EventEngine.this) {
                     if (session == null || session.state != EventState.ENDING) return;
-                    finalizeEvent(finalWinner, session.spec.coinReward,
+                    finalizeEvent(finalWinner, session.runtimeCoinReward,
                             "won " + session.spec.displayName);
                 }
             }, 100L);
@@ -346,6 +401,26 @@ public final class EventEngine {
         if (player == null || session == null) return false;
         UUID uuid = player.getUniqueId();
         return session.active.contains(uuid) || session.queued.contains(uuid);
+    }
+
+    /** Active combatants in a {@link EventState#RUNNING} session (excludes lobby queue). */
+    public synchronized boolean isActiveEventParticipant(Player player) {
+        if (player == null || session == null || session.state != EventState.RUNNING) return false;
+        return session.active.contains(player.getUniqueId());
+    }
+
+    /**
+     * True when both are on the same CTF team. Used so party friendly-fire rules can still
+     * block damage between party members on the same side (until dedicated team FF exists).
+     */
+    public synchronized boolean areCtfTeammates(Player a, Player b) {
+        if (a == null || b == null || session == null || session.state != EventState.RUNNING) return false;
+        if (session.spec.kind != EventKind.CTF) return false;
+        UUID ua = a.getUniqueId(), ub = b.getUniqueId();
+        if (!session.active.contains(ua) || !session.active.contains(ub)) return false;
+        var ta = TeamEngine.teamOf(session, ua);
+        var tb = TeamEngine.teamOf(session, ub);
+        return ta != null && ta == tb;
     }
 
     public synchronized boolean isParticipantInHardcore(Player player) {
@@ -395,7 +470,7 @@ public final class EventEngine {
         if (player == null) return new ActionResult(false, "§cOnly players can set arena spawns.");
         String arenaKey = normalizeArenaKey(arenaKeyRaw);
         if (!isValidArenaKey(arenaKey)) {
-            return new ActionResult(false, "§cArena setup only supports ffa/hardcore_ffa and duels/hardcore_duels.");
+            return new ActionResult(false, "§cArena setup only supports ffa, duels, and koth (hardcore variants map to ffa/duels/koth).");
         }
         Location loc = player.getLocation();
         List<Location> cached = spawnCache.computeIfAbsent(arenaKey, k -> new ArrayList<>());
@@ -426,7 +501,7 @@ public final class EventEngine {
     public synchronized ActionResult clearArenaSpawns(String arenaKeyRaw) {
         String arenaKey = normalizeArenaKey(arenaKeyRaw);
         if (!isValidArenaKey(arenaKey)) {
-            return new ActionResult(false, "§cArena setup only supports ffa/hardcore_ffa and duels/hardcore_duels.");
+            return new ActionResult(false, "§cArena setup only supports ffa, duels, and koth (hardcore variants map to ffa/duels/koth).");
         }
         spawnCache.put(arenaKey, new ArrayList<>());
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -497,11 +572,14 @@ public final class EventEngine {
 
     public synchronized List<String> getConfiguredEventKeys() {
         var sec = plugin.getConfig().getConfigurationSection("event_mode.events");
-        if (sec == null) return List.of("koth", "ffa", "duels", "chat_math", "chat_scrabble", "chat_quiz");
+        if (sec == null) return List.of("koth", "ffa", "duels");
         Set<String> seen = new HashSet<>();
         List<String> out = new ArrayList<>();
         for (String key : sec.getKeys(false)) {
             String normalized = normalizeEventKey(key);
+            if (ChatGameKeys.isChatGameConfigKey(normalized)) {
+                continue;
+            }
             if (sec.getBoolean(key + ".enabled", true) && seen.add(normalized)) out.add(normalized);
         }
         return out;
@@ -588,6 +666,107 @@ public final class EventEngine {
         return getHandler(session.spec.kind).getScoreboardLines(session);
     }
 
+    public synchronized List<String> listArenaRegistryLines() {
+        return arenaRegistry.describeAll();
+    }
+
+    public synchronized String getEventInfoSummary() {
+        if (session == null || session.state == EventState.IDLE) {
+            return "§7No active event.";
+        }
+        EventSession s = session;
+        String arena = s.selectedArenaKey != null ? s.selectedArenaKey : "§8legacy";
+        return "§d" + s.spec.displayName + " §8| §7" + s.state + " §8| §7kind §f" + s.spec.kind
+                + " §8| §7arena §f" + arena
+                + " §8| §7queue §f" + s.queued.size() + " §8| §7active §f" + s.active.size();
+    }
+
+    public synchronized ActionResult setRuntimeCoinReward(int coins) {
+        if (session == null || session.state == EventState.IDLE) {
+            return new ActionResult(false, "§7No active event.");
+        }
+        session.runtimeCoinReward = Math.max(0, coins);
+        return new ActionResult(true, "§aCoin reward set to §f" + session.runtimeCoinReward);
+    }
+
+    public synchronized ActionResult staffSpectateEnter(Player player) {
+        if (player == null || !player.isOnline()) {
+            return new ActionResult(false, "§cPlayer required.");
+        }
+        if (session == null || session.state != EventState.RUNNING) {
+            return new ActionResult(false, "§7No running event to spectate.");
+        }
+        UUID id = player.getUniqueId();
+        if (session.active.contains(id) || session.queued.contains(id)) {
+            return new ActionResult(false, "§7Leave the event first.");
+        }
+        if (session.spectatorVisitors.contains(id)) {
+            return new ActionResult(false, "§7You are already spectating.");
+        }
+        Location ret = player.getLocation().clone();
+        GameMode prev = player.getGameMode();
+        session.spectatorVisitorState.put(id, new SpectatorVisitState(ret, prev));
+        session.spectatorVisitors.add(id);
+        Location dest = getSpectatorDestination();
+        if (dest != null) player.teleport(dest);
+        player.setGameMode(GameMode.SPECTATOR);
+        return new ActionResult(true, "§aSpectating §f" + session.spec.displayName + "§a. Run §f/event spectate leave§a to exit.");
+    }
+
+    public synchronized ActionResult staffSpectateLeave(Player player) {
+        if (player == null) return new ActionResult(false, "§cPlayer required.");
+        UUID id = player.getUniqueId();
+        if (session == null || !session.spectatorVisitors.contains(id)) {
+            return new ActionResult(false, "§7You are not event-spectating.");
+        }
+        SpectatorVisitState st = session.spectatorVisitorState.remove(id);
+        session.spectatorVisitors.remove(id);
+        if (player.isOnline()) {
+            player.setGameMode(st != null && st.previousMode() != null ? st.previousMode() : GameMode.SURVIVAL);
+            if (st != null && st.returnLocation() != null && st.returnLocation().getWorld() != null) {
+                player.teleport(st.returnLocation());
+            }
+        }
+        return new ActionResult(true, "§7Returned from event spectate.");
+    }
+
+    public synchronized void handleCtfFlagInteract(Player player, org.bukkit.block.Block block) {
+        if (session == null || session.state != EventState.RUNNING || session.spec.kind != EventKind.CTF) return;
+        if (!session.active.contains(player.getUniqueId())) return;
+        ctfHandler.handleInteract(player, block, session);
+    }
+
+    /** @return true if the pickup should be cancelled (CTF ground flag item). */
+    public synchronized boolean handleCtfGroundFlagPickup(Player player, org.bukkit.entity.Item item) {
+        if (session == null || session.state != EventState.RUNNING || session.spec.kind != EventKind.CTF) {
+            return false;
+        }
+        if (!session.active.contains(player.getUniqueId())) return false;
+        return ctfHandler.handleGroundFlagPickup(player, item, session);
+    }
+
+    private Location getSpectatorDestination() {
+        if (session == null) return getEventWorldSpawn();
+        List<Location> sp = getArenaSpawnsForSession(session);
+        if (!sp.isEmpty()) return sp.get(0).clone();
+        return getEventWorldSpawn();
+    }
+
+    private void restoreStaffSpectators() {
+        if (session == null) return;
+        for (Map.Entry<UUID, SpectatorVisitState> e : new HashMap<>(session.spectatorVisitorState).entrySet()) {
+            Player p = Bukkit.getPlayer(e.getKey());
+            if (p == null || !p.isOnline()) continue;
+            SpectatorVisitState st = e.getValue();
+            p.setGameMode(st.previousMode() != null ? st.previousMode() : GameMode.SURVIVAL);
+            if (st.returnLocation() != null && st.returnLocation().getWorld() != null) {
+                p.teleport(st.returnLocation());
+            }
+        }
+        session.spectatorVisitorState.clear();
+        session.spectatorVisitors.clear();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ── Private implementation ────────────────────────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
@@ -599,10 +778,10 @@ public final class EventEngine {
         ffaHandler   = sharedFfa;
         duelsHandler = new DuelsHandler(sharedFfa);
         kothHandler  = new KothHandler(plugin,
-                this::getKothCuboid,
-                this::getWorldSpawn,
+                this::getKothCuboidForSession,
+                this::pickKothRespawnLocation,
                 this::onKothExpired);
-        ctfHandler   = new CtfHandler(sharedFfa);
+        ctfHandler   = new CtfHandler(plugin);
     }
 
     private EventHandler getHandler(EventKind kind) {
@@ -629,7 +808,7 @@ public final class EventEngine {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 synchronized (EventEngine.this) {
                     if (session == null || session.state != EventState.ENDING) return;
-                    finalizeEvent(finalWinner, session.spec.coinReward,
+                    finalizeEvent(finalWinner, session.runtimeCoinReward,
                             "won " + session.spec.displayName);
                 }
             }, 100L);
@@ -639,21 +818,49 @@ public final class EventEngine {
     // Called by KothHandler when its timer expires
     private synchronized void onKothExpired(EventSession s) {
         if (s != session || session.state != EventState.RUNNING) return;
-        UUID winner = session.kothSeconds.entrySet().stream()
-                .max(Comparator.comparingInt(Map.Entry::getValue))
+        int maxSec = session.kothSeconds.values().stream().max(Integer::compareTo).orElse(0);
+        List<UUID> tops = session.kothSeconds.entrySet().stream()
+                .filter(e -> e.getValue() == maxSec && maxSec > 0)
                 .map(Map.Entry::getKey)
-                .orElse(null);
-        if (winner == null && !session.active.isEmpty()) winner = session.active.iterator().next();
-        if (winner == null) {
-            broadcast("§7" + session.spec.displayName + " ended with no winner.");
-            clearState();
+                .sorted()
+                .toList();
+        if (tops.isEmpty()) {
+            UUID winner = session.active.isEmpty() ? null : session.active.iterator().next();
+            if (winner == null) {
+                broadcast("§7" + session.spec.displayName + " ended with no winner.");
+                EventPersistenceSnap snap = null;
+                if (session.persistenceSessionId > 0) {
+                    snap = takePersistenceSnapshot(session, null, 0);
+                }
+                clearState();
+                persistFinalizeFromSnapshotAsync(snap);
+                return;
+            }
+            finalizeEvent(winner, session.runtimeCoinReward, "won " + session.spec.displayName);
             return;
         }
-        finalizeEvent(winner, session.spec.coinReward, "won " + session.spec.displayName);
+        if (tops.size() == 1) {
+            finalizeEvent(tops.get(0), session.runtimeCoinReward, "won " + session.spec.displayName);
+            return;
+        }
+        finalizeKothTiedWinners(new ArrayList<>(tops), session.runtimeCoinReward);
     }
 
-    private synchronized void beginEvent(EventSpec spec, boolean automated) {
+    private synchronized void beginEvent(EventSpec spec, boolean automated, String arenaKeyOrNull) {
         session = new EventSession(spec);
+        session.runtimeCoinReward = spec.coinReward;
+        String arenaNorm = null;
+        if (arenaKeyOrNull != null && !arenaKeyOrNull.isBlank()) {
+            String ak = arenaKeyOrNull.toLowerCase(Locale.ROOT).trim();
+            if (arenaRegistry.get(spec.key, ak) != null) {
+                arenaNorm = ak;
+            }
+        }
+        if (arenaNorm == null) {
+            ArenaConfig def = arenaRegistry.defaultArena(spec.key);
+            arenaNorm = def != null ? def.key().toLowerCase(Locale.ROOT) : null;
+        }
+        session.selectedArenaKey = arenaNorm;
 
         if (spec.kind.isSignup()) {
             session.state = EventState.OPEN;
@@ -661,24 +868,8 @@ public final class EventEngine {
             return;
         }
 
-        // Chat events — no queue, instant start
         session.state = EventState.RUNNING;
-        if (spec.kind == EventKind.CHAT_MATH) {
-            int a = java.util.concurrent.ThreadLocalRandom.current().nextInt(4, 35);
-            int b = java.util.concurrent.ThreadLocalRandom.current().nextInt(4, 35);
-            session.chatAnswer = Integer.toString(a + b);
-            broadcast("§dMath Event: §fFirst to answer §e" + a + " + " + b + "§f wins §6" + spec.coinReward + " coins.");
-        } else if (spec.kind == EventKind.CHAT_SCRABBLE) {
-            String word = pickScrabbleWord();
-            session.chatAnswer = word;
-            broadcast("§dScrabble Event: §fUnscramble this word: §e" + scramble(word) + " §7(First correct answer wins)");
-        } else if (spec.kind == EventKind.CHAT_QUIZ) {
-            Quiz qa = pickQuiz();
-            session.chatAnswer = qa.answer;
-            broadcast("§dQuiz Event: §f" + qa.question + " §7(First correct answer wins)");
-        } else {
-            broadcast("§dEvent started: §f" + spec.displayName);
-        }
+        broadcast("§dEvent started: §f" + spec.displayName);
     }
 
     /** Transitions OPEN → LOBBY_COUNTDOWN and starts the boss bar countdown. */
@@ -717,8 +908,20 @@ public final class EventEngine {
             countdownBar = Bukkit.createBossBar("", BarColor.PURPLE, BarStyle.SOLID);
         }
         countdownBar.removeAll();
-        for (Player p : Bukkit.getOnlinePlayers()) countdownBar.addPlayer(p);
+        syncCountdownBarPlayers();
         countdownBar.setVisible(true);
+    }
+
+    /** Per-player opt-in via {@link com.darkniightz.core.system.PresentationPreference}. */
+    private void syncCountdownBarPlayers() {
+        if (countdownBar == null) return;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (com.darkniightz.core.system.PresentationPreference.showEventCountdownBossBar(p)) {
+                countdownBar.addPlayer(p);
+            } else {
+                countdownBar.removePlayer(p);
+            }
+        }
     }
 
     private void updateCountdownBossBar() {
@@ -729,6 +932,7 @@ public final class EventEngine {
         countdownBar.setTitle(ChatColor.translateAlternateColorCodes('&',
                 "&d" + session.spec.displayName + " &7starting in &f" + left + "s"));
         countdownBar.setProgress(prog);
+        syncCountdownBarPlayers();
     }
 
     /** Transitions LOBBY_COUNTDOWN → RUNNING. Teleports players and takes snapshots. */
@@ -742,21 +946,90 @@ public final class EventEngine {
 
         removeCountdownBar();
 
+        session.resolvedArenaConfig = resolveArenaConfig(session);
+
         EventKind kind = session.spec.kind;
 
         if (kind.isKoth()) {
-            if (!isKothConfigured()) {
-                broadcast("§cKOTH is not configured. Event aborted.");
+            if (getKothCuboidForSession(session) == null) {
+                broadcast("§cKOTH is not configured (arena_registry hill or /event setup koth). Event aborted.");
                 clearState();
                 return;
             }
             int durationSeconds = Math.max(30, plugin.getConfig().getInt("event_mode.koth.duration_seconds", 120));
+            if (session.resolvedArenaConfig != null && session.resolvedArenaConfig.kothDurationSeconds() != null) {
+                durationSeconds = Math.max(30, session.resolvedArenaConfig.kothDurationSeconds());
+            }
             session.endsAtMs = System.currentTimeMillis() + durationSeconds * 1000L;
+
+            boolean isHC = kind.isHardcore();
+            List<Location> ring = getArenaSpawnsForSession(session);
+            int si = 0;
+            for (UUID id : session.active) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                if (isHC) {
+                    if (!session.snapshots.containsKey(id)) {
+                        session.snapshots.put(id, InventorySnapshot.capture(p));
+                    }
+                    p.getInventory().clear();
+                    p.getInventory().setArmorContents(new ItemStack[4]);
+                    p.getInventory().setItemInOffHand(null);
+                    p.updateInventory();
+                } else {
+                    if (!session.snapshots.containsKey(id)) {
+                        session.snapshots.put(id, InventorySnapshot.capture(p));
+                    }
+                }
+                if (!ring.isEmpty()) {
+                    Location dest = ring.get(si % ring.size());
+                    if (dest != null) p.teleport(dest.clone());
+                    si++;
+                }
+            }
+
             getHandler(kind).onStart(session);
             startTickTask();
             // KOTH players stay in SMP — set DO_IMMEDIATE_RESPAWN there so the death screen is suppressed.
             setImmediateRespawn(true);
+            schedulePersistEventSessionStart(session);
             broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
+            discordNotifyEventRunning();
+            return;
+        }
+
+        if (kind == EventKind.CTF) {
+            ArenaConfig.CtfLayout lay = session.resolvedArenaConfig != null
+                    ? session.resolvedArenaConfig.ctf() : ArenaConfig.CtfLayout.empty();
+            if (!lay.isComplete()) {
+                broadcast("§cCTF requires arena_registry." + session.spec.key + " with ctf.red_spawn, blue_spawn, red_flag, blue_flag.");
+                clearState();
+                return;
+            }
+            int durationSeconds = Math.max(120, plugin.getConfig().getInt("event_mode.ctf.duration_seconds", 600));
+            session.endsAtMs = System.currentTimeMillis() + durationSeconds * 1000L;
+            String eventWorldName = plugin.getConfig().getString("event_mode.world", "events");
+            ensureEventWorld(eventWorldName);
+            TeamEngine.assignCtfTeams(session);
+            for (UUID id : session.active) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                if (!session.snapshots.containsKey(id)) {
+                    session.snapshots.put(id, InventorySnapshot.capture(p));
+                }
+                p.getInventory().clear();
+                p.getInventory().setArmorContents(new ItemStack[4]);
+                p.getInventory().setItemInOffHand(null);
+                boolean red = session.ctfTeamRed.contains(id);
+                CtfKitUtil.apply(p, red ? lay.redKit() : lay.blueKit());
+                Location dest = red ? lay.redSpawn() : lay.blueSpawn();
+                if (dest != null) p.teleport(dest.clone());
+            }
+            getHandler(kind).onStart(session);
+            startTickTask();
+            setImmediateRespawn(true);
+            schedulePersistEventSessionStart(session);
+            broadcast("§d" + session.spec.displayName + " (CTF) started with §f" + session.active.size() + "§d players.");
             return;
         }
 
@@ -766,7 +1039,7 @@ public final class EventEngine {
         String eventWorldName = plugin.getConfig().getString("event_mode.world", "events");
         ensureEventWorld(eventWorldName);
 
-        List<Location> spawns = getArenaSpawns(session.spec.key);
+        List<Location> spawns = getArenaSpawnsForSession(session);
         if (spawns.isEmpty()) {
             Location eventSpawn = getEventWorldSpawn();
             if (eventSpawn != null) spawns = List.of(eventSpawn);
@@ -806,8 +1079,24 @@ public final class EventEngine {
         // Arena events teleport players to events world (DO_IMMEDIATE_RESPAWN already permanent there).
         // Also set on SMP in case any death happens while still transitioning.
         setImmediateRespawn(true);
+        schedulePersistEventSessionStart(session);
         broadcast("§d" + session.spec.displayName + " started with §f" + session.active.size() + "§d players.");
+        discordNotifyEventRunning();
         checkImmediateElimination();
+    }
+
+    private void discordNotifyEventRunning() {
+        if (session == null) {
+            return;
+        }
+        if (!(plugin instanceof JebaitedCore core)) {
+            return;
+        }
+        var svc = core.getDiscordIntegrationService();
+        if (svc == null || !svc.isEnabled()) {
+            return;
+        }
+        svc.notifyEventStarted(session.spec.key, session.spec.displayName, session.active.size(), session.spec.kind.name());
     }
 
     private void checkImmediateElimination() {
@@ -821,6 +1110,11 @@ public final class EventEngine {
             synchronized (EventEngine.this) {
                 if (session == null || session.state != EventState.RUNNING) return;
                 getHandler(session.spec.kind).onTick(session);
+                if (session.spec.kind == EventKind.CTF && session.ctfPendingWinnerUuid != null) {
+                    UUID w = session.ctfPendingWinnerUuid;
+                    session.ctfPendingWinnerUuid = null;
+                    finalizeEvent(w, session.runtimeCoinReward, "ctf score limit");
+                }
             }
         }, 20L, 20L);
     }
@@ -830,9 +1124,12 @@ public final class EventEngine {
         EventSpec ended = session.spec;
         session.state = EventState.ENDING;
 
+        EventPersistenceSnap pSnap = takePersistenceSnapshot(session, winner, reward);
+
         rewardWinner(winner, reward, ended.displayName);
         writeEventStats(ended.key, winner);
         restoreSnapshots();
+        restoreStaffSpectators();
         if (ended.kind.isHardcore()) giveLootToWinner(winner);
         getHandler(ended.kind).onEnd(session);
 
@@ -841,15 +1138,103 @@ public final class EventEngine {
         broadcast("§d★ §fEvent Over: §d" + ended.displayName + " §7— Winner: §a" + winnerName + " §8(+§6" + reward + " coins§8)");
         if (reason != null && !reason.isBlank()) broadcast("§7Reason: §f" + reason);
 
+        if (plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventEnded(
+                        ended.key,
+                        ended.displayName,
+                        ended.kind.name(),
+                        winnerName,
+                        reward,
+                        reason == null ? "" : reason);
+            }
+        }
+
         clearState();
+        persistFinalizeFromSnapshotAsync(pSnap);
     }
 
-    private void doStopEvent(String reason) {
+    /** KOTH timer expiry with multiple leaders on uncontested time (coins + HC loot split). */
+    private synchronized void finalizeKothTiedWinners(List<UUID> winners, int rewardTotal) {
+        if (session == null || winners == null || winners.isEmpty()) return;
+        Collections.sort(winners);
+        EventSpec ended = session.spec;
+        session.state = EventState.ENDING;
+
+        LinkedHashSet<UUID> co = new LinkedHashSet<>(winners);
+        EventPersistenceSnap pSnap = takePersistenceSnapshot(session, winners.get(0), rewardTotal, co);
+
+        int n = winners.size();
+        int base = rewardTotal / n;
+        int rem = rewardTotal % n;
+        for (int i = 0; i < n; i++) {
+            int coins = base + (i < rem ? 1 : 0);
+            rewardWinner(winners.get(i), coins, ended.displayName + " tie");
+        }
+        writeEventStatsCoWinners(ended.key, winners);
+        restoreSnapshots();
+        restoreStaffSpectators();
+        if (ended.kind.isHardcore()) {
+            giveLootSplitToWinners(winners);
+        }
+        getHandler(ended.kind).onEnd(session);
+
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < winners.size(); i++) {
+            if (i > 0) names.append("§7, §a");
+            OfflinePlayer ow = Bukkit.getOfflinePlayer(winners.get(i));
+            String nm = ow.getName() != null ? ow.getName() : winners.get(i).toString().substring(0, 8);
+            names.append(nm);
+        }
+        broadcast("§d★ §fEvent Over: §d" + ended.displayName + " §7— §eTie §7— §a" + names
+                + " §8(+§6" + rewardTotal + " coins split§8)");
+
+        StringBuilder tiePlain = new StringBuilder();
+        for (int i = 0; i < winners.size(); i++) {
+            if (i > 0) {
+                tiePlain.append(", ");
+            }
+            OfflinePlayer ow = Bukkit.getOfflinePlayer(winners.get(i));
+            String nm = ow.getName() != null ? ow.getName() : winners.get(i).toString().substring(0, 8);
+            tiePlain.append(nm);
+        }
+        if (plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventTie(ended.key, ended.displayName, ended.kind.name(), tiePlain.toString(), rewardTotal);
+            }
+        }
+
+        clearState();
+        persistFinalizeFromSnapshotAsync(pSnap);
+    }
+
+    private synchronized void doStopEvent(String reason) {
+        EventSpec specForDiscordCancel = null;
+        if (session != null && session.state == EventState.RUNNING) {
+            specForDiscordCancel = session.spec;
+        }
+        EventPersistenceSnap snap = null;
         if (session != null) {
+            if (session.persistenceSessionId > 0 && session.state == EventState.RUNNING) {
+                snap = takePersistenceSnapshot(session, null, 0);
+            }
             restoreSnapshots();
+            restoreStaffSpectators();
             removeCountdownBar();
         }
         clearState();
+        if (specForDiscordCancel != null
+                && reason != null
+                && !reason.toLowerCase(Locale.ROOT).contains("plugin shutdown")
+                && plugin instanceof JebaitedCore core) {
+            var svc = core.getDiscordIntegrationService();
+            if (svc != null && svc.isEnabled()) {
+                svc.notifyEventCancelled(specForDiscordCancel.key, specForDiscordCancel.displayName, reason);
+            }
+        }
+        persistFinalizeFromSnapshotAsync(snap);
     }
 
     private void restoreSnapshots() {
@@ -931,6 +1316,43 @@ public final class EventEngine {
         }
     }
 
+    /** Round-robin hardcore loot pool across tied KOTH winners (§21). */
+    private void giveLootSplitToWinners(List<UUID> winnerIds) {
+        if (session == null || session.hardcoreLootPool.isEmpty() || winnerIds == null || winnerIds.isEmpty()) {
+            return;
+        }
+        List<Player> online = new ArrayList<>();
+        for (UUID id : winnerIds) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline()) {
+                online.add(p);
+            }
+        }
+        if (online.isEmpty()) {
+            session.hardcoreLootPool.clear();
+            return;
+        }
+        List<ItemStack> pool = new ArrayList<>(session.hardcoreLootPool);
+        session.hardcoreLootPool.clear();
+        int wi = 0;
+        for (ItemStack item : pool) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            Player target = online.get(wi % online.size());
+            wi++;
+            Map<Integer, ItemStack> overflow = target.getInventory().addItem(item);
+            for (ItemStack leftover : overflow.values()) {
+                target.getWorld().dropItemNaturally(target.getLocation(), leftover);
+            }
+            target.updateInventory();
+        }
+        for (Player p : online) {
+            p.sendMessage(Component.text("⚔ ", NamedTextColor.GOLD)
+                    .append(Component.text("Tie win — you received a share of the hardcore loot pool.",
+                            NamedTextColor.YELLOW)));
+            p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 0.8f);
+        }
+    }
+
     private void rewardWinner(UUID winner, int reward, String eventDisplay) {
         if (!(plugin instanceof JebaitedCore core)) return;
         ProfileStore store = core.getProfileStore();
@@ -951,7 +1373,6 @@ public final class EventEngine {
         if (!(plugin instanceof JebaitedCore core)) return;
         ProfileStore store = core.getProfileStore();
         if (store == null || session == null) return;
-        boolean chatCategory = eventKey != null && eventKey.toLowerCase(Locale.ROOT).startsWith("chat_");
         for (UUID id : session.active) {
             boolean won = id.equals(winner);
             store.updateEventStats(id, eventKey, 1, won ? 1 : 0, won ? 0 : 1);
@@ -959,13 +1380,140 @@ public final class EventEngine {
                 OfflinePlayer op = Bukkit.getOfflinePlayer(id);
                 PlayerProfile profile = store.getOrCreate(op, core.getRankManager().getDefaultGroup());
                 if (profile != null) {
-                    if (chatCategory) profile.incEventWinsChat();
-                    else if (session.spec.kind.isHardcore()) profile.incEventWinsHardcore();
+                    if (session.spec.kind.isHardcore()) profile.incEventWinsHardcore();
                     else profile.incEventWinsCombat();
                     store.saveDeferred(id);
                 }
             }
         }
+    }
+
+    private void writeEventStatsCoWinners(String eventKey, Collection<UUID> winners) {
+        if (!(plugin instanceof JebaitedCore core)) return;
+        ProfileStore store = core.getProfileStore();
+        if (store == null || session == null) return;
+        Set<UUID> win = new HashSet<>(winners);
+        for (UUID id : session.active) {
+            boolean won = win.contains(id);
+            store.updateEventStats(id, eventKey, 1, won ? 1 : 0, won ? 0 : 1);
+            if (won) {
+                OfflinePlayer op = Bukkit.getOfflinePlayer(id);
+                PlayerProfile profile = store.getOrCreate(op, core.getRankManager().getDefaultGroup());
+                if (profile != null) {
+                    if (session.spec.kind.isHardcore()) profile.incEventWinsHardcore();
+                    else profile.incEventWinsCombat();
+                    store.saveDeferred(id);
+                }
+            }
+        }
+    }
+
+    private EventPersistenceSnap takePersistenceSnapshot(EventSession s, UUID winnerOrNull, int rewardCoins) {
+        return takePersistenceSnapshot(s, winnerOrNull, rewardCoins, Set.of());
+    }
+
+    private EventPersistenceSnap takePersistenceSnapshot(EventSession s, UUID winnerOrNull, int rewardCoins,
+                                                       Set<UUID> coWinners) {
+        int sid = s.persistenceSessionId;
+        Map<UUID, Integer> kills = new HashMap<>();
+        for (Map.Entry<UUID, AtomicInteger> e : s.eventKills.entrySet()) {
+            kills.put(e.getKey(), e.getValue().get());
+        }
+        Map<UUID, Integer> deaths = new HashMap<>();
+        for (Map.Entry<UUID, AtomicInteger> e : s.eventDeaths.entrySet()) {
+            deaths.put(e.getKey(), e.getValue().get());
+        }
+        String arenaKey = s.spec.key;
+        if (arenaKey != null && arenaKey.isBlank()) {
+            arenaKey = null;
+        }
+        Set<UUID> tie = coWinners == null ? Set.of() : Set.copyOf(coWinners);
+        return new EventPersistenceSnap(
+                sid,
+                s.spec.kind.name(),
+                arenaKey,
+                new HashSet<>(s.active),
+                new HashSet<>(s.eliminated),
+                new HashSet<>(s.spectating),
+                winnerOrNull,
+                tie,
+                rewardCoins,
+                kills,
+                deaths);
+    }
+
+    private void schedulePersistEventSessionStart(EventSession forSameSession) {
+        if (!(plugin instanceof JebaitedCore core)) return;
+        if (!core.getDatabaseManager().isEnabled()) return;
+        EventParticipantDAO dao = core.getEventParticipantDAO();
+        if (dao == null) return;
+        final EventSession anchor = forSameSession;
+        String eventType = anchor.spec.kind.name();
+        String arenaKey = anchor.spec.key;
+        long startedAt = System.currentTimeMillis();
+        EventParticipantDAO.runAsync(plugin, () -> {
+            int id = dao.insertSessionRunning(eventType, arenaKey, startedAt);
+            if (id <= 0) return;
+            EventParticipantDAO.runOnMainWhenPossible(plugin, () -> {
+                synchronized (EventEngine.this) {
+                    if (session != anchor) return;
+                    session.persistenceSessionId = id;
+                }
+            });
+        });
+    }
+
+    private List<EventParticipantDAO.ParticipantRow> buildParticipantRows(EventPersistenceSnap snap) {
+        List<EventParticipantDAO.ParticipantRow> rows = new ArrayList<>();
+        Set<UUID> tie = snap.coWinners();
+        boolean split = tie != null && !tie.isEmpty();
+        List<UUID> tieSorted = split ? tie.stream().sorted().toList() : List.of();
+        int nWin = tieSorted.size();
+        int totalReward = snap.rewardCoins();
+        int baseEach = split && nWin > 0 ? totalReward / nWin : totalReward;
+        int remExtra = split && nWin > 0 ? totalReward % nWin : 0;
+
+        for (UUID pid : snap.active()) {
+            int k = snap.kills().getOrDefault(pid, 0);
+            int d = snap.deaths().getOrDefault(pid, 0);
+            String result;
+            boolean won = split ? tie.contains(pid)
+                    : snap.winnerOrNull() != null && pid.equals(snap.winnerOrNull());
+            if (won) {
+                result = "WIN";
+            } else if (snap.spectating().contains(pid) || snap.eliminated().contains(pid)) {
+                result = "SPECTATE";
+            } else {
+                result = "LOSS";
+            }
+            int coins = 0;
+            if (won) {
+                if (split) {
+                    int idx = tieSorted.indexOf(pid);
+                    coins = baseEach + (idx >= 0 && idx < remExtra ? 1 : 0);
+                } else {
+                    coins = totalReward;
+                }
+            }
+            rows.add(new EventParticipantDAO.ParticipantRow(pid, k, d, result, coins, 0));
+        }
+        return rows;
+    }
+
+    private void persistFinalizeFromSnapshotAsync(EventPersistenceSnap snap) {
+        if (snap == null || snap.sessionId() <= 0) return;
+        if (!(plugin instanceof JebaitedCore core)) return;
+        if (!core.getDatabaseManager().isEnabled()) return;
+        EventParticipantDAO dao = core.getEventParticipantDAO();
+        if (dao == null) return;
+        List<EventParticipantDAO.ParticipantRow> rows = buildParticipantRows(snap);
+        EventParticipantDAO.runAsync(plugin, () -> {
+            long endedAt = System.currentTimeMillis();
+            dao.updateSessionEnd(snap.sessionId(), endedAt, snap.winnerOrNull(), null, rows.size());
+            if (!rows.isEmpty()) {
+                dao.upsertParticipantsBatch(snap.sessionId(), rows);
+            }
+        });
     }
 
     // ── Auto-tick ────────────────────────────────────────────────────────────
@@ -978,7 +1526,7 @@ public final class EventEngine {
         String random = keys.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(keys.size()));
         EventSpec spec = loadSpec(random);
         if (spec == null || !spec.enabled) return;
-        beginEvent(spec, true);
+        beginEvent(spec, true, null);
     }
 
     // ── Announce helpers ──────────────────────────────────────────────────────
@@ -1077,15 +1625,12 @@ public final class EventEngine {
 
     private String getEventDescription(EventSpec spec) {
         return switch (spec.kind) {
-            case KOTH          -> "Hold the hill the longest to win.";
+            case KOTH          -> "Earn the most uncontested hill time (sole player in zone) to win.";
             case FFA           -> "Free-for-all. Last player standing wins. Gear is restored on death.";
             case DUELS         -> "1v1 duel. Best of one. Gear is restored after the match.";
-            case CHAT_MATH     -> "Solve the math problem in chat first to win coins.";
-            case CHAT_SCRABBLE -> "Unscramble the word in chat first to win coins.";
-            case CHAT_QUIZ     -> "Answer the trivia question in chat first to win coins.";
             case HARDCORE, HARDCORE_FFA  -> "Hardcore FFA — die and lose your items, last survivor claims the pool.";
             case HARDCORE_DUELS          -> "Hardcore duel — the loser drops everything to the winner.";
-            case HARDCORE_KOTH           -> "Hardcore KOTH — die and lose your items. Most hill time wins the loot pool.";
+            case HARDCORE_KOTH           -> "Hardcore KOTH — die and lose your items. Most uncontested hill time wins; ties split the loot pool.";
             case CTF           -> "Capture the Flag — steal the enemy flag and bring it to your base.";
             default            -> plugin.getConfig().getString("event_mode.events." + spec.key + ".description",
                                        "Compete to win " + spec.coinReward + " coins.");
@@ -1096,6 +1641,9 @@ public final class EventEngine {
 
     private EventSpec loadSpec(String rawKey) {
         String key = normalizeEventKey(rawKey);
+        if (ChatGameKeys.isChatGameConfigKey(key)) {
+            return null;
+        }
         var sec = plugin.getConfig().getConfigurationSection("event_mode.events." + key);
         if (sec == null) return null;
         String display = compactDisplayName(key, sec.getString("display_name", key.toUpperCase(Locale.ROOT)));
@@ -1148,16 +1696,32 @@ public final class EventEngine {
         };
     }
 
-    // ── KOTH helpers ─────────────────────────────────────────────────────────
+    // ── Arena registry + KOTH helpers ────────────────────────────────────────
 
-    private boolean isKothConfigured() {
-        return getKothCuboid() != null;
+    private ArenaConfig resolveArenaConfig(EventSession s) {
+        if (s == null) return null;
+        if (s.selectedArenaKey != null) {
+            ArenaConfig a = arenaRegistry.get(s.spec.key, s.selectedArenaKey);
+            if (a != null) return a;
+        }
+        return arenaRegistry.defaultArena(s.spec.key);
     }
 
-    private KothHandler.Cuboid getKothCuboid() {
+    private KothHandler.Cuboid getKothCuboidForSession(EventSession s) {
+        ArenaConfig ac = resolveArenaConfig(s);
+        if (ac != null && ac.hill() != null) {
+            return ac.hill().toHandlerCuboid();
+        }
+        return getLegacyKothCuboid();
+    }
+
+    /** Legacy {@code event_mode.koth.pos1/pos2} corners when registry has no hill. */
+    private KothHandler.Cuboid getLegacyKothCuboid() {
         String world = plugin.getConfig().getString("event_mode.koth.world", "smp");
         if (world == null || world.isBlank()) return null;
-        if (!plugin.getConfig().isSet("event_mode.koth.pos1.x") || !plugin.getConfig().isSet("event_mode.koth.pos2.x")) return null;
+        if (!plugin.getConfig().isSet("event_mode.koth.pos1.x") || !plugin.getConfig().isSet("event_mode.koth.pos2.x")) {
+            return null;
+        }
         int x1 = plugin.getConfig().getInt("event_mode.koth.pos1.x");
         int y1 = plugin.getConfig().getInt("event_mode.koth.pos1.y");
         int z1 = plugin.getConfig().getInt("event_mode.koth.pos1.z");
@@ -1167,19 +1731,37 @@ public final class EventEngine {
         return new KothHandler.Cuboid(world, x1, y1, z1, x2, y2, z2);
     }
 
-    private List<Location> getArenaSpawns(String eventKey) {
-        return spawnCache.getOrDefault(normalizeArenaKey(eventKey), List.of());
+    private List<Location> getArenaSpawnsForSession(EventSession s) {
+        if (s == null) return List.of();
+        String norm = normalizeArenaKey(s.spec.key);
+        List<Location> db = spawnCache.getOrDefault(norm, List.of());
+        if (!db.isEmpty()) return db;
+        if (s.resolvedArenaConfig != null && !s.resolvedArenaConfig.spawns().isEmpty()) {
+            return s.resolvedArenaConfig.spawns();
+        }
+        return List.of();
+    }
+
+    /** Next KOTH respawn: DB/YAML arena spawns round-robin, else SMP {@link #getWorldSpawn()}. */
+    private Location pickKothRespawnLocation(EventSession s) {
+        if (s == null) return getWorldSpawn();
+        List<Location> spawns = getArenaSpawnsForSession(s);
+        if (spawns.isEmpty()) return getWorldSpawn();
+        int idx = Math.floorMod(s.kothSpawnCursor.getAndIncrement(), spawns.size());
+        Location loc = spawns.get(idx);
+        return loc != null ? loc.clone() : getWorldSpawn();
     }
 
     private static String normalizeArenaKey(String arenaKeyRaw) {
         String key = normalizeEventKey(arenaKeyRaw);
         if ("duels".equals(key) || "hardcore_duels".equals(key)) return "duels";
         if ("ffa".equals(key) || "hardcore_ffa".equals(key) || "hardcore".equals(key)) return "ffa";
+        if ("hardcore_koth".equals(key)) return "koth";
         return key;
     }
 
     private static boolean isValidArenaKey(String normalised) {
-        return "ffa".equals(normalised) || "duels".equals(normalised);
+        return "ffa".equals(normalised) || "duels".equals(normalised) || "koth".equals(normalised);
     }
 
     // ── World helpers ─────────────────────────────────────────────────────────
@@ -1311,51 +1893,6 @@ public final class EventEngine {
                 + ":" + loc.getYaw() + ":" + loc.getPitch();
     }
 
-    // ── Chat event helpers ────────────────────────────────────────────────────
-
-    private String pickScrabbleWord() {
-        List<String> words = plugin.getConfig().getStringList("event_mode.chat.scrabble_words");
-        if (words == null || words.isEmpty()) words = List.of("minecraft", "diamond", "creeper", "survival", "jebaited");
-        return words.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(words.size())).toLowerCase(Locale.ROOT).trim();
-    }
-
-    private String scramble(String word) {
-        List<Character> chars = new ArrayList<>();
-        for (char c : word.toCharArray()) chars.add(c);
-        Collections.shuffle(chars);
-        StringBuilder sb = new StringBuilder(chars.size());
-        for (char c : chars) sb.append(c);
-        String out = sb.toString();
-        if (out.equalsIgnoreCase(word) && out.length() > 1) return new StringBuilder(out).reverse().toString();
-        return out;
-    }
-
-    private record Quiz(String question, String answer) {}
-
-    private Quiz pickQuiz() {
-        var sec = plugin.getConfig().getConfigurationSection("event_mode.chat.quiz");
-        if (sec == null || sec.getKeys(false).isEmpty()) {
-            return new Quiz("What dimension do you need Eyes of Ender for?", "end");
-        }
-        List<String> keys = new ArrayList<>(sec.getKeys(false));
-        String pick = keys.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(keys.size()));
-        String q = sec.getString(pick + ".question", "What item summons the Wither?");
-        String a = sec.getString(pick + ".answer", "soul sand");
-        return new Quiz(q, normalizeAnswer(a));
-    }
-
-    private static String normalizeAnswer(String value) {
-        if (value == null) return "";
-        return value.toLowerCase(Locale.ROOT).trim().replaceAll("[^a-z0-9]", "");
-    }
-
-    private static boolean matchesAnswer(String guess, String expected) {
-        if (guess.isBlank() || expected.isBlank()) return false;
-        if (guess.equals(expected)) return true;
-        if (expected.startsWith(guess) && guess.length() >= 3) return true;
-        return guess.contains(expected);
-    }
-
     // ── Task management ───────────────────────────────────────────────────────
 
     private void stopAutoTask() {
@@ -1388,17 +1925,10 @@ public final class EventEngine {
     }
 
     private void broadcast(String legacy) {
-        String prefix = plugin.getConfig().getString("event_mode.broadcast_prefix", "&9[&dEVENT&9] &f");
-        String message = ChatColor.translateAlternateColorCodes('&', prefix + legacy);
-        if (plugin instanceof JebaitedCore core) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                PlayerProfile profile = core.getProfileStore().getOrCreate(player, core.getRankManager().getDefaultGroup());
-                if (profile != null && !profile.isEventNotificationsEnabled()) continue;
-                if (profile != null && session != null && !profile.isEventCategoryEnabled(session.spec.key)) continue;
-                player.sendMessage(message);
-            }
+        if (session != null) {
+            EventNotifications.broadcastCategory(plugin, session.spec.key, legacy);
         } else {
-            Bukkit.broadcastMessage(message);
+            EventNotifications.broadcastCategoryOptional(plugin, null, legacy);
         }
     }
 }

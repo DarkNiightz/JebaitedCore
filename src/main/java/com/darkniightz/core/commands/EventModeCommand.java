@@ -39,6 +39,13 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
     }
     private static final List<String> KOTH_ACTIONS  = List.of("pos1", "pos2");
     private static final List<String> SPAWN_ACTIONS = List.of("addspawn", "clearspawns", "listspawns", "view");
+    /** Tab completions for {@code /event setup koth|hardcore_koth …}. */
+    private static final List<String> KOTH_SETUP_ACTIONS;
+    static {
+        List<String> k = new ArrayList<>(KOTH_ACTIONS);
+        k.addAll(SPAWN_ACTIONS);
+        KOTH_SETUP_ACTIONS = List.copyOf(k);
+    }
 
     private final EventModeManager eventModeManager;
     private final ProfileStore profiles;
@@ -65,6 +72,12 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         if (devMode != null && devMode.isActive(p.getUniqueId())) return true;
         var profile = profiles.getOrCreate(p, ranks.getDefaultGroup());
         return profile != null && ranks.isAtLeast(profile.getPrimaryRank(), "srmod");
+    }
+
+    private boolean isHelper(Player p) {
+        if (devMode != null && devMode.isActive(p.getUniqueId())) return true;
+        var profile = profiles.getOrCreate(p, ranks.getDefaultGroup());
+        return profile != null && ranks.isAtLeast(profile.getPrimaryRank(), "helper");
     }
 
     //  Command 
@@ -102,6 +115,31 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if ("info".equals(sub)) {
+            sender.sendMessage(Messages.prefixed(eventModeManager.getEventInfoSummary()));
+            return true;
+        }
+
+        if ("spectate".equals(sub)) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(Messages.prefixed("§cOnly players can spectate."));
+                return true;
+            }
+            if (!isHelper(player)) {
+                sender.sendMessage(Messages.noPerm());
+                return true;
+            }
+            String spectSub = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "enter";
+            if ("leave".equals(spectSub) || "quit".equals(spectSub) || "exit".equals(spectSub)) {
+                var r = eventModeManager.staffSpectateLeave(player);
+                sender.sendMessage(Messages.prefixed(r.message()));
+            } else {
+                var r = eventModeManager.staffSpectateEnter(player);
+                sender.sendMessage(Messages.prefixed(r.message()));
+            }
+            return true;
+        }
+
         //  Staff gate: srmod+ 
         if (sender instanceof Player p && !isSrmod(p)) {
             sender.sendMessage(Messages.noPerm());
@@ -112,7 +150,8 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         boolean adminOnly = sub.equals("setup") || sub.equals("rebuildworld")
                 || sub.equals("resetworld") || sub.equals("wipeworld")
                 || sub.equals("tp") || sub.equals("teleport")
-                || sub.equals("world") || sub.equals("edit");
+                || sub.equals("world") || sub.equals("edit")
+                || sub.equals("setreward") || sub.equals("arenas");
         if (adminOnly && sender instanceof Player p && !isAdmin(p)) {
             sender.sendMessage(Messages.noPerm());
             return true;
@@ -153,8 +192,38 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
                     sendStartUsage(sender, label);
                     return true;
                 }
-                var result = eventModeManager.startEvent(args[1]);
+                var result = args.length >= 3
+                        ? eventModeManager.startEvent(args[1], args[2])
+                        : eventModeManager.startEvent(args[1]);
                 sender.sendMessage(Messages.prefixed(result.message()));
+                return true;
+            }
+
+            case "setreward" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Messages.prefixed("§eUsage: §f/" + label + " setreward <coins>"));
+                    return true;
+                }
+                try {
+                    int coins = Integer.parseInt(args[1]);
+                    var result = eventModeManager.setRuntimeCoinReward(coins);
+                    sender.sendMessage(Messages.prefixed(result.message()));
+                } catch (NumberFormatException ex) {
+                    sender.sendMessage(Messages.prefixed("§cCoins must be a number."));
+                }
+                return true;
+            }
+
+            case "arenas" -> {
+                List<String> lines = eventModeManager.listArenaRegistryLines();
+                if (lines.isEmpty()) {
+                    sender.sendMessage(Messages.prefixed("§7No arenas in §fevent_mode.arena_registry§7."));
+                } else {
+                    sender.sendMessage(Messages.prefixed("§dArena registry §8(" + lines.size() + ")"));
+                    for (String line : lines) {
+                        sender.sendMessage(Messages.prefixed(line));
+                    }
+                }
                 return true;
             }
 
@@ -238,15 +307,23 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
                 if ("hardcore".equals(type)) type = "hardcore_ffa";
 
                 if (KOTH_TYPES.contains(type)) {
-                    if (args.length < 3
-                            || (!"pos1".equals(args[2].toLowerCase(Locale.ROOT))
-                             && !"pos2".equals(args[2].toLowerCase(Locale.ROOT)))) {
+                    if (args.length < 3) {
                         sender.sendMessage(Messages.prefixed(
-                            "§eUsage: §f/" + label + " setup " + type + " <pos1|pos2>"));
+                                "§eUsage: §f/" + label + " setup " + type
+                                        + " <pos1|pos2|addspawn|clearspawns|listspawns|view [s]>"));
                         return true;
                     }
-                    var result = eventModeManager.setupKothPosition(p, "pos1".equals(args[2].toLowerCase(Locale.ROOT)));
-                    sender.sendMessage(Messages.prefixed(result.message()));
+                    String action = args[2].toLowerCase(Locale.ROOT);
+                    if ("pos1".equals(action) || "pos2".equals(action)) {
+                        var result = eventModeManager.setupKothPosition(p, "pos1".equals(action));
+                        sender.sendMessage(Messages.prefixed(result.message()));
+                        return true;
+                    }
+                    if (SPAWN_ACTIONS.contains(action)) {
+                        return handleArenaSetup(p, sender, label, type, action, args);
+                    }
+                    sender.sendMessage(Messages.prefixed(
+                            "§cUnknown action. Use §fpos1§c/§fpos2§c for the hill box, or §faddspawn§c/§fclearspawns§c/§flistspawns§c/§fview§c for player spawns."));
                     return true;
                 }
 
@@ -320,16 +397,20 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(helpHeader("Event Control  /" + label));
         sender.sendMessage(helpSection("Info"));
         sender.sendMessage(helpEntry(label, "status",               "",               "Current event state"));
+        sender.sendMessage(helpEntry(label, "info",                 "",               "Kind, arena, queue, participants"));
+        sender.sendMessage(helpEntry(label, "spectate",             "[leave]",        "Helper+ visit running event as spectator"));
         sender.sendMessage(helpEntry(label, "list",                 "",               "All configured events (clickable)"));
         sender.sendMessage(helpSection("Queue"));
         sender.sendMessage(helpEntry(label, "join",                 "",               "Join the event queue"));
         sender.sendMessage(helpEntry(label, "join confirm",         "",               "Confirm HC join  items at risk"));
         sender.sendMessage(helpEntry(label, "leave",                "",               "Leave the event queue"));
         sender.sendMessage(helpSection("Lifecycle  (srmod+)"));
-        sender.sendMessage(helpEntry(label, "start",                "<event>",        "Open lobby for a named event"));
+        sender.sendMessage(helpEntry(label, "start",                "<event> [arena]", "Open lobby (optional arena_registry key)"));
         sender.sendMessage(helpEntry(label, "stop",                 "",               "Stop the active event"));
         sender.sendMessage(helpEntry(label, "forcestart",           "",               "Skip lobby countdown"));
         sender.sendMessage(helpEntry(label, "complete",             "<name> [coins]", "Declare winner + optional coin override"));
+        sender.sendMessage(helpEntry(label, "setreward",            "<coins>",        "Override coin reward (running event)"));
+        sender.sendMessage(helpEntry(label, "arenas",               "",               "List YAML arena_registry entries"));
         sender.sendMessage(helpSection("Setup  (admin)"));
         sender.sendMessage(helpEntry(label, "setup",                "<type> ...",     "Arena/hill config  see /" + label + " setup"));
         sender.sendMessage(helpEntry(label, "tp",                   "",               "Teleport to event world"));
@@ -338,9 +419,9 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
 
     private void sendSetupHelp(CommandSender sender, String label) {
         sender.sendMessage(helpHeader("Event Setup  /" + label + " setup"));
-        sender.sendMessage(helpSection("KOTH  define the hill cuboid with two corners"));
-        sender.sendMessage(helpEntry(label, "setup koth",           "<pos1|pos2>",    "Standard KOTH hill corners"));
-        sender.sendMessage(helpEntry(label, "setup hardcore_koth",  "<pos1|pos2>",    "Hardcore KOTH hill corners"));
+        sender.sendMessage(helpSection("KOTH  hill cuboid (pos1/pos2) + ring spawns (addspawn…)"));
+        sender.sendMessage(helpEntry(label, "setup koth",           "<pos1|pos2|spawns…>", "Hill corners and/or player spawn ring"));
+        sender.sendMessage(helpEntry(label, "setup hardcore_koth",  "<pos1|pos2|spawns…>", "HC KOTH hill + spawns"));
         sender.sendMessage(helpSection("Arena  add/manage individual spawn points"));
         sender.sendMessage(helpEntry(label, "setup ffa",            "<addspawn|clearspawns|listspawns|view>", "FFA spawn points"));
         sender.sendMessage(helpEntry(label, "setup duels",          "<addspawn|clearspawns|listspawns|view>", "Duels spawn points"));
@@ -389,12 +470,23 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         String typing = args.length > 0 ? args[args.length - 1].toLowerCase(Locale.ROOT) : "";
 
         if (args.length == 1) {
-            List<String> opts = new ArrayList<>(List.of("join", "leave", "status"));
+            List<String> opts = new ArrayList<>(List.of("join", "leave", "status", "info"));
+            if (sender instanceof Player p) {
+                if (isHelper(p)) {
+                    opts.add("spectate");
+                }
+            }
             if (!(sender instanceof Player p) || isSrmod(p)) {
                 opts.addAll(List.of("list", "start", "stop", "forcestart",
-                                    "complete", "setup", "tp", "rebuildworld"));
+                                    "complete", "setup", "tp", "rebuildworld",
+                                    "setreward", "arenas"));
             }
             return StringUtil.copyPartialMatches(typing, opts, new ArrayList<>());
+        }
+
+        if (args.length == 2 && "spectate".equalsIgnoreCase(args[0])
+                && sender instanceof Player ph && isHelper(ph) && !isSrmod(ph)) {
+            return StringUtil.copyPartialMatches(typing, List.of("leave", "quit", "exit"), new ArrayList<>());
         }
 
         // All deeper completions require srmod+
@@ -427,15 +519,20 @@ public class EventModeCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && "setup".equals(sub)) {
             String type = "hardcore".equals(arg1) ? "hardcore_ffa" : arg1;
             if (KOTH_TYPES.contains(type))
-                return StringUtil.copyPartialMatches(typing, KOTH_ACTIONS, new ArrayList<>());
+                return StringUtil.copyPartialMatches(typing, KOTH_SETUP_ACTIONS, new ArrayList<>());
             if (ARENA_TYPES.contains(type))
                 return StringUtil.copyPartialMatches(typing, SPAWN_ACTIONS, new ArrayList<>());
         }
 
         if (args.length == 4 && "setup".equals(sub)
-                && ARENA_TYPES.contains(arg1) && "view".equals(arg2)) {
+                && (ARENA_TYPES.contains(arg1) || KOTH_TYPES.contains(arg1)) && "view".equals(arg2)) {
             return StringUtil.copyPartialMatches(typing,
                 List.of("30", "60", "120"), new ArrayList<>());
+        }
+
+        if (args.length == 3 && ("start".equals(sub) || "on".equals(sub) || "enable".equals(sub))) {
+            return StringUtil.copyPartialMatches(typing,
+                    eventModeManager.listArenaKeysForKind(arg1), new ArrayList<>());
         }
 
         return List.of();

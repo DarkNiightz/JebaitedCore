@@ -6,6 +6,7 @@ import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
 import com.darkniightz.core.ranks.RankManager.RankStyle;
+import com.darkniightz.core.permissions.PermissionConstants;
 import com.darkniightz.core.system.NicknameManager;
 import com.darkniightz.main.JebaitedCore;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -86,6 +87,13 @@ public class ChatListener implements Listener {
         if (moderation.inStaffChat(sender.getUniqueId())) {
             Component original = event.message();
             String plain = PlainTextComponentSerializer.plainText().serialize(original);
+            boolean looksLikeStaffCmd = plain.startsWith("/");
+            if (!looksLikeStaffCmd && plugin instanceof JebaitedCore core) {
+                var discord = core.getDiscordIntegrationService();
+                if (discord != null) {
+                    discord.notifyChatRelay(sender.getUniqueId(), sender.getName(), plain, "staff");
+                }
+            }
             String msg = "§d[Staff] §7" + sender.getName() + ": §f" + plain;
             event.setCancelled(true);
             for (var viewer : sender.getServer().getOnlinePlayers()) {
@@ -132,6 +140,18 @@ public class ChatListener implements Listener {
         // Safety: if somehow a message starting with '/' reaches here, don't track as chat
         boolean looksLikeCommand = plain.startsWith("/");
         String coloredMessage = (isAqua ? aquaCode : defaultCode) + plain;
+
+        if (!looksLikeCommand && plugin instanceof JebaitedCore core) {
+            var discord = core.getDiscordIntegrationService();
+            if (discord != null) {
+                String bridge = "global";
+                if (plugin.getConfig().getBoolean("integrations.discord.relay_faction_channel_enabled", false)
+                        && sender.hasPermission(PermissionConstants.DISCORD_BRIDGE_FACTION)) {
+                    bridge = "faction";
+                }
+                discord.notifyChatRelay(sender.getUniqueId(), sender.getName(), plain, bridge);
+            }
+        }
 
         // Tracking: increment on the main thread to avoid async/cache race misses.
         if (!looksLikeCommand && plugin instanceof org.bukkit.plugin.java.JavaPlugin jp) {

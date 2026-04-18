@@ -36,7 +36,7 @@ public class EventModeChatListener implements Listener {
         // Correct answer consumes chat message to keep event clear and avoid duplicated spam.
         event.setCancelled(true);
         Bukkit.getScheduler().runTask(plugin, () ->
-            player.sendMessage(com.darkniightz.core.Messages.prefixed("§aCorrect! You completed the event."))
+            player.sendMessage(com.darkniightz.core.Messages.prefixed("§aCorrect! You won the chat game."))
         );
     }
 }

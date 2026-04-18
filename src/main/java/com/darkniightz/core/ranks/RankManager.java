@@ -186,6 +186,14 @@ public class RankManager {
         return rankIndex.containsKey(key);
     }
 
+    /** True if the group exists on the configured ladder (case-insensitive). Does not map unknown names to default. */
+    public boolean isRecognizedRank(String rank) {
+        if (rank == null || rank.isBlank()) {
+            return false;
+        }
+        return ladderContains(rank.trim().toLowerCase(Locale.ROOT));
+    }
+
     public static final class RankStyle {
         public final String prefix;
         public final boolean rainbow;

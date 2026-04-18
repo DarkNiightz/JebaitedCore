@@ -4,13 +4,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.Plugin;
 
 /**
  * Intercepts fatal damage for event participants so they NEVER actually die.
  * Cancelling the damage event means no death screen, no respawn sequence, no DO_IMMEDIATE_RESPAWN
- * fight. The engine decides what happens next (spectator for FFA/Duels, world-spawn for KOTH).
+ * fight. The engine decides what happens next (spectator for FFA/Duels, KOTH ring spawns or world spawn).
  */
 public class EventModeCombatListener implements Listener {
     private final EventModeManager manager;
@@ -29,6 +30,10 @@ public class EventModeCombatListener implements Listener {
         if (player.getHealth() - event.getFinalDamage() > 0) return;
         // Cancel the killing blow — player stays alive, zero death screen, zero respawn dance
         event.setCancelled(true);
-        manager.handleParticipantFatalDamage(player);
+        Player killer = null;
+        if (event instanceof EntityDamageByEntityEvent by && by.getDamager() instanceof Player damager) {
+            killer = damager;
+        }
+        manager.handleParticipantFatalDamage(player, killer);
     }
 }

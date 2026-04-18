@@ -29,6 +29,10 @@ public class PlayerProfile {
     public static final String PREF_DEATH_MESSAGES = "death_messages";
     public static final String PREF_EVENT_NOTIFICATIONS = "event_notifications";
     public static final String PREF_EVENT_PREFIX = "event_";
+    /** full | some | none — boss bars + titles intensity (see PresentationPreference). */
+    public static final String PREF_SCREEN_EFFECTS = "screen_effects";
+    /** Server shop: confirm GUI before shift-buying a full stack (Gameplay settings). */
+    public static final String PREF_SHOP_STACK_CONFIRM = "shop_stack_buy_confirm";
 
     private final UUID uuid;
     private final String name;
@@ -67,6 +71,8 @@ public class PlayerProfile {
     private double balance; // Main economy balance
     private String activeTag;
     private String language = "en";
+    /** Boss bar + title intensity: full, some, none. */
+    private String screenEffectsMode = "full";
     private final Map<String, Boolean> preferences = new LinkedHashMap<>();
 
     // Session-only timestamps for auto-off timers (not persisted yet)
@@ -390,6 +396,34 @@ public class PlayerProfile {
             default -> { setScoreboardMode("normal"); yield "normal"; }
         };
     }
+
+    /** Returns full, some, or none. */
+    public String getScreenEffectsMode() {
+        if (screenEffectsMode == null || screenEffectsMode.isBlank()) return "full";
+        return switch (screenEffectsMode.toLowerCase(Locale.ROOT)) {
+            case "none", "some" -> screenEffectsMode.toLowerCase(Locale.ROOT);
+            default -> "full";
+        };
+    }
+
+    public void setScreenEffectsMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            screenEffectsMode = "full";
+            return;
+        }
+        String m = mode.toLowerCase(Locale.ROOT);
+        screenEffectsMode = ("none".equals(m) || "some".equals(m)) ? m : "full";
+    }
+
+    /** Cycles full → some → none → full. */
+    public String cycleScreenEffectsMode() {
+        return switch (getScreenEffectsMode()) {
+            case "full" -> { setScreenEffectsMode("some"); yield "some"; }
+            case "some" -> { setScreenEffectsMode("none"); yield "none"; }
+            default -> { setScreenEffectsMode("full"); yield "full"; }
+        };
+    }
+
     public boolean isJoinLeaveMessagesEnabled() { return getPreference(PREF_JOIN_LEAVE_MESSAGES, true); }
     public boolean isDeathMessagesEnabled() { return getPreference(PREF_DEATH_MESSAGES, true); }
     public boolean isEventNotificationsEnabled() { return getPreference(PREF_EVENT_NOTIFICATIONS, true); }
@@ -426,6 +460,8 @@ public class PlayerProfile {
             String value = line.substring(eq + 1).trim();
             if ("language".equals(key)) {
                 setLanguage(value);
+            } else if (PREF_SCREEN_EFFECTS.equals(key) || "screen_effects".equals(key)) {
+                setScreenEffectsMode(value);
             } else if (PREF_SCOREBOARD_MODE.equals(key)) {
                 setScoreboardMode(value);
             } else if (PREF_SCOREBOARD.equals(key) && !Boolean.parseBoolean(value)) {
@@ -439,6 +475,7 @@ public class PlayerProfile {
     public String serializePreferences() {
         StringBuilder out = new StringBuilder();
         out.append("language=").append(getLanguage());
+        out.append('\n').append(PREF_SCREEN_EFFECTS).append('=').append(getScreenEffectsMode());
         out.append('\n').append(PREF_SCOREBOARD_MODE).append('=').append(getScoreboardMode());
         for (Map.Entry<String, Boolean> entry : preferences.entrySet()) {
             if (entry.getKey() == null || entry.getKey().isBlank()) continue;

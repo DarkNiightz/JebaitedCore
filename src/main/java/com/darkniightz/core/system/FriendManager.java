@@ -5,6 +5,7 @@ import com.darkniightz.core.chat.ChatUtil;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
+import com.darkniightz.main.JebaitedCore;
 import com.darkniightz.main.database.DatabaseManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -280,5 +281,15 @@ public class FriendManager {
     /** Wraps a legacy-formatted string into an Adventure Component. */
     private static Component legacy(String text) {
         return LegacyComponentSerializer.legacySection().deserialize(text);
+    }
+
+    /**
+     * Accumulates {@code friendship_stats.party_time_ms} for a pair when they were in the same party.
+     * Skips when DB is disabled. Runs the write asynchronously.
+     */
+    public void addPartyTimeTogetherAsync(UUID a, UUID b, long deltaMs) {
+        if (deltaMs <= 0) return;
+        if (!(plugin instanceof JebaitedCore core) || !core.getDatabaseManager().isEnabled()) return;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> dao.addPartyTimeTogether(a, b, deltaMs));
     }
 }

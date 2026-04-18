@@ -84,6 +84,87 @@ near:
   min_rank: vip
   radius: 200
 
+# Optional integrations (mcMMO is soft-depend — upgrade mcMMO on staging first; see README)
+integrations:
+  mcmmo:
+    # On enable, log a one-line getPowerLevel probe for the first online player (ops / staging)
+    bridge_self_test: false
+  discord:
+    enabled: true
+    guild_id: ""
+    # Bot HTTP base (plugin -> signed webhooks). Same host as bot container if using Docker.
+    bot_api_base_url: "http://127.0.0.1:8787"
+    # Must match bot JB_WEBHOOK_SECRET / bot-config security.webhook_hmac_secret
+    webhook_hmac_secret: "CHANGE_ME"
+    link_code_ttl_seconds: 900
+    relay_channel: "jebaited.discord.relay"
+    # Mirror in-game chat → Discord (global / optionally staff / faction) per bot-config channels.
+    relay_chat: false
+    relay_chat_global_min_ms: 200
+    relay_chat_per_player_min_ms: 800
+    # When true, players with permission jebaited.discord.bridge.faction use the faction relay channel.
+    relay_faction_channel_enabled: false
+    # Paper HTTP API for bot → server (bind localhost; reverse-proxy or docker publish as needed).
+    inbound:
+      enabled: true
+      # 0.0.0.0 so Discord bot / Stripe (Docker network) can reach Paper; firewall host as needed
+      bind_host: "0.0.0.0"
+      bind_port: 8789
+      # Shared secret: bot PluginBridgeClient sends Authorization: Bearer <token> (must match bot config)
+      api_token: "CHANGE_ME"
+    # Mirror Bukkit log lines to Discord (rate-limited). Off by default.
+    console_mirror_enabled: false
+    # Allow Discord console channel (developers) to run server commands via bot. Requires inbound + bot role.
+    console_commands_enabled: false
+    # Sample interval for /activity chart (default 6000 = 5 minutes)
+    activity_sample_interval_ticks: 6000
+  redis:
+    enabled: false
+    uri: "redis://127.0.0.1:6379"
+    events_channel: "jebaited.events"
+  webhooks:
+    request_timeout_ms: 3000
+    max_skew_seconds: 120
+
+# In-game Stripe store (/donate). Requires DB migration V010, Stripe keys (env recommended), and webhook URL → Paper.
+store:
+  enabled: true
+  menu_title: "§8Support the server"
+  stripe:
+    enabled: true
+    # Prefer environment variables STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (test mode keys on staging).
+    secret_key: ""
+    webhook_secret: ""
+    success_url: "https://example.com/store/success?session_id={CHECKOUT_SESSION_ID}"
+    cancel_url: "https://example.com/store/cancel"
+  # Used only when Discord inbound is off but Stripe webhooks are on (same defaults as discord.inbound).
+  http:
+    bind_host: "0.0.0.0"
+    bind_port: 8789
+  packages:
+    - id: gold_rank
+      display_name: "Gold rank"
+      description: "Donor tier + standard donor perks"
+      amount_cents: 999
+      currency: usd
+      min_rank_to_purchase: ""
+      grants:
+        donor_rank: gold
+    - id: coins_500
+      display_name: "500 Cosmetic Coins"
+      description: "Wardrobe and cosmetics"
+      amount_cents: 499
+      currency: usd
+      grants:
+        cosmetic_coins: 500
+    - id: starter_cash
+      display_name: "50k SMP balance"
+      description: "In-game economy grant"
+      amount_cents: 299
+      currency: usd
+      grants:
+        economy: 50000
+
 # Donor kits — cooldown applies to each kit independently
 # Valid range: 0 to 604800000 (7 days). Default is 86400000 (24 hours).
 kits:
@@ -206,7 +287,42 @@ bossbar:
     - "This is a test"
     - "Another Config TesTTTTTT"
 
+# Chat mini-games (parallel to combat /event). Word lists + quiz stay under event_mode.chat below.
+chat_games:
+  automation:
+    enabled: true
+    interval_seconds: 180
+  games:
+    chat_math:
+      enabled: true
+      display_name: "Chat Game: Math Question"
+      target_server: "SMP"
+      coin_reward: 50
+    chat_scrabble:
+      enabled: true
+      display_name: "Chat Game: Scrabble"
+      target_server: "SMP"
+      coin_reward: 35
+    chat_quiz:
+      enabled: true
+      display_name: "Chat Game: Quiz"
+      target_server: "SMP"
+      coin_reward: 40
+
 event_mode:
+  # Optional structured arenas (spawns + KOTH hill + CTF layout). DB spawns from /event setup still override YAML when present.
+  # See ROADMAP §21 for full schema. Keys under each list must be unique per kind.
+  # CTF example (per-arena row): ctf: { red_spawn, blue_spawn, red_flag, blue_flag, win_score, flag_return_seconds,
+  #   red_kit: [ { material: IRON_SWORD, amount: 1 }, { material: LEATHER_HELMET, amount: 1, equip: HEAD } ]
+  #   blue_kit: [ ... ] }
+  arena_registry:
+    ffa: []
+    duels: []
+    koth: []
+    hardcore_koth: []
+    ctf: []
+  ctf:
+    duration_seconds: 600
   automation:
     enabled: true
   interval-seconds: 300
@@ -272,24 +388,19 @@ event_mode:
       coin_reward: 200
       min_players: 2
       max_players: 32
-    chat_scrabble:
-      enabled: true
-      display_name: "Chat Game: Scrabble"
+    ctf:
+      enabled: false
+      display_name: "Capture The Flag"
       target_server: "SMP"
-      coin_reward: 35
-    chat_math:
-      enabled: true
-      display_name: "Chat Game: Math Question"
-      target_server: "SMP"
-      coin_reward: 50
-    chat_quiz:
-      enabled: true
-      display_name: "Chat Game: Quiz"
-      target_server: "SMP"
-      coin_reward: 40
+      coin_reward: 120
+      min_players: 4
+      max_players: 16
   koth:
     duration_seconds: 120
     world: "smp"
+    # Hill: /event setup koth pos1|pos2 (or arena_registry.<koth|hardcore_koth>.hill)
+    # Player spawns (ring around the hill): /event setup koth addspawn|listspawns|…
+    #   and/or event_mode.arena_registry.koth / hardcore_koth spawns: in YAML
     # Configure with /event setup koth pos1 and /event setup koth pos2
     # pos1:
     #   x: 0
@@ -366,6 +477,17 @@ scoreboard:
   update_ticks: 40
   nametag_max_length: 48
   nametag_extra_format: " §8• §d{tag}"
+  tablist:
+    enabled: true
+    interval_seconds: 10
+    progress_bar_length: 20
+    # staff-only clean mode for users with jebaited.tablist.hide
+    hidden_footer: "&fJebaited Network"
+    categories:
+      - help
+      - store
+      - discord
+      - network
 
 # Join/Quit Messages
 join-quit:
@@ -388,6 +510,15 @@ economy:
   pay:
     enabled: true
     min_amount: 0.01
+
+# Server balance shop (ROADMAP §17) — prices in DB; seed rows when table is empty
+server_shop:
+  seed_on_empty: true
+  menu_title: "§8Server Shop"
+  confirm_title: "§8Confirm stack purchase"
+  # Min ms between buy/sell actions (spam guard). Donors get donor_rate_limit_ms (rank store / any donor rank).
+  rate_limit_ms: 120
+  donor_rate_limit_ms: 0
 
 homes:
   teleport_delay_seconds: 0

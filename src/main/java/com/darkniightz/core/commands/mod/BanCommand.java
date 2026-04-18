@@ -2,6 +2,7 @@ package com.darkniightz.core.commands.mod;
 
 import com.darkniightz.core.Messages;
 import com.darkniightz.core.dev.DevModeManager;
+import com.darkniightz.core.moderation.ModerationLimits;
 import com.darkniightz.core.moderation.ModerationLogger;
 import com.darkniightz.core.moderation.TimeUtil;
 import com.darkniightz.core.players.PlayerProfile;
@@ -99,6 +100,16 @@ public class BanCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Messages.prefixed("§cInvalid duration: §e" + args[1]));
                 return true;
             }
+            if (sender instanceof Player pl) {
+                PlayerProfile actor = profiles.getOrCreate(pl, ranks.getDefaultGroup());
+                boolean bypass = devMode != null && devMode.isActive(pl.getUniqueId());
+                if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")
+                        && dur > ModerationLimits.HELPER_MAX_TEMP_MS) {
+                    sender.sendMessage(Messages.prefixed(
+                            "§eHelpers may temp-ban for at most §f7d§e. Duration capped."));
+                    dur = ModerationLimits.HELPER_MAX_TEMP_MS;
+                }
+            }
             String reason = args.length >= 3 ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length)) : "Temporarily banned";
             long until = System.currentTimeMillis() + dur;
             final OfflinePlayer ftarget2 = target;
@@ -128,7 +139,9 @@ public class BanCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player p)) return List.of();
         PlayerProfile actor = profiles.getOrCreate(p, ranks.getDefaultGroup());
         boolean bypass = devMode != null && devMode.isActive(p.getUniqueId());
-        if (!bypass && !ranks.isAtLeast(actor.getPrimaryRank(), "helper")) return List.of();
+        if (!bypass && (permanentOnly
+                ? !ranks.isAtLeast(actor.getPrimaryRank(), "moderator")
+                : !ranks.isAtLeast(actor.getPrimaryRank(), "helper"))) return List.of();
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return Bukkit.getOnlinePlayers().stream()

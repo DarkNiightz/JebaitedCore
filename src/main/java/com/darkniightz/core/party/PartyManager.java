@@ -1,6 +1,7 @@
 package com.darkniightz.core.party;
 
 import com.darkniightz.core.Messages;
+import com.darkniightz.main.JebaitedCore;
 import com.darkniightz.core.players.PlayerProfile;
 import com.darkniightz.core.players.ProfileStore;
 import com.darkniightz.core.ranks.RankManager;
@@ -15,8 +16,10 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +88,7 @@ public final class PartyManager {
     }
 
     private void disbandInternal(Party party, String reason) {
+        flushPartyTimeDisband(party);
         broadcast(party, reason);
         for (UUID uuid : Set.copyOf(party.getMembers())) memberIndex.remove(uuid);
         parties.remove(party.getId());
@@ -426,9 +430,36 @@ public final class PartyManager {
     }
 
     private void removeMemberInternal(Party party, UUID uuid) {
+        flushPartyTimeForLeaving(party, uuid);
         party.removeMember(uuid);
         memberIndex.remove(uuid);
         if (party.size() <= 1) disbandInternal(party, "cNot enough members  party disbanded.");
+    }
+
+    private void flushPartyTimeDisband(Party party) {
+        List<UUID> mem = new ArrayList<>(party.memberSnapshot());
+        for (int i = 0; i < mem.size(); i++) {
+            for (int j = i + 1; j < mem.size(); j++) {
+                flushPartyTimeForPair(mem.get(i), mem.get(j), party);
+            }
+        }
+    }
+
+    private void flushPartyTimeForLeaving(Party party, UUID leaving) {
+        for (UUID other : party.memberSnapshot()) {
+            if (other.equals(leaving)) continue;
+            flushPartyTimeForPair(leaving, other, party);
+        }
+    }
+
+    private void flushPartyTimeForPair(UUID u1, UUID u2, Party party) {
+        if (u1.equals(u2)) return;
+        long now = System.currentTimeMillis();
+        long overlapMs = Math.max(0L, now - Math.max(party.joinedAtMs(u1), party.joinedAtMs(u2)));
+        if (overlapMs <= 0L) return;
+        if (!(plugin instanceof JebaitedCore core)) return;
+        if (!core.getDatabaseManager().isEnabled()) return;
+        core.getFriendManager().addPartyTimeTogetherAsync(u1, u2, overlapMs);
     }
 
     private Party findInvitePartyFor(UUID invitee, String inviterName) {
