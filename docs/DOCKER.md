@@ -78,6 +78,25 @@ docker compose up -d --build
 
 Or move the repo tree to a path **without** spaces.
 
+## Known footguns (do this every time)
+
+- **Compose project drift:** keep `name: jebaitednetwork` on wrapper compose files. If old stacks exist (`mcserver`, `jebaitedcore`), shut them down first to prevent duplicate containers and port conflicts.
+- **Windows BuildKit path issue:** on `Vibe Code` paths, prefer `.\up-build.ps1` from `JebaitedNetwork` so BuildKit is disabled.
+- **mcMMO MySQL host wiring:** in `MC Server/plugins/mcMMO/config.yml`, use `MySQL.Server.Address: mysql` (or reachable alias `jnet-mysql`). `jebaited-mysql` is not a valid alias in the current network.
+- **Post-restart health sequence:**
+  - `docker restart jnet-mc-hub jnet-mc-smp`
+  - `docker ps --format "table {{.Names}}\t{{.Status}}"`
+  - `docker logs jnet-mc-hub --since 90s`
+  - `docker logs jnet-mc-smp --since 90s`
+
+### Next-session checklist
+
+1. Start from `Vibe Code/JebaitedNetwork`.
+2. Use `.\up-build.ps1` on Windows paths with spaces.
+3. Confirm only one compose project is active (`jebaitednetwork`).
+4. After jar/config changes, restart only required containers and verify health/logs.
+5. If mcMMO errors on startup, validate `MC Server/plugins/mcMMO/config.yml` host is `mysql`.
+
 ## Environment file
 
 Create **`JebaitedNetwork/.env`** (see **`JebaitedNetwork/.env.example`** if present).

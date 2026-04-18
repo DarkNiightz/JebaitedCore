@@ -5,17 +5,27 @@ Copy the block below into the first message when starting a **new** chat so cont
 ```
 ## Handoff
 - **Repo:** JebaitedCore (Paper 1.21 plugin). ROADMAP.md is source of truth for intent.
-- **Branch:** (fill)
-- **Last commit / PR:** (fill)
-- **Handoff saved:** 2026-04-18 — **§17 shop** operator-validated: in-game `/shop`, **web panel** connected, **no inventory space** + **insufficient balance** paths OK. **Discord bot + Stripe `/donate` intro shipped**; **Stripe not production-complete** (business profile, live keys, real success/cancel URLs, production webhook) — **parked**.
-- **Intent this phase:** not continuing Discord/Stripe/Docker wiring unless something breaks; **prefer plugin gameplay** (§21 / I2 / parallel mcMMO).
-- **Events update (hardcore):** no join-time inventory wipe; losers' inventory feeds hardcore loot pool on death; winners claim via new `/loot` GUI (`jebaited.loot.use`).
-- **Shipped (prior work, see ROADMAP):** `StoreService`, `/donate` + `DonateMenu`, webhook route, `DiscordInboundHttpService`, bot bridge + slash commands; `Vibe Code\scripts\build-jebaitedcore-docker.ps1` → **`MC Server\plugins`** (hub bind mount). Full §23/§17 detail in [ROADMAP.md](ROADMAP.md).
-- **Optional backlog (when you return):** finish Stripe live; bot → Paper **8789** + matching **`JB_PLUGIN_API_TOKEN`** / `integrations.discord.inbound.api_token` — canonical Docker: **[docs/DOCKER.md](docs/DOCKER.md)** (`JebaitedNetwork/docker-compose.yml`, `.env` there). (Tablist Discord linked-count footer is now wired in `scoreboard.tablist`.)
-- **Working on:** (fill)
-- **Next 1–3 steps:** 1) **§21** — KOTH polish and/or **party-aware `TeamEngine`** + HC-CTF ([ROADMAP.md](ROADMAP.md) **Current focus**). 2) Or scope **I2 Player Shops** / §18 when economy/events APIs feel stable. 3) **Parallel:** mcMMO wrappers (`/mcability`, `/mccooldown`, `/ptp`) per roadmap “Next theme pick”.
-- **Files to open first:** [ROADMAP.md](ROADMAP.md) §21; `[core/eventmode](src/main/java/com/darkniightz/core/eventmode/)`; for I2 later: `[ShopManager](src/main/java/com/darkniightz/core/shop/ShopManager.java)` + `src/main/resources/db/`. **Discord/Stripe ops only if un-parking:** `[DiscordInboundHttpService](src/main/java/com/darkniightz/core/system/DiscordInboundHttpService.java)`, `[PluginBridgeClient](bot-service/src/main/java/com/darkniightz/bot/bridge/PluginBridgeClient.java)`, `[bot-config.yml](bot-service/src/main/resources/bot-config.yml)`.
-- **Verify:** `.\mvnw.cmd -DskipTests compile`; `.\mvnw.cmd -f bot-service/pom.xml -DskipTests package` only if touching bot.
+- **Branch:** `cursor/next-steps-2026-04-18`
+- **Last commit / PR:** `8fa4f15` (server-side parity + persistence hardening). PR open link: https://github.com/DarkNiightz/JebaitedCore/compare/main...cursor/next-steps-2026-04-18?expand=1
+- **Handoff saved:** 2026-04-18 — panel/server parity tranche shipped, plus Docker restart hardening notes captured.
+- **Shipped this session (server-side only):**
+  - Command parity: `setrank` console/RCON path, `/unfreeze` label, `maintenance allow` alias, cosmetics admin RCON commands (`give|take|wipe`).
+  - Hardcore flow: no join wipe, death-to-pool, winner claim via `/loot` GUI.
+  - DB migrations: `V011` moderation lifecycle, `V012` server id columns, `V013` booster/quest tables.
+  - Write-path hardening: moderation status transitions + server stamping, audit log server stamping, immediate rank DB persist fallback logging.
+- **Docker/ops learnings (critical):**
+  - Keep one compose project name: `name: jebaitednetwork` (avoid duplicate stacks/port collisions).
+  - Canonical stack path: `Vibe Code/JebaitedNetwork/docker-compose.yml` and `.env` there.
+  - Windows path with spaces: use `JebaitedNetwork/up-build.ps1` (BuildKit off).
+  - mcMMO MySQL host in `MC Server/plugins/mcMMO/config.yml` must be `mysql` (not `jebaited-mysql`).
+- **Quick restart verify:**
+  - `docker restart jnet-mc-hub jnet-mc-smp`
+  - `docker ps --format "table {{.Names}}\t{{.Status}}"` (hub/smp should become healthy)
+  - `docker logs jnet-mc-hub --since 90s` + `docker logs jnet-mc-smp --since 90s` (look for Paper done + JebaitedCore startup report)
+- **Working on next:** §21 KOTH polish / party-aware TeamEngine + HC-CTF; then I2 Player Shops; parallel mcMMO wrappers.
+- **Next 1–3 steps:** 1) Finish §21 event architecture cleanup (KOTH/CTF flow). 2) Start I2 schema + minimal write paths. 3) Continue mcMMO wrapper parity (`/mcability`, `/mccooldown`, `/ptp`).
+- **Files to open first:** [ROADMAP.md](ROADMAP.md), `src/main/java/com/darkniightz/core/eventmode/`, [docs/DOCKER.md](docs/DOCKER.md), [PlayerProfileDAO](src/main/java/com/darkniightz/main/PlayerProfileDAO.java), [AuditLogService](src/main/java/com/darkniightz/core/system/AuditLogService.java).
+- **Verify:** `.\mvnw.cmd -DskipTests compile`; `docker compose -f docker-compose.ci.yml config`; runtime container health checks above.
 ```
 
 Erase or overwrite the bullets each session so the next run does not inherit stale tasks.
